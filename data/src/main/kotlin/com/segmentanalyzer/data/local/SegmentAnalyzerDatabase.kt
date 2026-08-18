@@ -15,7 +15,7 @@ import com.segmentanalyzer.data.local.entity.SegmentEntity
 
 @Database(
     entities = [RideEntity::class, SegmentEntity::class, RidePointEntity::class, SegmentAttemptEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(RideTypeConverters::class)

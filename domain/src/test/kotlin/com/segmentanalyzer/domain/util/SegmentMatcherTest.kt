@@ -65,7 +65,29 @@ class SegmentMatcherTest {
     }
 
     @Test
-    fun `only the first entry-exit pair is matched on a lapped track`() {
+    fun `every lap on a repeatedly-ridden track is matched, not just the first`() {
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(END_LAT, END_LON, 60, 1_000.0),
+            point(START_LAT, START_LON, 120, 2_000.0),
+            point(END_LAT, END_LON, 170, 3_000.0),
+            point(START_LAT, START_LON, 300, 4_000.0),
+            point(END_LAT, END_LON, 345, 5_000.0),
+        )
+
+        val results = matchAllSegmentPasses(track, START_LAT, START_LON, END_LAT, END_LON)
+
+        assertEquals(3, results.size)
+        assertEquals(0 to 1, results[0].entryIndex to results[0].exitIndex)
+        assertEquals(Duration.ofSeconds(60), results[0].duration)
+        assertEquals(2 to 3, results[1].entryIndex to results[1].exitIndex)
+        assertEquals(Duration.ofSeconds(50), results[1].duration)
+        assertEquals(4 to 5, results[2].entryIndex to results[2].exitIndex)
+        assertEquals(Duration.ofSeconds(45), results[2].duration)
+    }
+
+    @Test
+    fun `matchSegment still returns only the first pass, for callers that only want one`() {
         val track = listOf(
             point(START_LAT, START_LON, 0, 0.0),
             point(END_LAT, END_LON, 60, 1_000.0),
@@ -77,7 +99,22 @@ class SegmentMatcherTest {
 
         assertEquals(0, result?.entryIndex)
         assertEquals(1, result?.exitIndex)
-        assertEquals(Duration.ofSeconds(60), result?.duration)
+    }
+
+    @Test
+    fun `polyline-aware matching also finds every lap`() {
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(END_LAT, END_LON, 60, 1_000.0),
+            point(START_LAT, START_LON, 120, 2_000.0),
+            point(END_LAT, END_LON, 170, 3_000.0),
+        )
+
+        val results = matchAllSegmentPasses(track, START_LAT, START_LON, END_LAT, END_LON, polyline = STRAIGHT_POLYLINE)
+
+        assertEquals(2, results.size)
+        assertEquals(Duration.ofSeconds(60), results[0].duration)
+        assertEquals(Duration.ofSeconds(50), results[1].duration)
     }
 
     @Test

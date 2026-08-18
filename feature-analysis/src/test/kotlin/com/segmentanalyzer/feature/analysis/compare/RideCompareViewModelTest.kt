@@ -127,6 +127,50 @@ class RideCompareViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `a same-timestamp duplicate isn't auto-picked as previous, but is offered in the picker`() = runTest(dispatcher) {
+        // Re-importing the same FIT file produces two attempts with an identical start time —
+        // "previous" requires strictly-before, so the tie shouldn't resolve to either direction.
+        val sameInstant = Instant.parse("2025-05-13T00:00:00Z")
+        val current = attempt(1, seconds = 108, startTime = sameInstant)
+        val duplicate = attempt(2, seconds = 108, startTime = sameInstant)
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, duplicate))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.chips.size)
+        assertEquals(AttemptRole.CURRENT, state.chips.single().role)
+        assertEquals(null, state.addableAttempts.first { it.id == 2L }.statusLabel)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a same-timestamp duplicate can still be manually added and compared`() = runTest(dispatcher) {
+        val sameInstant = Instant.parse("2025-05-13T00:00:00Z")
+        val current = attempt(1, seconds = 108, startTime = sameInstant)
+        val duplicate = attempt(2, seconds = 108, startTime = sameInstant)
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, duplicate))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onAddClick()
+        viewModel.onAddableAttemptSelected(2L)
+        viewModel.onConfirmAdd()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.chips.size)
+        assertEquals(AttemptRole.SELECTED, state.chips.first { it.attemptId == 2L }.role)
+        assertEquals(1, state.timeGapSeries.size)
+        val totalTimeRow = state.statRows.first { it.label == "Total Time" }
+        // Identical durations — both are "best" (tied), and every stat computes without dividing by zero.
+        assertTrue(totalTimeRow.values.all { it.isBest })
+        collectJob.cancel()
+    }
+
     private fun viewModel(currentAttemptId: Long, attempts: List<SegmentAttempt>): RideCompareViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L, "anchorAttemptId" to currentAttemptId))
         val attemptRepository = FakeCompareSegmentAttemptRepository(attempts)

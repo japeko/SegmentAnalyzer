@@ -12,7 +12,7 @@ import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.util.decodePolyline
-import com.segmentanalyzer.domain.util.matchSegment
+import com.segmentanalyzer.domain.util.matchAllSegmentPasses
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -48,7 +48,7 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
             if (points.isEmpty()) return@withContext 0
             val track = points.map { it.toDomain(0.0) }
 
-            val matches = segmentDao.getAll().mapNotNull { segment -> segment.toAttemptOrNull(rideId, track) }
+            val matches = segmentDao.getAll().flatMap { segment -> segment.toAttempts(rideId, track) }
             segmentAttemptDao.insertIfNew(matches).count { it != -1L }
         }
 
@@ -57,35 +57,37 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
             val segment = segmentDao.getById(segmentId) ?: return@withContext 0
             val rideIds = ridePointDao.rideIdsWithTracks()
 
-            val matches = rideIds.mapNotNull { rideId ->
+            val matches = rideIds.flatMap { rideId ->
                 val track = ridePointDao.pointsForRide(rideId).map { it.toDomain(0.0) }
-                segment.toAttemptOrNull(rideId, track)
+                segment.toAttempts(rideId, track)
             }
             segmentAttemptDao.insertIfNew(matches).count { it != -1L }
         }
 }
 
-private fun SegmentEntity.toAttemptOrNull(rideId: Long, track: List<TrackPoint>): SegmentAttemptEntity? {
+private fun SegmentEntity.toAttempts(rideId: Long, track: List<TrackPoint>): List<SegmentAttemptEntity> {
     val startLat = startLatitude
     val startLon = startLongitude
     val endLat = endLatitude
     val endLon = endLongitude
-    if (startLat == null || startLon == null || endLat == null || endLon == null) return null
+    if (startLat == null || startLon == null || endLat == null || endLon == null) return emptyList()
 
     val decodedPolyline = polyline?.let { decodePolyline(it) }.orEmpty()
-    val match = matchSegment(track, startLat, startLon, endLat, endLon, polyline = decodedPolyline) ?: return null
-    return SegmentAttemptEntity(
-        segmentId = id,
-        rideId = rideId,
-        startTimeEpochMillis = match.startTime.toEpochMilli(),
-        durationMillis = match.duration.toMillis(),
-        avgSpeedKmh = match.avgSpeedKmh,
-        elevationGainMeters = match.elevationGainMeters,
-        avgPowerWatts = match.avgPowerWatts,
-        entryPointSequence = match.entryIndex,
-        exitPointSequence = match.exitIndex,
-        createdAtEpochMillis = Instant.now().toEpochMilli(),
-    )
+    val now = Instant.now().toEpochMilli()
+    return matchAllSegmentPasses(track, startLat, startLon, endLat, endLon, polyline = decodedPolyline).map { match ->
+        SegmentAttemptEntity(
+            segmentId = id,
+            rideId = rideId,
+            startTimeEpochMillis = match.startTime.toEpochMilli(),
+            durationMillis = match.duration.toMillis(),
+            avgSpeedKmh = match.avgSpeedKmh,
+            elevationGainMeters = match.elevationGainMeters,
+            avgPowerWatts = match.avgPowerWatts,
+            entryPointSequence = match.entryIndex,
+            exitPointSequence = match.exitIndex,
+            createdAtEpochMillis = now,
+        )
+    }
 }
 
 private fun RidePointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = TrackPoint(

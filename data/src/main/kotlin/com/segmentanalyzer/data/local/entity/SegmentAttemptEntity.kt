@@ -7,8 +7,10 @@ import androidx.room.PrimaryKey
 
 /**
  * A ride matched against a segment: the ride's track passed within [SEGMENT_PROXIMITY_METERS]
- * (see the matcher) of both the segment's start and end. One row per (segment, ride) pair — a
- * ride that laps the same segment twice within itself only produces one attempt (first pass).
+ * (see the matcher) of both the segment's start and end. A ride that laps the same segment
+ * several times within itself produces one row per lap — uniqueness is on
+ * (segmentId, rideId, entryPointSequence) so distinct laps of the same ride/segment pair can
+ * coexist, while re-running the matcher on already-matched data stays idempotent.
  */
 @Entity(
     tableName = "segment_attempts",
@@ -29,7 +31,7 @@ import androidx.room.PrimaryKey
     indices = [
         Index("segmentId"),
         Index("rideId"),
-        Index(value = ["segmentId", "rideId"], unique = true),
+        Index(value = ["segmentId", "rideId", "entryPointSequence"], unique = true),
     ],
 )
 data class SegmentAttemptEntity(

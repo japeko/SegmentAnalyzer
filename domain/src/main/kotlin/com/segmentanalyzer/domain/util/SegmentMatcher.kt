@@ -31,16 +31,41 @@ data class SegmentMatchResult(
 )
 
 /**
- * Finds the first pass of [track] through a segment defined by ([startLat],[startLon]) to
- * ([endLat],[endLon]), or null if the track never comes within [proximityMeters] of both in
- * order. Only the first entry/exit pair is matched — a lap or out-and-back within one ride
- * produces a single attempt, not multiple.
+ * Finds every pass of [track] through a segment defined by ([startLat],[startLon]) to
+ * ([endLat],[endLon]) — a rider lapping the same descent repeatedly within one ride produces one
+ * result per lap, not just the first. Each pass is searched for starting right after the previous
+ * one's exit, so laps never overlap.
  *
  * If [polyline] has the segment's full route (from Strava's `map.polyline`), it's used both to
- * pin the entry/exit to the closest actual approach (tighter than just "first/last point in
- * range") and to reject a ride that only clips near both endpoints via an unrelated path. With
+ * pin each entry/exit to the closest actual approach (tighter than just "first/last point in
+ * range") and to reject a pass that only clips near both endpoints via an unrelated path. With
  * no polyline, falls back to matching against the two endpoint coordinates alone.
  */
+fun matchAllSegmentPasses(
+    track: List<TrackPoint>,
+    startLat: Double,
+    startLon: Double,
+    endLat: Double,
+    endLon: Double,
+    proximityMeters: Double = SEGMENT_PROXIMITY_METERS,
+    polyline: List<LatLng> = emptyList(),
+): List<SegmentMatchResult> {
+    val results = mutableListOf<SegmentMatchResult>()
+    var searchOffset = 0
+    while (searchOffset < track.size) {
+        val bounds = if (polyline.size >= 2) {
+            findEntryExitViaPolyline(track, polyline, proximityMeters, searchOffset)
+        } else {
+            findEntryExitViaEndpoints(track, startLat, startLon, endLat, endLon, proximityMeters, searchOffset)
+        } ?: break
+        val (entryIndex, exitIndex) = bounds
+        results += buildMatchResult(track, entryIndex, exitIndex)
+        searchOffset = exitIndex + 1
+    }
+    return results
+}
+
+/** Convenience for callers that only care about the first pass. */
 fun matchSegment(
     track: List<TrackPoint>,
     startLat: Double,
@@ -49,14 +74,10 @@ fun matchSegment(
     endLon: Double,
     proximityMeters: Double = SEGMENT_PROXIMITY_METERS,
     polyline: List<LatLng> = emptyList(),
-): SegmentMatchResult? {
-    val bounds = if (polyline.size >= 2) {
-        findEntryExitViaPolyline(track, polyline, proximityMeters)
-    } else {
-        findEntryExitViaEndpoints(track, startLat, startLon, endLat, endLon, proximityMeters)
-    } ?: return null
-    val (entryIndex, exitIndex) = bounds
+): SegmentMatchResult? =
+    matchAllSegmentPasses(track, startLat, startLon, endLat, endLon, proximityMeters, polyline).firstOrNull()
 
+private fun buildMatchResult(track: List<TrackPoint>, entryIndex: Int, exitIndex: Int): SegmentMatchResult {
     val entry = track[entryIndex]
     val exit = track[exitIndex]
     val duration = Duration.between(entry.timestamp, exit.timestamp)
@@ -93,9 +114,11 @@ private fun findEntryExitViaEndpoints(
     endLat: Double,
     endLon: Double,
     proximityMeters: Double,
+    searchOffset: Int,
 ): Pair<Int, Int>? {
-    val firstNearStart = track.indexOfFirst { haversineMeters(it.latitude, it.longitude, startLat, startLon) <= proximityMeters }
-    if (firstNearStart == -1) return null
+    val firstNearStart = (searchOffset until track.size).firstOrNull { index ->
+        haversineMeters(track[index].latitude, track[index].longitude, startLat, startLon) <= proximityMeters
+    } ?: return null
 
     val exitIndex = ((firstNearStart + 1) until track.size).firstOrNull { index ->
         haversineMeters(track[index].latitude, track[index].longitude, endLat, endLon) <= proximityMeters
@@ -116,12 +139,14 @@ private fun findEntryExitViaPolyline(
     track: List<TrackPoint>,
     polyline: List<LatLng>,
     proximityMeters: Double,
+    searchOffset: Int,
 ): Pair<Int, Int>? {
     val start = polyline.first()
     val end = polyline.last()
 
-    val roughEntry = track.indexOfFirst { haversineMeters(it.latitude, it.longitude, start.latitude, start.longitude) <= proximityMeters }
-    if (roughEntry == -1) return null
+    val roughEntry = (searchOffset until track.size).firstOrNull { index ->
+        haversineMeters(track[index].latitude, track[index].longitude, start.latitude, start.longitude) <= proximityMeters
+    } ?: return null
     val roughExit = ((roughEntry + 1) until track.size).firstOrNull { index ->
         haversineMeters(track[index].latitude, track[index].longitude, end.latitude, end.longitude) <= proximityMeters
     } ?: return null
