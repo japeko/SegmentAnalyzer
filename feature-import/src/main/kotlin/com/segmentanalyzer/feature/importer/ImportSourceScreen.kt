@@ -19,12 +19,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** Where to import rides from. Deliberately small and generic so GPX import has an obvious home later. */
+/** Where to import rides from. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportSourceScreen(
     onGarminClick: () -> Unit,
     onFitFileClick: () -> Unit,
+    onGpxFileClick: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -53,6 +54,9 @@ fun ImportSourceScreen(
             }
             OutlinedButton(onClick = onFitFileClick, modifier = Modifier.fillMaxWidth()) {
                 Text("Import a FIT file")
+            }
+            OutlinedButton(onClick = onGpxFileClick, modifier = Modifier.fillMaxWidth()) {
+                Text("Import a GPX file")
             }
         }
     }

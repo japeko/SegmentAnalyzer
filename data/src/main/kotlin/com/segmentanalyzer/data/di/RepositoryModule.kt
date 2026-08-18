@@ -3,6 +3,7 @@ package com.segmentanalyzer.data.di
 import com.segmentanalyzer.data.repository.FitFileRepositoryImpl
 import com.segmentanalyzer.data.repository.GarminAccountRepositoryImpl
 import com.segmentanalyzer.data.repository.GarminImportRepositoryImpl
+import com.segmentanalyzer.data.repository.GpxFileRepositoryImpl
 import com.segmentanalyzer.data.repository.RideRepositoryImpl
 import com.segmentanalyzer.data.repository.SegmentRepositoryImpl
 import com.segmentanalyzer.data.repository.StravaAccountRepositoryImpl
@@ -10,6 +11,7 @@ import com.segmentanalyzer.data.repository.StravaSegmentRepositoryImpl
 import com.segmentanalyzer.domain.repository.FitFileRepository
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.repository.GarminImportRepository
+import com.segmentanalyzer.domain.repository.GpxFileRepository
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.repository.StravaAccountRepository
@@ -51,4 +53,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     internal abstract fun bindFitFileRepository(impl: FitFileRepositoryImpl): FitFileRepository
+
+    @Binds
+    @Singleton
+    internal abstract fun bindGpxFileRepository(impl: GpxFileRepositoryImpl): GpxFileRepository
 }
