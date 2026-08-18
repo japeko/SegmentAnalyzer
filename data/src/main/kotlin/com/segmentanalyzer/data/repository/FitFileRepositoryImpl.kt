@@ -10,9 +10,11 @@ import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.data.local.fit.FitFileParser
 import com.segmentanalyzer.data.local.fit.FitParseException
 import com.segmentanalyzer.data.local.fit.FitSessionSummary
+import com.segmentanalyzer.data.local.fit.FitTrackPoint
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.FitFileRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.withContext
@@ -58,8 +60,20 @@ private fun FitSessionSummary.toRide(uri: String, displayName: String?): Ride {
         isPersonalBest = false,
         elevationProfile = emptyList(),
         sourceFilePath = uri,
+        track = trackPoints.map { it.toDomain() },
     )
 }
+
+private fun FitTrackPoint.toDomain(): TrackPoint = TrackPoint(
+    latitude = latitude,
+    longitude = longitude,
+    elevationMeters = elevationMeters,
+    timestamp = timestamp,
+    cumulativeDistanceMeters = cumulativeDistanceMeters,
+    heartRateBpm = heartRateBpm,
+    cadenceRpm = cadenceRpm,
+    powerWatts = powerWatts,
+)
 
 /** Maps FIT's Sport/SubSport to ours, or null if it isn't a cycling activity at all. */
 private fun FitSessionSummary.toActivityTypeOrNull(): ActivityType? {

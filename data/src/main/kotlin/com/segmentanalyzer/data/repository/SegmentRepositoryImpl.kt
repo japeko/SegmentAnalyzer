@@ -15,6 +15,6 @@ class SegmentRepositoryImpl @Inject constructor(
     override fun observeSegments(): Flow<List<Segment>> =
         segmentDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-    override suspend fun saveSegments(segments: List<Segment>): Int =
-        segmentDao.insertIfNew(segments.map { it.toEntity() }).count { it != -1L }
+    override suspend fun saveSegments(segments: List<Segment>): List<Long> =
+        segmentDao.insertIfNew(segments.map { it.toEntity() }).filter { it != -1L }
 }

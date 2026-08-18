@@ -13,10 +13,24 @@ import androidx.compose.ui.graphics.Color
  */
 data class ExtendedColors(
     val textTertiary: Color,
-)
+    /** Delta coloring for attempt/comparison charts: ahead of reference. */
+    val faster: Color,
+    /** Delta coloring for attempt/comparison charts: behind reference. */
+    val slower: Color,
+    /** Third slot color for multi-ride comparison chips/charts (first two reuse primary/tertiary). */
+    val compareC: Color,
+) {
+    /** Cycles through the comparison palette (primary, tertiary, compareC, ...) for chip N. */
+    fun compareColor(index: Int, primary: Color, tertiary: Color): Color =
+        when (index % 3) {
+            0 -> primary
+            1 -> tertiary
+            else -> compareC
+        }
+}
 
 private val LocalExtendedColors = compositionLocalOf {
-    ExtendedColors(textTertiary = DarkOnSurfaceTertiary)
+    ExtendedColors(textTertiary = DarkOnSurfaceTertiary, faster = DarkFaster, slower = DarkSlower, compareC = DarkCompareC)
 }
 
 val MaterialThemeExtras: ExtendedColors
@@ -26,9 +40,9 @@ val MaterialThemeExtras: ExtendedColors
 @Composable
 fun ProvideExtendedColors(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val extended = if (darkTheme) {
-        ExtendedColors(textTertiary = DarkOnSurfaceTertiary)
+        ExtendedColors(textTertiary = DarkOnSurfaceTertiary, faster = DarkFaster, slower = DarkSlower, compareC = DarkCompareC)
     } else {
-        ExtendedColors(textTertiary = LightOnSurfaceTertiary)
+        ExtendedColors(textTertiary = LightOnSurfaceTertiary, faster = LightFaster, slower = LightSlower, compareC = LightCompareC)
     }
     CompositionLocalProvider(LocalExtendedColors provides extended, content = content)
 }

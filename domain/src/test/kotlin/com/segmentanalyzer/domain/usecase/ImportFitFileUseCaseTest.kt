@@ -5,6 +5,7 @@ import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.repository.FitFileRepository
 import com.segmentanalyzer.domain.repository.RideRepository
+import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -33,7 +34,11 @@ class ImportFitFileUseCaseTest {
     @Test
     fun `saves the parsed ride and returns it`() = runTest {
         val rideRepository = FakeFitRideRepository()
-        val useCase = ImportFitFileUseCase(FakeFitFileRepository(Result.success(parsedRide)), rideRepository)
+        val useCase = ImportFitFileUseCase(
+            FakeFitFileRepository(Result.success(parsedRide)),
+            rideRepository,
+            MatchNewRideToSegmentsUseCase(FakeFitSegmentAttemptRepository()),
+        )
 
         val result = useCase("content://fake/morning-ride.fit")
 
@@ -48,6 +53,7 @@ class ImportFitFileUseCaseTest {
         val useCase = ImportFitFileUseCase(
             FakeFitFileRepository(Result.failure(IllegalStateException("not a cycling activity"))),
             rideRepository,
+            MatchNewRideToSegmentsUseCase(FakeFitSegmentAttemptRepository()),
         )
 
         val result = useCase("content://fake/run.fit")
@@ -64,6 +70,7 @@ private class FakeFitFileRepository(private val result: Result<Ride>) : FitFileR
 
 private class FakeFitRideRepository : RideRepository {
     val savedRides = mutableListOf<Ride>()
+    private var nextId = 1L
 
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
 
@@ -71,4 +78,16 @@ private class FakeFitRideRepository : RideRepository {
         savedRides += rides
         return rides.size
     }
+
+    override suspend fun saveRide(ride: Ride): Long {
+        savedRides += ride
+        return nextId++
+    }
+}
+
+private class FakeFitSegmentAttemptRepository : SegmentAttemptRepository {
+    override fun observeAttemptsForSegment(segmentId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentAttempt>())
+    override suspend fun trackPointsForAttempt(attemptId: Long) = emptyList<com.segmentanalyzer.domain.model.TrackPoint>()
+    override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long) = 0
 }

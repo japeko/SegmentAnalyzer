@@ -8,6 +8,6 @@ interface SegmentRepository {
     /** All segments, most recently synced first. */
     fun observeSegments(): Flow<List<Segment>>
 
-    /** Saves synced segments, skipping ones already present (matched by [Segment.externalId]). */
-    suspend fun saveSegments(segments: List<Segment>): Int
+    /** Saves synced segments, skipping ones already present. Returns the ids of newly inserted segments. */
+    suspend fun saveSegments(segments: List<Segment>): List<Long>
 }

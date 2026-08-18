@@ -141,4 +141,5 @@ private class FakeGarminImportRepository(private val result: Result<List<Ride>>)
 private class FakeRideRepository(private val newRideCount: Int) : RideRepository {
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
     override suspend fun saveRides(rides: List<Ride>): Int = newRideCount
+    override suspend fun saveRide(ride: Ride): Long? = null
 }

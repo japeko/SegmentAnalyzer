@@ -18,4 +18,9 @@ data class SegmentEntity(
     val climbCategory: Int,
     val city: String?,
     val state: String?,
+    val startLatitude: Double? = null,
+    val startLongitude: Double? = null,
+    val endLatitude: Double? = null,
+    val endLongitude: Double? = null,
+    val polyline: String? = null,
 )

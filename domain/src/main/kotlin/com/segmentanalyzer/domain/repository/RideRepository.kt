@@ -13,4 +13,7 @@ interface RideRepository {
      * Returns how many were newly inserted.
      */
     suspend fun saveRides(rides: List<Ride>): Int
+
+    /** Saves a single ride and its track (if any). Returns the new row id, or null if it was a duplicate. */
+    suspend fun saveRide(ride: Ride): Long?
 }

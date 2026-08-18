@@ -12,4 +12,11 @@ data class Segment(
     val climbCategory: Int,
     val city: String?,
     val state: String?,
+    /** Null if Strava didn't supply coordinates for this segment — such segments are never matched to rides. */
+    val startLatitude: Double? = null,
+    val startLongitude: Double? = null,
+    val endLatitude: Double? = null,
+    val endLongitude: Double? = null,
+    /** Encoded (Google polyline format) full route, if Strava's per-segment detail fetch succeeded. */
+    val polyline: String? = null,
 )

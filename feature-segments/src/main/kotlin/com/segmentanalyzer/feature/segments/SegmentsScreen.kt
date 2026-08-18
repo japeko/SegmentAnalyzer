@@ -1,5 +1,6 @@
 package com.segmentanalyzer.feature.segments
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ fun SegmentsScreen(
     uiState: SegmentsUiState,
     onSyncClick: () -> Unit,
     onGoToSettingsClick: () -> Unit,
+    onSegmentClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -71,7 +73,9 @@ fun SegmentsScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(uiState.segments, key = { it.id }) { segment -> SegmentCard(segment) }
+                    items(uiState.segments, key = { it.id }) { segment ->
+                        SegmentCard(segment, onClick = onSegmentClick)
+                    }
                 }
             }
         }
@@ -149,8 +153,8 @@ private fun SyncStatusBar(
 }
 
 @Composable
-private fun SegmentCard(segment: Segment, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth()) {
+private fun SegmentCard(segment: Segment, onClick: (Long) -> Unit, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth().clickable { onClick(segment.id) }) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(

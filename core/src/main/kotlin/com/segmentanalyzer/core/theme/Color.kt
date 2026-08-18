@@ -16,6 +16,9 @@ val DarkTertiary = Color(0xFFE8C468) // personal-best amber
 val DarkOnTertiary = Color(0xFF2E2409)
 val DarkError = Color(0xFFEF9A9A)
 val DarkOnError = Color(0xFF3A0A0A)
+val DarkFaster = Color(0xFF6FB8E8) // ahead-of-reference delta
+val DarkSlower = Color(0xFFE8935D) // behind-reference delta
+val DarkCompareC = Color(0xFF5FC4B8) // third ride-comparison slot (teal)
 
 // Light theme
 val LightBackground = Color(0xFFFAFAFB)
@@ -31,3 +34,6 @@ val LightTertiary = Color(0xFFB08D2E)
 val LightOnTertiary = Color(0xFFFFFFFF)
 val LightError = Color(0xFFB3261E)
 val LightOnError = Color(0xFFFFFFFF)
+val LightFaster = Color(0xFF3B7FC4) // ahead-of-reference delta
+val LightSlower = Color(0xFFC4622E) // behind-reference delta
+val LightCompareC = Color(0xFF2E9184) // third ride-comparison slot (teal)

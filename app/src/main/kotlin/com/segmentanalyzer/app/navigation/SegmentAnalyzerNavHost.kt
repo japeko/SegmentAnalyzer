@@ -11,6 +11,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.segmentanalyzer.feature.analysis.compare.RideCompareRoute
 import com.segmentanalyzer.feature.auth.garmin.GarminLoginRoute
 import com.segmentanalyzer.feature.auth.strava.StravaCallbackRoute
 import com.segmentanalyzer.feature.history.history.RideHistoryRoute
@@ -20,6 +21,7 @@ import com.segmentanalyzer.feature.importer.fit.FitFileImportRoute
 import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
 import com.segmentanalyzer.feature.importer.gpx.GpxFileImportRoute
 import com.segmentanalyzer.feature.segments.SegmentsRoute
+import com.segmentanalyzer.feature.segments.detail.SegmentDetailRoute
 import com.segmentanalyzer.feature.settings.SettingsRoute
 
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
@@ -27,6 +29,8 @@ private const val GARMIN_IMPORT_ROUTE = "garmin_import"
 private const val IMPORT_SOURCE_ROUTE = "import_source"
 private const val FIT_FILE_IMPORT_ROUTE = "fit_file_import"
 private const val GPX_FILE_IMPORT_ROUTE = "gpx_file_import"
+private const val SEGMENT_DETAIL_ROUTE = "segment_detail"
+private const val RIDE_COMPARE_ROUTE = "ride_compare"
 
 /** Must match the intent-filter path in AndroidManifest.xml (minus the code/error query args). */
 const val STRAVA_CALLBACK_ROUTE_BASE = "strava_callback"
@@ -57,7 +61,10 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
             )
         }
         composable(TopLevelDestination.Segments.route) {
-            SegmentsRoute(onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) })
+            SegmentsRoute(
+                onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) },
+                onSegmentClick = { segmentId -> navController.navigate("$SEGMENT_DETAIL_ROUTE/$segmentId") },
+            )
         }
         composable(TopLevelDestination.Records.route) { RecordsRoute() }
         composable(TopLevelDestination.Settings.route) {
@@ -93,6 +100,26 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         }
         composable(GPX_FILE_IMPORT_ROUTE) {
             GpxFileImportRoute(onBackClick = { navController.popBackStack() })
+        }
+        composable(
+            route = "$SEGMENT_DETAIL_ROUTE/{segmentId}",
+            arguments = listOf(navArgument("segmentId") { type = NavType.LongType }),
+        ) {
+            SegmentDetailRoute(
+                onBackClick = { navController.popBackStack() },
+                onAttemptClick = { segmentId, attemptId ->
+                    navController.navigate("$RIDE_COMPARE_ROUTE/$segmentId?anchorAttemptId=$attemptId")
+                },
+            )
+        }
+        composable(
+            route = "$RIDE_COMPARE_ROUTE/{segmentId}?anchorAttemptId={anchorAttemptId}",
+            arguments = listOf(
+                navArgument("segmentId") { type = NavType.LongType },
+                navArgument("anchorAttemptId") { type = NavType.LongType },
+            ),
+        ) {
+            RideCompareRoute(onBackClick = { navController.popBackStack() })
         }
         composable(
             route = STRAVA_CALLBACK_ROUTE,

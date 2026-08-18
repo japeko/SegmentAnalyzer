@@ -7,10 +7,12 @@ import com.segmentanalyzer.common.DispatcherProvider
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.data.local.gpx.GpxFileParser
 import com.segmentanalyzer.data.local.gpx.GpxParseException
+import com.segmentanalyzer.data.local.gpx.GpxTrackPoint
 import com.segmentanalyzer.data.local.gpx.GpxTrackSummary
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.GpxFileRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.withContext
@@ -54,8 +56,17 @@ private fun GpxTrackSummary.toRide(uri: String, displayName: String?): Ride {
         isPersonalBest = false,
         elevationProfile = emptyList(),
         sourceFilePath = uri,
+        track = points.map { it.toDomain() },
     )
 }
+
+private fun GpxTrackPoint.toDomain(): TrackPoint = TrackPoint(
+    latitude = latitude,
+    longitude = longitude,
+    elevationMeters = elevationMeters,
+    timestamp = timestamp,
+    cumulativeDistanceMeters = cumulativeDistanceMeters,
+)
 
 /**
  * Unlike FIT's always-present `Sport` enum, GPX's `<trk><type>` is free text and often absent

@@ -1,6 +1,9 @@
 package com.segmentanalyzer.domain.usecase
 
 import com.segmentanalyzer.domain.model.Segment
+import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +34,7 @@ class SyncStravaSegmentsUseCaseTest {
         val useCase = SyncStravaSegmentsUseCase(
             FakeStravaSegmentRepository(Result.success(fetched)),
             FakeSegmentRepository(newCount = 2),
+            MatchNewSegmentsToRidesUseCase(FakeSyncSegmentAttemptRepository()),
         )
 
         val result = useCase()
@@ -45,6 +49,7 @@ class SyncStravaSegmentsUseCaseTest {
         val useCase = SyncStravaSegmentsUseCase(
             FakeStravaSegmentRepository(Result.failure(IllegalStateException("session expired"))),
             segmentRepository,
+            MatchNewSegmentsToRidesUseCase(FakeSyncSegmentAttemptRepository()),
         )
 
         val result = useCase()
@@ -65,8 +70,15 @@ private class FakeSegmentRepository(private val newCount: Int) : SegmentReposito
 
     override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(emptyList())
 
-    override suspend fun saveSegments(segments: List<Segment>): Int {
+    override suspend fun saveSegments(segments: List<Segment>): List<Long> {
         saveCallCount++
-        return newCount
+        return (1..newCount).map { it.toLong() }
     }
+}
+
+private class FakeSyncSegmentAttemptRepository : SegmentAttemptRepository {
+    override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
+    override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
+    override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0
 }

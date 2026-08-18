@@ -21,6 +21,19 @@ internal data class StravaSegmentDto(
     @SerialName("climb_category") val climbCategory: Int = 0,
     val city: String? = null,
     val state: String? = null,
+    @SerialName("start_latlng") val startLatLng: List<Double>? = null,
+    @SerialName("end_latlng") val endLatLng: List<Double>? = null,
+)
+
+@Serializable
+internal data class StravaPolylineMapDto(
+    val polyline: String? = null,
+    @SerialName("summary_polyline") val summaryPolyline: String? = null,
+)
+
+@Serializable
+internal data class StravaSegmentDetailDto(
+    val map: StravaPolylineMapDto? = null,
 )
 
 /** Fetches the athlete's starred segments from Strava's official REST API. */
@@ -51,7 +64,31 @@ internal class StravaSegmentApi @Inject constructor(
         }
     }
 
+    /** The starred-segments list has no route geometry — this fetches the full polyline for one segment. */
+    fun fetchSegmentDetail(accessToken: String, segmentId: String): StravaSegmentDetailDto {
+        val request = Request.Builder()
+            .url("$SEGMENT_URL/$segmentId")
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        val body = try {
+            okHttpClient.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw StravaApiException("HTTP ${response.code}: $text")
+                text
+            }
+        } catch (e: IOException) {
+            throw StravaApiException(e.message ?: "network error", e)
+        }
+        return try {
+            json.decodeFromString(body)
+        } catch (e: Exception) {
+            throw StravaApiException("couldn't parse Strava's segment detail response", e)
+        }
+    }
+
     private companion object {
         const val STARRED_SEGMENTS_URL = "https://www.strava.com/api/v3/segments/starred"
+        const val SEGMENT_URL = "https://www.strava.com/api/v3/segments"
     }
 }

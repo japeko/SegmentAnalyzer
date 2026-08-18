@@ -1,20 +1,49 @@
 package com.segmentanalyzer.data.repository
 
+import androidx.room.withTransaction
+import com.segmentanalyzer.data.local.SegmentAnalyzerDatabase
 import com.segmentanalyzer.data.local.dao.RideDao
+import com.segmentanalyzer.data.local.dao.RidePointDao
+import com.segmentanalyzer.data.local.entity.RidePointEntity
 import com.segmentanalyzer.data.mapper.toDomain
 import com.segmentanalyzer.data.mapper.toEntity
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class RideRepositoryImpl @Inject constructor(
+    private val database: SegmentAnalyzerDatabase,
     private val rideDao: RideDao,
+    private val ridePointDao: RidePointDao,
 ) : RideRepository {
     override fun observeRides(): Flow<List<Ride>> =
         rideDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
     override suspend fun saveRides(rides: List<Ride>): Int =
         rideDao.insertIfNew(rides.map { it.toEntity() }).count { it != -1L }
+
+    override suspend fun saveRide(ride: Ride): Long? = database.withTransaction {
+        val id = rideDao.insertIfNew(listOf(ride.toEntity())).first()
+        if (id == -1L) return@withTransaction null
+        if (ride.track.isNotEmpty()) {
+            ridePointDao.insertAll(ride.track.mapIndexed { index, point -> point.toEntity(id, index) })
+        }
+        id
+    }
 }
+
+private fun TrackPoint.toEntity(rideId: Long, sequence: Int): RidePointEntity = RidePointEntity(
+    rideId = rideId,
+    sequence = sequence,
+    latitude = latitude,
+    longitude = longitude,
+    elevationMeters = elevationMeters,
+    timestampEpochMillis = timestamp.toEpochMilli(),
+    cumulativeDistanceMeters = cumulativeDistanceMeters,
+    heartRateBpm = heartRateBpm,
+    cadenceRpm = cadenceRpm,
+    powerWatts = powerWatts,
+)

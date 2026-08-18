@@ -1,0 +1,152 @@
+package com.segmentanalyzer.feature.analysis.compare
+
+import androidx.lifecycle.SavedStateHandle
+import com.segmentanalyzer.domain.model.ActivitySource
+import com.segmentanalyzer.domain.model.Segment
+import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
+import com.segmentanalyzer.domain.repository.SegmentRepository
+import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
+import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.time.Duration
+import java.time.Instant
+
+private val segment = Segment(
+    id = 1,
+    externalId = "42",
+    name = "Skyline Ridge Loop",
+    distanceMeters = 14_200.0,
+    averageGradePercent = 3.0,
+    maximumGradePercent = 9.0,
+    elevationGainMeters = 336.0,
+    climbCategory = 2,
+    city = null,
+    state = null,
+)
+
+private fun attempt(id: Long, seconds: Long, startTime: Instant, avgSpeedKmh: Double = 18.0) = SegmentAttempt(
+    id = id,
+    segmentId = 1,
+    rideId = id,
+    rideName = "Ride $id",
+    rideSource = ActivitySource.FIT_FILE,
+    startTime = startTime,
+    duration = Duration.ofSeconds(seconds),
+    avgSpeedKmh = avgSpeedKmh,
+    elevationGainMeters = 300.0,
+    avgPowerWatts = null,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class RideCompareViewModelTest {
+
+    private val dispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `defaults to current, personal best, and previous chips`() = runTest(dispatcher) {
+        val current = attempt(2, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        // The PB is deliberately older than "previous" here, so it's not also the closest-before-current
+        // ride — otherwise PREVIOUS and PERSONAL_BEST would collide onto the same attempt.
+        val pb = attempt(1, seconds = 2688, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val previous = attempt(3, seconds = 2795, startTime = Instant.parse("2026-08-10T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 2L, attempts = listOf(current, pb, previous))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(3, state.chips.size)
+        assertEquals(AttemptRole.CURRENT, state.chips.first { it.attemptId == 2L }.role)
+        assertEquals(AttemptRole.PERSONAL_BEST, state.chips.first { it.attemptId == 1L }.role)
+        assertEquals(AttemptRole.PREVIOUS, state.chips.first { it.attemptId == 3L }.role)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `adding an attempt from the picker includes it as a selected chip`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2700, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val older = attempt(2, seconds = 2800, startTime = Instant.parse("2026-06-06T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, older))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onAddClick()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isAddSheetVisible)
+
+        viewModel.onAddableAttemptSelected(2L)
+        viewModel.onConfirmAdd()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(false, state.isAddSheetVisible)
+        assertTrue(state.chips.any { it.attemptId == 2L })
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `total time row marks the fastest attempt as best`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val faster = attempt(2, seconds = 2688, startTime = Instant.parse("2026-08-05T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, faster))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val totalTimeRow = viewModel.uiState.value.statRows.first { it.label == "Total Time" }
+        assertTrue(totalTimeRow.values.first { it.attemptId == 2L }.isBest)
+        assertEquals(false, totalTimeRow.values.first { it.attemptId == 1L }.isBest)
+        collectJob.cancel()
+    }
+
+    private fun viewModel(currentAttemptId: Long, attempts: List<SegmentAttempt>): RideCompareViewModel {
+        val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L, "anchorAttemptId" to currentAttemptId))
+        val attemptRepository = FakeCompareSegmentAttemptRepository(attempts)
+        return RideCompareViewModel(
+            savedStateHandle,
+            ObserveSegmentsUseCase(FakeCompareSegmentRepository()),
+            ObserveSegmentAttemptsUseCase(attemptRepository),
+            BuildTimeGapSeriesUseCase(attemptRepository),
+        )
+    }
+}
+
+private class FakeCompareSegmentRepository : SegmentRepository {
+    override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(listOf(segment))
+    override suspend fun saveSegments(segments: List<Segment>): List<Long> = emptyList()
+}
+
+private class FakeCompareSegmentAttemptRepository(private val attempts: List<SegmentAttempt>) : SegmentAttemptRepository {
+    override fun observeAttemptsForSegment(segmentId: Long) = MutableStateFlow(attempts)
+    override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
+    override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long) = 0
+}

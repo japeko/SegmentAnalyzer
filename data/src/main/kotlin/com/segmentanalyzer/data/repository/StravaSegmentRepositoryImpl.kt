@@ -26,9 +26,19 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
                 val session = validSession() ?: throw StravaSessionExpiredException()
                 segmentApi.fetchStarredSegments(session.accessToken)
                     .filter { it.activityType == "Ride" }
-                    .map { it.toDomain() }
+                    .map { it.toDomain(polyline = fetchPolylineOrNull(session.accessToken, it.id.toString())) }
             }
         }
+
+    /**
+     * The starred-segments list has no route geometry, so each segment needs a separate detail
+     * fetch. Best-effort — a failure here (rate limit, network) just leaves that segment without
+     * a polyline, falling back to endpoint-only matching for it rather than failing the sync.
+     */
+    private fun fetchPolylineOrNull(accessToken: String, segmentId: String): String? = runCatching {
+        val map = segmentApi.fetchSegmentDetail(accessToken, segmentId).map
+        map?.polyline?.takeIf { it.isNotBlank() } ?: map?.summaryPolyline?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     /** Returns the stored session, refreshing the access token first if it has expired. */
     private fun validSession(): StravaSession? {
@@ -47,7 +57,7 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
     }
 }
 
-private fun StravaSegmentDto.toDomain(): Segment = Segment(
+private fun StravaSegmentDto.toDomain(polyline: String?): Segment = Segment(
     id = 0,
     externalId = id.toString(),
     name = name,
@@ -58,4 +68,9 @@ private fun StravaSegmentDto.toDomain(): Segment = Segment(
     climbCategory = climbCategory,
     city = city,
     state = state,
+    startLatitude = startLatLng?.getOrNull(0),
+    startLongitude = startLatLng?.getOrNull(1),
+    endLatitude = endLatLng?.getOrNull(0),
+    endLongitude = endLatLng?.getOrNull(1),
+    polyline = polyline,
 )

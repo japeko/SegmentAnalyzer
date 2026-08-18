@@ -83,4 +83,5 @@ private class FakeRideRepository(rides: List<Ride>) : RideRepository {
     private val flow = MutableStateFlow(rides)
     override fun observeRides() = flow
     override suspend fun saveRides(rides: List<Ride>): Int = 0
+    override suspend fun saveRide(ride: Ride): Long? = null
 }

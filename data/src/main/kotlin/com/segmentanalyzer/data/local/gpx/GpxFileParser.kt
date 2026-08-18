@@ -1,14 +1,19 @@
 package com.segmentanalyzer.data.local.gpx
 
 import android.util.Xml
+import com.segmentanalyzer.domain.util.haversineMeters
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.time.Instant
 import javax.inject.Inject
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+
+internal data class GpxTrackPoint(
+    val latitude: Double,
+    val longitude: Double,
+    val elevationMeters: Float?,
+    val timestamp: Instant,
+    val cumulativeDistanceMeters: Double,
+)
 
 internal data class GpxTrackSummary(
     val name: String?,
@@ -18,6 +23,7 @@ internal data class GpxTrackSummary(
     val endTime: Instant,
     val distanceMeters: Double,
     val elevationGainMeters: Double,
+    val points: List<GpxTrackPoint>,
 )
 
 /** Thrown when a GPX file can't be read as a ride: malformed XML, or no timestamped track points. */
@@ -56,6 +62,10 @@ internal class GpxFileParser @Inject constructor() {
         var currentTag = ""
         var trkptLat: Double? = null
         var trkptLon: Double? = null
+        var trkptEle: Double? = null
+        var trkptTime: Instant? = null
+
+        val points = mutableListOf<GpxTrackPoint>()
 
         try {
             var eventType = parser.eventType
@@ -66,6 +76,8 @@ internal class GpxFileParser @Inject constructor() {
                         if (currentTag == "trkpt") {
                             trkptLat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
                             trkptLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
+                            trkptEle = null
+                            trkptTime = null
                         }
                     }
 
@@ -78,10 +90,12 @@ internal class GpxFileParser @Inject constructor() {
                                 "time" -> runCatching { Instant.parse(text) }.getOrNull()?.let { instant ->
                                     if (firstTime == null) firstTime = instant
                                     lastTime = instant
+                                    trkptTime = instant
                                 }
                                 "ele" -> text.toDoubleOrNull()?.let { ele ->
                                     lastEle?.let { previous -> if (ele > previous) elevationGainMeters += ele - previous }
                                     lastEle = ele
+                                    trkptEle = ele
                                 }
                             }
                         }
@@ -97,9 +111,20 @@ internal class GpxFileParser @Inject constructor() {
                                 }
                                 lastLat = lat
                                 lastLon = lon
+                                trkptTime?.let { time ->
+                                    points += GpxTrackPoint(
+                                        latitude = lat,
+                                        longitude = lon,
+                                        elevationMeters = trkptEle?.toFloat(),
+                                        timestamp = time,
+                                        cumulativeDistanceMeters = distanceMeters,
+                                    )
+                                }
                             }
                             trkptLat = null
                             trkptLon = null
+                            trkptEle = null
+                            trkptTime = null
                         }
                     }
                 }
@@ -117,15 +142,7 @@ internal class GpxFileParser @Inject constructor() {
             endTime = lastTime ?: resolvedStart,
             distanceMeters = distanceMeters,
             elevationGainMeters = elevationGainMeters,
+            points = points,
         )
     }
-}
-
-private fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val earthRadiusMeters = 6_371_000.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2) * sin(dLon / 2)
-    return earthRadiusMeters * 2 * atan2(sqrt(a), sqrt(1 - a))
 }

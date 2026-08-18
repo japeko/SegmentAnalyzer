@@ -3,9 +3,13 @@ package com.segmentanalyzer.feature.segments
 import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.StravaConnectionState
+import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.repository.StravaAccountRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
+import com.segmentanalyzer.domain.usecase.MatchNewSegmentsToRidesUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.SyncStravaSegmentsUseCase
@@ -100,7 +104,11 @@ class SegmentsViewModelTest {
         return SegmentsViewModel(
             ObserveSegmentsUseCase(FakeSegmentRepository()),
             ObserveStravaConnectionStateUseCase(FakeStravaAccountRepository(accountState)),
-            SyncStravaSegmentsUseCase(segmentRepository, FakeSegmentRepository(newCount = 1)),
+            SyncStravaSegmentsUseCase(
+                segmentRepository,
+                FakeSegmentRepository(newCount = 1),
+                MatchNewSegmentsToRidesUseCase(FakeSegmentsVmSegmentAttemptRepository()),
+            ),
         )
     }
 }
@@ -134,5 +142,12 @@ private class FakeStravaSegmentRepository(private val result: Result<List<Segmen
 
 private class FakeSegmentRepository(private val newCount: Int = 0) : SegmentRepository {
     override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(emptyList())
-    override suspend fun saveSegments(segments: List<Segment>): Int = newCount
+    override suspend fun saveSegments(segments: List<Segment>): List<Long> = (1..newCount).map { it.toLong() }
+}
+
+private class FakeSegmentsVmSegmentAttemptRepository : SegmentAttemptRepository {
+    override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
+    override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
+    override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0
 }

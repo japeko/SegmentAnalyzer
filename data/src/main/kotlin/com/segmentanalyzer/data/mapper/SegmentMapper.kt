@@ -14,6 +14,11 @@ fun SegmentEntity.toDomain(): Segment = Segment(
     climbCategory = climbCategory,
     city = city,
     state = state,
+    startLatitude = startLatitude,
+    startLongitude = startLongitude,
+    endLatitude = endLatitude,
+    endLongitude = endLongitude,
+    polyline = polyline,
 )
 
 fun Segment.toEntity(): SegmentEntity = SegmentEntity(
@@ -27,4 +32,9 @@ fun Segment.toEntity(): SegmentEntity = SegmentEntity(
     climbCategory = climbCategory,
     city = city,
     state = state,
+    startLatitude = startLatitude,
+    startLongitude = startLongitude,
+    endLatitude = endLatitude,
+    endLongitude = endLongitude,
+    polyline = polyline,
 )

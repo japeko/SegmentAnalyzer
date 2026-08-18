@@ -75,4 +75,6 @@ private class FakeImportRideRepository(private val newCount: Int) : RideReposito
         saveCallCount++
         return newCount
     }
+
+    override suspend fun saveRide(ride: Ride): Long? = null
 }

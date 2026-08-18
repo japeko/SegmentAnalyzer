@@ -24,6 +24,8 @@ data class Ride(
     val sourceFilePath: String?,
     /** Garmin/Strava activity id, used to avoid re-importing the same ride. Null for local files. */
     val externalId: String? = null,
+    /** Full-resolution GPS track, chronological. Empty for Garmin/Strava-sourced rides. */
+    val track: List<TrackPoint> = emptyList(),
 ) {
     val averageSpeedKmh: Double
         get() {

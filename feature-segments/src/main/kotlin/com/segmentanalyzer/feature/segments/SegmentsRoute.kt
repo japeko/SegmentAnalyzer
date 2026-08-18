@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun SegmentsRoute(
     onGoToSettingsClick: () -> Unit,
+    onSegmentClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SegmentsViewModel = hiltViewModel(),
 ) {
@@ -18,6 +19,7 @@ fun SegmentsRoute(
         uiState = uiState,
         onSyncClick = viewModel::onSyncClick,
         onGoToSettingsClick = onGoToSettingsClick,
+        onSegmentClick = onSegmentClick,
         modifier = modifier,
     )
 }
