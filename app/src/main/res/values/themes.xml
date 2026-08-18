@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.SegmentAnalyzer.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.SegmentAnalyzer</item>
+    </style>
+
+    <style name="Theme.SegmentAnalyzer" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+</resources>
