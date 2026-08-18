@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun SettingsRoute(
     onConnectGarminClick: () -> Unit,
+    onConnectStravaClick: (authorizationUrl: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -20,6 +21,11 @@ fun SettingsRoute(
         onDisconnectGarminClick = viewModel::onDisconnectGarminClick,
         onConfirmDisconnectGarmin = viewModel::onConfirmDisconnectGarmin,
         onDismissDisconnectGarmin = viewModel::onDismissDisconnectGarmin,
+        onConnectStravaClick = onConnectStravaClick,
+        onDisconnectStravaClick = viewModel::onDisconnectStravaClick,
+        onConfirmDisconnectStrava = viewModel::onConfirmDisconnectStrava,
+        onDismissDisconnectStrava = viewModel::onDismissDisconnectStrava,
+        stravaAuthorizationUrl = viewModel.stravaAuthorizationUrl,
         modifier = modifier,
     )
 }

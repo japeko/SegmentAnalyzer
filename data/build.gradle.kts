@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
+}
+
+// Strava app credentials, kept out of version control. Register a free app at
+// strava.com/settings/api and add STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET to local.properties.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -11,6 +20,17 @@ android {
 
     defaultConfig {
         minSdk = 26
+
+        buildConfigField("String", "STRAVA_CLIENT_ID", "\"${localProperties.getProperty("STRAVA_CLIENT_ID", "")}\"")
+        buildConfigField(
+            "String",
+            "STRAVA_CLIENT_SECRET",
+            "\"${localProperties.getProperty("STRAVA_CLIENT_SECRET", "")}\"",
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

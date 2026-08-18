@@ -3,7 +3,10 @@ package com.segmentanalyzer.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.domain.usecase.DisconnectGarminAccountUseCase
+import com.segmentanalyzer.domain.usecase.DisconnectStravaAccountUseCase
+import com.segmentanalyzer.domain.usecase.GetStravaAuthorizationUrlUseCase
 import com.segmentanalyzer.domain.usecase.ObserveGarminConnectionStateUseCase
+import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,17 +20,28 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     observeGarminConnectionState: ObserveGarminConnectionStateUseCase,
     private val disconnectGarminAccount: DisconnectGarminAccountUseCase,
+    observeStravaConnectionState: ObserveStravaConnectionStateUseCase,
+    private val disconnectStravaAccount: DisconnectStravaAccountUseCase,
+    getStravaAuthorizationUrl: GetStravaAuthorizationUrlUseCase,
 ) : ViewModel() {
 
-    private val showDisconnectConfirmation = MutableStateFlow(false)
+    /** Pure string building, no network — safe to compute once and hand to the browser launcher. */
+    val stravaAuthorizationUrl: String = getStravaAuthorizationUrl()
+
+    private val showDisconnectGarminConfirmation = MutableStateFlow(false)
+    private val showDisconnectStravaConfirmation = MutableStateFlow(false)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         observeGarminConnectionState(),
-        showDisconnectConfirmation,
-    ) { connectionState, showConfirmation ->
+        showDisconnectGarminConfirmation,
+        observeStravaConnectionState(),
+        showDisconnectStravaConfirmation,
+    ) { garminState, showGarminConfirmation, stravaState, showStravaConfirmation ->
         SettingsUiState(
-            garminConnectionState = connectionState,
-            showDisconnectGarminConfirmation = showConfirmation,
+            garminConnectionState = garminState,
+            showDisconnectGarminConfirmation = showGarminConfirmation,
+            stravaConnectionState = stravaState,
+            showDisconnectStravaConfirmation = showStravaConfirmation,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -36,15 +50,28 @@ class SettingsViewModel @Inject constructor(
     )
 
     fun onDisconnectGarminClick() {
-        showDisconnectConfirmation.value = true
+        showDisconnectGarminConfirmation.value = true
     }
 
     fun onDismissDisconnectGarmin() {
-        showDisconnectConfirmation.value = false
+        showDisconnectGarminConfirmation.value = false
     }
 
     fun onConfirmDisconnectGarmin() {
-        showDisconnectConfirmation.value = false
+        showDisconnectGarminConfirmation.value = false
         viewModelScope.launch { disconnectGarminAccount() }
+    }
+
+    fun onDisconnectStravaClick() {
+        showDisconnectStravaConfirmation.value = true
+    }
+
+    fun onDismissDisconnectStrava() {
+        showDisconnectStravaConfirmation.value = false
+    }
+
+    fun onConfirmDisconnectStrava() {
+        showDisconnectStravaConfirmation.value = false
+        viewModelScope.launch { disconnectStravaAccount() }
     }
 }

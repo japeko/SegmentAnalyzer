@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.segmentanalyzer.data.local.SegmentAnalyzerDatabase
 import com.segmentanalyzer.data.local.dao.RideDao
+import com.segmentanalyzer.data.local.dao.SegmentDao
 import com.segmentanalyzer.data.seed.RideSeedCallback
 import dagger.Module
 import dagger.Provides
@@ -37,4 +38,7 @@ object DatabaseModule {
 
     @Provides
     fun provideRideDao(database: SegmentAnalyzerDatabase): RideDao = database.rideDao()
+
+    @Provides
+    fun provideSegmentDao(database: SegmentAnalyzerDatabase): SegmentDao = database.segmentDao()
 }

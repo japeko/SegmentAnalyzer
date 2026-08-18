@@ -1,11 +1,18 @@
 package com.segmentanalyzer.app.navigation
 
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.segmentanalyzer.feature.auth.garmin.GarminLoginRoute
+import com.segmentanalyzer.feature.auth.strava.StravaCallbackRoute
 import com.segmentanalyzer.feature.history.history.RideHistoryRoute
 import com.segmentanalyzer.feature.history.records.RecordsRoute
 import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
@@ -15,8 +22,22 @@ import com.segmentanalyzer.feature.settings.SettingsRoute
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
 
+/** Must match the intent-filter path in AndroidManifest.xml (minus the code/error query args). */
+const val STRAVA_CALLBACK_ROUTE_BASE = "strava_callback"
+private const val STRAVA_CALLBACK_ROUTE = "$STRAVA_CALLBACK_ROUTE_BASE?code={code}&error={error}"
+
+/** Builds the in-app nav route for a Strava OAuth redirect's code/error, for [SegmentAnalyzerApp] to navigate to. */
+fun stravaCallbackRoute(code: String?, error: String?): String {
+    val builder = Uri.Builder().path(STRAVA_CALLBACK_ROUTE_BASE)
+    code?.let { builder.appendQueryParameter("code", it) }
+    error?.let { builder.appendQueryParameter("error", it) }
+    return builder.build().toString()
+}
+
 @Composable
 fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
     NavHost(
         navController = navController,
         startDestination = TopLevelDestination.Rides.route,
@@ -29,10 +50,17 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onImportClick = { navController.navigate(GARMIN_IMPORT_ROUTE) },
             )
         }
-        composable(TopLevelDestination.Segments.route) { SegmentsRoute() }
+        composable(TopLevelDestination.Segments.route) {
+            SegmentsRoute(onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) })
+        }
         composable(TopLevelDestination.Records.route) { RecordsRoute() }
         composable(TopLevelDestination.Settings.route) {
-            SettingsRoute(onConnectGarminClick = { navController.navigate(GARMIN_LOGIN_ROUTE) })
+            SettingsRoute(
+                onConnectGarminClick = { navController.navigate(GARMIN_LOGIN_ROUTE) },
+                onConnectStravaClick = { authorizationUrl ->
+                    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(authorizationUrl))
+                },
+            )
         }
         composable(GARMIN_LOGIN_ROUTE) {
             GarminLoginRoute(
@@ -45,6 +73,29 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) },
                 onBackClick = { navController.popBackStack() },
             )
+        }
+        composable(
+            route = STRAVA_CALLBACK_ROUTE,
+            arguments = listOf(
+                navArgument("code") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("error") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) {
+            val backToSettings = {
+                navController.navigate(TopLevelDestination.Settings.route) {
+                    popUpTo(navController.graph.findStartDestination().id)
+                    launchSingleTop = true
+                }
+            }
+            StravaCallbackRoute(onConnected = backToSettings, onBackToSettingsClick = backToSettings)
         }
     }
 }

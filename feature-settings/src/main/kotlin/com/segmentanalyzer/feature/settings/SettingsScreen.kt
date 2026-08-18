@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.GarminConnectionState
+import com.segmentanalyzer.domain.model.StravaConnectionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +38,11 @@ fun SettingsScreen(
     onDisconnectGarminClick: () -> Unit,
     onConfirmDisconnectGarmin: () -> Unit,
     onDismissDisconnectGarmin: () -> Unit,
+    onConnectStravaClick: (authorizationUrl: String) -> Unit,
+    onDisconnectStravaClick: () -> Unit,
+    onConfirmDisconnectStrava: () -> Unit,
+    onDismissDisconnectStrava: () -> Unit,
+    stravaAuthorizationUrl: String,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -55,10 +61,25 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            GarminConnectionCard(
-                connectionState = uiState.garminConnectionState,
+            ConnectionCard(
+                source = ActivitySource.GARMIN,
+                isConnected = uiState.garminConnectionState is GarminConnectionState.Connected,
+                statusText = when (val state = uiState.garminConnectionState) {
+                    is GarminConnectionState.Connected -> "Connected as ${state.username}"
+                    GarminConnectionState.Disconnected -> "Not connected"
+                },
                 onConnectClick = onConnectGarminClick,
                 onDisconnectClick = onDisconnectGarminClick,
+            )
+            ConnectionCard(
+                source = ActivitySource.STRAVA,
+                isConnected = uiState.stravaConnectionState is StravaConnectionState.Connected,
+                statusText = when (val state = uiState.stravaConnectionState) {
+                    is StravaConnectionState.Connected -> "Connected as ${state.athleteName}"
+                    StravaConnectionState.Disconnected -> "Not connected"
+                },
+                onConnectClick = { onConnectStravaClick(stravaAuthorizationUrl) },
+                onDisconnectClick = onDisconnectStravaClick,
             )
         }
     }
@@ -76,17 +97,31 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (uiState.showDisconnectStravaConfirmation) {
+        AlertDialog(
+            onDismissRequest = onDismissDisconnectStrava,
+            title = { Text("Disconnect Strava?") },
+            text = { Text("Segment Analyzer will no longer be able to sync segments from Strava until you reconnect.") },
+            confirmButton = {
+                TextButton(onClick = onConfirmDisconnectStrava) { Text("Disconnect") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissDisconnectStrava) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 @Composable
-private fun GarminConnectionCard(
-    connectionState: GarminConnectionState,
+private fun ConnectionCard(
+    source: ActivitySource,
+    isConnected: Boolean,
+    statusText: String,
     onConnectClick: () -> Unit,
     onDisconnectClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isConnected = connectionState is GarminConnectionState.Connected
-
     Card(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -101,14 +136,11 @@ private fun GarminConnectionCard(
                     .padding(end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                SourceTag(source = ActivitySource.GARMIN)
+                SourceTag(source = source)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusDot(connected = isConnected)
                     Text(
-                        text = when (connectionState) {
-                            is GarminConnectionState.Connected -> "Connected as ${connectionState.username}"
-                            GarminConnectionState.Disconnected -> "Not connected"
-                        },
+                        text = statusText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,

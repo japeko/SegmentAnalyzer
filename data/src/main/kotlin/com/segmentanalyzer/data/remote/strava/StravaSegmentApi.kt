@@ -1,0 +1,57 @@
+package com.segmentanalyzer.data.remote.strava
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.IOException
+import javax.inject.Inject
+
+@Serializable
+internal data class StravaSegmentDto(
+    val id: Long,
+    val name: String,
+    @SerialName("activity_type") val activityType: String,
+    val distance: Double,
+    @SerialName("average_grade") val averageGrade: Double,
+    @SerialName("maximum_grade") val maximumGrade: Double,
+    @SerialName("elevation_high") val elevationHigh: Double? = null,
+    @SerialName("elevation_low") val elevationLow: Double? = null,
+    @SerialName("climb_category") val climbCategory: Int = 0,
+    val city: String? = null,
+    val state: String? = null,
+)
+
+/** Fetches the athlete's starred segments from Strava's official REST API. */
+internal class StravaSegmentApi @Inject constructor(
+    private val okHttpClient: OkHttpClient,
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun fetchStarredSegments(accessToken: String): List<StravaSegmentDto> {
+        val request = Request.Builder()
+            .url(STARRED_SEGMENTS_URL)
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        val body = try {
+            okHttpClient.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw StravaApiException("HTTP ${response.code}: $text")
+                text
+            }
+        } catch (e: IOException) {
+            throw StravaApiException(e.message ?: "network error", e)
+        }
+        return try {
+            json.decodeFromString(body)
+        } catch (e: Exception) {
+            throw StravaApiException("couldn't parse Strava's starred segments response", e)
+        }
+    }
+
+    private companion object {
+        const val STARRED_SEGMENTS_URL = "https://www.strava.com/api/v3/segments/starred"
+    }
+}
