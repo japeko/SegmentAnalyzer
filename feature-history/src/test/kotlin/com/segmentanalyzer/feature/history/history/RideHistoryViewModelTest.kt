@@ -1,6 +1,5 @@
 package com.segmentanalyzer.feature.history.history
 
-import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
@@ -10,7 +9,9 @@ import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -61,19 +62,25 @@ class RideHistoryViewModelTest {
             ObserveMonthlySummaryUseCase(repository),
         )
 
-        viewModel.uiState.test {
-            assertEquals(2, awaitItem().rides.size)
+        // `onFilterSelected` changes both the direct selectedFilter flow and (via flatMapLatest)
+        // the rides flow, which settle on different ticks — checking the settled `.value` after
+        // advancing avoids depending on how many intermediate combine emissions that produces.
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.rides.size)
 
-            viewModel.onFilterSelected(ActivityType.ROAD)
+        viewModel.onFilterSelected(ActivityType.ROAD)
+        advanceUntilIdle()
 
-            val filtered = awaitItem()
-            assertEquals(1, filtered.rides.size)
-            assertEquals("Sunday Club Ride", filtered.rides.first().name)
-        }
+        val filtered = viewModel.uiState.value
+        assertEquals(1, filtered.rides.size)
+        assertEquals("Sunday Club Ride", filtered.rides.first().name)
+        collectJob.cancel()
     }
 }
 
 private class FakeRideRepository(rides: List<Ride>) : RideRepository {
     private val flow = MutableStateFlow(rides)
     override fun observeRides() = flow
+    override suspend fun saveRides(rides: List<Ride>): Int = 0
 }

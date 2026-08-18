@@ -1,6 +1,7 @@
 package com.segmentanalyzer.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
@@ -15,7 +16,7 @@ import com.segmentanalyzer.domain.model.ActivityType
  * telemetry tracks — [elevationProfilePreview] here is only a lightweight ~24-point sparkline
  * for the history card thumbnail, not analysis-grade data; segment/split/route-grouping tables.
  */
-@Entity(tableName = "rides")
+@Entity(tableName = "rides", indices = [Index(value = ["externalId"], unique = true)])
 data class RideEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     /** Garmin/Strava activity id, kept for de-duplication on future re-import. Null for local files. */

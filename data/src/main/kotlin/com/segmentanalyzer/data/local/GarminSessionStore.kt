@@ -45,9 +45,21 @@ internal class GarminSessionStore @Inject constructor(
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        // Preserve the remembered username across a disconnect — it's just for pre-filling the
+        // login form, not part of the session, so there's no reason to make the rider retype it.
+        val rememberedUsername = prefs.getString(KEY_LAST_USERNAME, null)
+        val editor = prefs.edit().clear()
+        if (rememberedUsername != null) editor.putString(KEY_LAST_USERNAME, rememberedUsername)
+        editor.apply()
         _state.value = GarminConnectionState.Disconnected
     }
+
+    /** Remembers the username from a connect attempt (successful or not), for [lastUsername]. */
+    fun saveLastUsername(username: String) {
+        prefs.edit().putString(KEY_LAST_USERNAME, username).apply()
+    }
+
+    fun lastUsername(): String? = prefs.getString(KEY_LAST_USERNAME, null)
 
     /** The stored session, for authenticated Garmin API calls (e.g. ride import). */
     fun session(): GarminSession? {
@@ -78,5 +90,6 @@ internal class GarminSessionStore @Inject constructor(
         const val KEY_REFRESH_TOKEN = "refresh_token"
         const val KEY_EXPIRES_AT = "expires_at"
         const val KEY_CONNECTED_AT = "connected_at"
+        const val KEY_LAST_USERNAME = "last_username"
     }
 }

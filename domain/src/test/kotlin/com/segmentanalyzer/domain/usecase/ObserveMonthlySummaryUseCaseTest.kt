@@ -60,4 +60,5 @@ class ObserveMonthlySummaryUseCaseTest {
 private class FakeRideRepository(rides: List<Ride>) : RideRepository {
     private val flow = MutableStateFlow(rides)
     override fun observeRides() = flow
+    override suspend fun saveRides(rides: List<Ride>): Int = 0
 }

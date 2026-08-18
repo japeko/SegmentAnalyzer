@@ -18,4 +18,8 @@ interface RideDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(rides: List<RideEntity>)
+
+    /** Inserts rides, skipping ones whose [RideEntity.externalId] already exists (-1 per skip). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfNew(rides: List<RideEntity>): List<Long>
 }

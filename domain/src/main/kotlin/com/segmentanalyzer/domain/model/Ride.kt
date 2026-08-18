@@ -22,6 +22,8 @@ data class Ride(
     val isPersonalBest: Boolean,
     val elevationProfile: List<Float>,
     val sourceFilePath: String?,
+    /** Garmin/Strava activity id, used to avoid re-importing the same ride. Null for local files. */
+    val externalId: String? = null,
 ) {
     val averageSpeedKmh: Double
         get() {

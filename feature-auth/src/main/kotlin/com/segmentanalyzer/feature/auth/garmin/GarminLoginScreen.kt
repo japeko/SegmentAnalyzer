@@ -18,11 +18,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,7 +37,9 @@ fun GarminLoginScreen(
     uiState: GarminLoginUiState,
     onUsernameChanged: (String) -> Unit,
     onPasswordChanged: (String) -> Unit,
+    onMfaCodeChanged: (String) -> Unit,
     onConnectClick: () -> Unit,
+    onSubmitMfaCodeClick: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -55,32 +63,17 @@ fun GarminLoginScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                text = "Sign in with your Garmin Connect account to import rides. Your password " +
-                    "is sent directly to Garmin and is never stored on this device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            OutlinedTextField(
-                value = uiState.username,
-                onValueChange = onUsernameChanged,
-                label = { Text("Email or username") },
-                singleLine = true,
-                enabled = !uiState.isLoading,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            OutlinedTextField(
-                value = uiState.password,
-                onValueChange = onPasswordChanged,
-                label = { Text("Password") },
-                singleLine = true,
-                enabled = !uiState.isLoading,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            when (uiState.step) {
+                GarminLoginStep.Credentials -> CredentialsForm(
+                    uiState = uiState,
+                    onUsernameChanged = onUsernameChanged,
+                    onPasswordChanged = onPasswordChanged,
+                )
+                GarminLoginStep.MfaCode -> MfaCodeForm(
+                    uiState = uiState,
+                    onMfaCodeChanged = onMfaCodeChanged,
+                )
+            }
 
             if (uiState.errorMessage != null) {
                 Text(
@@ -91,7 +84,7 @@ fun GarminLoginScreen(
             }
 
             Button(
-                onClick = onConnectClick,
+                onClick = if (uiState.step == GarminLoginStep.Credentials) onConnectClick else onSubmitMfaCodeClick,
                 enabled = uiState.canSubmit,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -102,9 +95,69 @@ fun GarminLoginScreen(
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                 } else {
-                    Text("Connect")
+                    Text(if (uiState.step == GarminLoginStep.Credentials) "Connect" else "Submit code")
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CredentialsForm(
+    uiState: GarminLoginUiState,
+    onUsernameChanged: (String) -> Unit,
+    onPasswordChanged: (String) -> Unit,
+) {
+    Text(
+        text = "Sign in with your Garmin Connect account to import rides. Your password " +
+            "is sent directly to Garmin and is never stored on this device.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    OutlinedTextField(
+        value = uiState.username,
+        onValueChange = onUsernameChanged,
+        label = { Text("Email or username") },
+        singleLine = true,
+        enabled = !uiState.isLoading,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    OutlinedTextField(
+        value = uiState.password,
+        onValueChange = onPasswordChanged,
+        label = { Text("Password") },
+        singleLine = true,
+        enabled = !uiState.isLoading,
+        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        trailingIcon = {
+            TextButton(onClick = { passwordVisible = !passwordVisible }) {
+                Text(if (passwordVisible) "Hide" else "Show")
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun MfaCodeForm(uiState: GarminLoginUiState, onMfaCodeChanged: (String) -> Unit) {
+    Text(
+        text = "Garmin sent a verification code to your email. Enter it below to finish connecting.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    OutlinedTextField(
+        value = uiState.mfaCode,
+        onValueChange = onMfaCodeChanged,
+        label = { Text("Verification code") },
+        singleLine = true,
+        enabled = !uiState.isLoading,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

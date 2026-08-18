@@ -7,7 +7,7 @@ import com.segmentanalyzer.data.local.converter.RideTypeConverters
 import com.segmentanalyzer.data.local.dao.RideDao
 import com.segmentanalyzer.data.local.entity.RideEntity
 
-@Database(entities = [RideEntity::class], version = 1, exportSchema = true)
+@Database(entities = [RideEntity::class], version = 2, exportSchema = true)
 @TypeConverters(RideTypeConverters::class)
 abstract class SegmentAnalyzerDatabase : RoomDatabase() {
     abstract fun rideDao(): RideDao

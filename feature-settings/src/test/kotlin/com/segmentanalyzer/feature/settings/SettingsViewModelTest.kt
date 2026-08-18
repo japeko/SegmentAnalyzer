@@ -1,6 +1,7 @@
 package com.segmentanalyzer.feature.settings
 
 import app.cash.turbine.test
+import com.segmentanalyzer.domain.model.GarminConnectResult
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.usecase.DisconnectGarminAccountUseCase
@@ -96,7 +97,12 @@ private class FakeGarminAccountRepository(
 
     override fun observeConnectionState(): Flow<GarminConnectionState> = state
 
-    override suspend fun connect(username: String, password: String): Result<Unit> = Result.success(Unit)
+    override fun lastUsername(): String? = null
+
+    override suspend fun connect(username: String, password: String): Result<GarminConnectResult> =
+        Result.success(GarminConnectResult.Connected)
+
+    override suspend fun submitMfaCode(code: String): Result<Unit> = Result.success(Unit)
 
     override suspend fun disconnect() {
         state.value = GarminConnectionState.Disconnected

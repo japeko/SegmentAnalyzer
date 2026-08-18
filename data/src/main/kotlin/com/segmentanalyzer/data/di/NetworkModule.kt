@@ -20,13 +20,25 @@ object NetworkModule {
         OkHttpClient.Builder().cookieJar(InMemoryCookieJar()).build()
 }
 
-/** Per-host in-memory cookie storage, enough to carry session cookies through the Garmin SSO login. */
+/**
+ * Per-host in-memory cookie storage, enough to carry session cookies through the Garmin SSO
+ * login. Merges by cookie name rather than replacing the whole host bucket per response — a
+ * server only re-sends Set-Cookie for what it's adding/changing, not everything already set, so
+ * overwriting the bucket wholesale silently drops earlier cookies (e.g. the session cookie from
+ * step 1) on the very next response that happens to set an unrelated one.
+ */
 private class InMemoryCookieJar : CookieJar {
-    private val cookiesByHost = mutableMapOf<String, List<Cookie>>()
+    private val cookiesByHost = mutableMapOf<String, MutableMap<String, Cookie>>()
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        cookiesByHost[url.host] = cookies
+        val hostCookies = cookiesByHost.getOrPut(url.host) { mutableMapOf() }
+        for (cookie in cookies) hostCookies[cookie.name] = cookie
     }
 
-    override fun loadForRequest(url: HttpUrl): List<Cookie> = cookiesByHost[url.host].orEmpty()
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        val now = System.currentTimeMillis()
+        val hostCookies = cookiesByHost[url.host] ?: return emptyList()
+        hostCookies.values.removeAll { it.expiresAt < now }
+        return hostCookies.values.toList()
+    }
 }

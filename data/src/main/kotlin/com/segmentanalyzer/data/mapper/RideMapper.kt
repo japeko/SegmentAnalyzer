@@ -17,4 +17,21 @@ fun RideEntity.toDomain(): Ride = Ride(
     isPersonalBest = isPersonalBest,
     elevationProfile = elevationProfilePreview,
     sourceFilePath = sourceFilePath,
+    externalId = externalId,
+)
+
+fun Ride.toEntity(): RideEntity = RideEntity(
+    id = 0,
+    externalId = externalId,
+    name = name,
+    activityType = activityType,
+    source = source,
+    startTimeEpochMillis = startTime.toEpochMilli(),
+    durationMillis = duration.toMillis(),
+    distanceMeters = distanceMeters,
+    elevationGainMeters = elevationGainMeters,
+    isPersonalBest = isPersonalBest,
+    elevationProfilePreview = elevationProfile,
+    sourceFilePath = sourceFilePath,
+    createdAtEpochMillis = Instant.now().toEpochMilli(),
 )

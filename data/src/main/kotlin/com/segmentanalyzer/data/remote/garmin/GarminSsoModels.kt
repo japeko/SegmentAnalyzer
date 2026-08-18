@@ -10,13 +10,16 @@ internal data class GarminSession(
     val expiresAt: Instant,
 )
 
+/** Where a [GarminSsoClient] login call currently stands. */
+internal sealed class GarminSsoStep {
+    data class LoggedIn(val session: GarminSession) : GarminSsoStep()
+    data object MfaRequired : GarminSsoStep()
+}
+
 /** Failure modes surfaced from the Garmin Connect SSO login flow. */
 sealed class GarminSsoException(message: String) : Exception(message) {
     data object InvalidCredentials :
         GarminSsoException("Invalid Garmin Connect username or password.")
-
-    data object MfaRequired :
-        GarminSsoException("This Garmin account requires multi-factor authentication, which isn't supported yet.")
 
     data class Unavailable(val detail: String) :
         GarminSsoException("Couldn't reach Garmin Connect: $detail")

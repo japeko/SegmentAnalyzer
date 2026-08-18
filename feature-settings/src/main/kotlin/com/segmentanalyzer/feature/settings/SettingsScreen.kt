@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.domain.model.ActivitySource
@@ -94,7 +95,12 @@ private fun GarminConnectionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 SourceTag(source = ActivitySource.GARMIN)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusDot(connected = isConnected)
@@ -105,12 +111,14 @@ private fun GarminConnectionCard(
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
 
             OutlinedButton(onClick = if (isConnected) onDisconnectClick else onConnectClick) {
-                Text(if (isConnected) "Disconnect" else "Connect")
+                Text(if (isConnected) "Disconnect" else "Connect", maxLines = 1, softWrap = false)
             }
         }
     }

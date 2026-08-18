@@ -30,6 +30,9 @@ object DatabaseModule {
             SegmentAnalyzerDatabase.DATABASE_NAME,
         )
             .addCallback(seedCallbackFactory.get())
+            // Pre-release (0.1.0), no real user data yet — destructive migration is fine until
+            // the schema settles and proper migrations are worth writing.
+            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
     @Provides

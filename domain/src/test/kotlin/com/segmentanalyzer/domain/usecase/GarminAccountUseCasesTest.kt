@@ -1,5 +1,6 @@
 package com.segmentanalyzer.domain.usecase
 
+import com.segmentanalyzer.domain.model.GarminConnectResult
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import kotlinx.coroutines.flow.Flow
@@ -54,11 +55,15 @@ private class FakeGarminAccountRepository : GarminAccountRepository {
 
     override fun observeConnectionState(): Flow<GarminConnectionState> = state
 
-    override suspend fun connect(username: String, password: String): Result<Unit> {
+    override fun lastUsername(): String? = null
+
+    override suspend fun connect(username: String, password: String): Result<GarminConnectResult> {
         lastConnectAttempt = username to password
         state.value = GarminConnectionState.Connected(username, Instant.EPOCH)
-        return Result.success(Unit)
+        return Result.success(GarminConnectResult.Connected)
     }
+
+    override suspend fun submitMfaCode(code: String): Result<Unit> = Result.success(Unit)
 
     override suspend fun disconnect() {
         state.value = GarminConnectionState.Disconnected
