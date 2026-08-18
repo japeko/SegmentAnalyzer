@@ -15,12 +15,16 @@ import com.segmentanalyzer.feature.auth.garmin.GarminLoginRoute
 import com.segmentanalyzer.feature.auth.strava.StravaCallbackRoute
 import com.segmentanalyzer.feature.history.history.RideHistoryRoute
 import com.segmentanalyzer.feature.history.records.RecordsRoute
+import com.segmentanalyzer.feature.importer.ImportSourceRoute
+import com.segmentanalyzer.feature.importer.fit.FitFileImportRoute
 import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
 import com.segmentanalyzer.feature.segments.SegmentsRoute
 import com.segmentanalyzer.feature.settings.SettingsRoute
 
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
+private const val IMPORT_SOURCE_ROUTE = "import_source"
+private const val FIT_FILE_IMPORT_ROUTE = "fit_file_import"
 
 /** Must match the intent-filter path in AndroidManifest.xml (minus the code/error query args). */
 const val STRAVA_CALLBACK_ROUTE_BASE = "strava_callback"
@@ -47,7 +51,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
             RideHistoryRoute(
                 onRideClick = { /* Ride Analysis screen isn't implemented yet. */ },
                 onSearchClick = { /* Search isn't implemented yet. */ },
-                onImportClick = { navController.navigate(GARMIN_IMPORT_ROUTE) },
+                onImportClick = { navController.navigate(IMPORT_SOURCE_ROUTE) },
             )
         }
         composable(TopLevelDestination.Segments.route) {
@@ -73,6 +77,16 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) },
                 onBackClick = { navController.popBackStack() },
             )
+        }
+        composable(IMPORT_SOURCE_ROUTE) {
+            ImportSourceRoute(
+                onGarminClick = { navController.navigate(GARMIN_IMPORT_ROUTE) },
+                onFitFileClick = { navController.navigate(FIT_FILE_IMPORT_ROUTE) },
+                onBackClick = { navController.popBackStack() },
+            )
+        }
+        composable(FIT_FILE_IMPORT_ROUTE) {
+            FitFileImportRoute(onBackClick = { navController.popBackStack() })
         }
         composable(
             route = STRAVA_CALLBACK_ROUTE,

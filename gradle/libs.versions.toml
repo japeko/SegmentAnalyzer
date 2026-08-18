@@ -17,6 +17,7 @@ okhttp = "4.12.0"
 kotlinxSerializationJson = "1.7.3"
 securityCrypto = "1.1.0"
 browser = "1.9.0"
+garminFit = "21.176.0"
 coreSplashscreen = "1.2.0"
 junit = "4.13.2"
 androidxTestExtJunit = "1.2.1"
@@ -67,10 +68,13 @@ okhttp-core = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
-# MapLibre (maps), a chart library, and the Garmin FIT SDK are declared in the stack by CLAUDE.md
-# but have no dependency here yet since no screen consuming them is in scope this pass. MapLibre
-# publishes to Maven Central as org.maplibre.gl:android-sdk; the FIT SDK is not Maven-published
-# (Garmin distributes it as a manual AAR) and will need to be vendored when feature-import lands.
+# Official Garmin FIT Java SDK — genuinely published on Maven Central (verified directly against
+# search.maven.org), a zero-dependency pure Java 8 library. Used by :data for local .fit file
+# import; no vendoring needed.
+garmin-fit = { group = "com.garmin", name = "fit", version.ref = "garminFit" }
+# MapLibre (maps) and a chart library are declared in the stack by CLAUDE.md but have no
+# dependency here yet since no screen consuming them is in scope this pass. MapLibre publishes to
+# Maven Central as org.maplibre.gl:android-sdk.
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }

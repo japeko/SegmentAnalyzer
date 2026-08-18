@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.okhttp.core)
     implementation(libs.androidx.security.crypto)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.garmin.fit)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
