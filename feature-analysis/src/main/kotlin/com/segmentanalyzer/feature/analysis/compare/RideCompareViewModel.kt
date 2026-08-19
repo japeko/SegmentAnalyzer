@@ -5,10 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
+import com.segmentanalyzer.domain.model.LatLng
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
+import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.util.gradientPercentSegments
 import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
 import com.segmentanalyzer.domain.util.routePoints
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private data class AddSheetState(val isVisible: Boolean = false, val selectedAddableId: Long? = null)
@@ -28,6 +33,7 @@ class RideCompareViewModel @Inject constructor(
     observeSegments: ObserveSegmentsUseCase,
     observeSegmentAttempts: ObserveSegmentAttemptsUseCase,
     private val buildTimeGapSeries: BuildTimeGapSeriesUseCase,
+    private val getAttemptTrack: GetAttemptTrackUseCase,
 ) : ViewModel() {
 
     private val segmentId: Long = checkNotNull(savedStateHandle["segmentId"])
@@ -36,14 +42,24 @@ class RideCompareViewModel @Inject constructor(
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val excludedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val addSheetState = MutableStateFlow(AddSheetState())
+    // Current's actual GPS track (with elevation, if the source ride had it) — used to draw the
+    // map's route gradient-colored by slope. Falls back to the segment's flat polyline if empty
+    // (e.g. a Garmin- or Strava-sourced ride, which has no stored track in V1).
+    private val currentTrack = MutableStateFlow<List<TrackPoint>>(emptyList())
+
+    init {
+        viewModelScope.launch {
+            currentTrack.value = getAttemptTrack(currentAttemptId)
+        }
+    }
 
     val uiState: StateFlow<RideCompareUiState> = combine(
         observeSegments().map { segments -> segments.find { it.id == segmentId } },
         observeSegmentAttempts(segmentId),
         selectedIds,
         excludedIds,
-        addSheetState,
-    ) { segment, attempts, selected, excluded, sheet ->
+        combine(addSheetState, currentTrack) { sheet, track -> sheet to track },
+    ) { segment, attempts, selected, excluded, (sheet, track) ->
         if (segment == null || attempts.isEmpty()) {
             return@combine RideCompareUiState(isLoading = true)
         }
@@ -115,7 +131,8 @@ class RideCompareViewModel @Inject constructor(
         RideCompareUiState(
             isLoading = false,
             segmentName = segment.name,
-            routePoints = segment.routePoints(),
+            routePoints = if (track.isNotEmpty()) track.map { LatLng(it.latitude, it.longitude) } else segment.routePoints(),
+            gradientPercents = if (track.isNotEmpty()) gradientPercentSegments(track) else null,
             chips = chips,
             timeGapSeries = timeGapSeries,
             statRows = buildStatRows(chips, attempts),

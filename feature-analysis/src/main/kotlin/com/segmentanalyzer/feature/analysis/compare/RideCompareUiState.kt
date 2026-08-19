@@ -34,6 +34,8 @@ data class RideCompareUiState(
     val isLoading: Boolean = true,
     val segmentName: String = "",
     val routePoints: List<LatLng> = emptyList(),
+    /** Gradient percent for each routePoints segment (size = routePoints.size - 1); null if unknown. */
+    val gradientPercents: List<Double>? = null,
     val chips: List<AttemptChip> = emptyList(),
     val timeGapSeries: List<TimeGapSeriesUi> = emptyList(),
     val statRows: List<CompareStatRow> = emptyList(),

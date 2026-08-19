@@ -70,6 +70,7 @@ fun RideCompareScreen(
                 item {
                     RoutePreviewCard(
                         routePoints = uiState.routePoints,
+                        gradientPercents = uiState.gradientPercents,
                         highlightFraction = scrubFraction,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                     )

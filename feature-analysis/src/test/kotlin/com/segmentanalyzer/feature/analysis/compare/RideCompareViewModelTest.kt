@@ -8,6 +8,7 @@ import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
+import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +87,40 @@ class RideCompareViewModelTest {
         assertEquals(AttemptRole.CURRENT, state.chips.first { it.attemptId == 2L }.role)
         assertEquals(AttemptRole.PERSONAL_BEST, state.chips.first { it.attemptId == 1L }.role)
         assertEquals(AttemptRole.PREVIOUS, state.chips.first { it.attemptId == 3L }.role)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `route uses Current's real GPS track, gradient-colored, when one is stored`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 100, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val other = attempt(2, seconds = 110, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val track = listOf(
+            TrackPoint(0.0, 0.0, elevationMeters = 100f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 0.0),
+            TrackPoint(0.001, 0.0, elevationMeters = 110f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 111.0),
+            TrackPoint(0.002, 0.0, elevationMeters = 105f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 222.0),
+        )
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, other), tracksByAttemptId = mapOf(1L to track))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(3, state.routePoints.size)
+        assertEquals(2, state.gradientPercents?.size)
+        assertTrue(state.gradientPercents!![0] > 0) // climbing 100 -> 110
+        assertTrue(state.gradientPercents[1] < 0) // descending 110 -> 105
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `route falls back to the segment's flat polyline when Current has no stored track`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 100, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.gradientPercents)
         collectJob.cancel()
     }
 
@@ -239,14 +274,19 @@ class RideCompareViewModelTest {
         collectJob.cancel()
     }
 
-    private fun viewModel(currentAttemptId: Long, attempts: List<SegmentAttempt>): RideCompareViewModel {
+    private fun viewModel(
+        currentAttemptId: Long,
+        attempts: List<SegmentAttempt>,
+        tracksByAttemptId: Map<Long, List<TrackPoint>> = emptyMap(),
+    ): RideCompareViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L, "anchorAttemptId" to currentAttemptId))
-        val attemptRepository = FakeCompareSegmentAttemptRepository(attempts)
+        val attemptRepository = FakeCompareSegmentAttemptRepository(attempts, tracksByAttemptId)
         return RideCompareViewModel(
             savedStateHandle,
             ObserveSegmentsUseCase(FakeCompareSegmentRepository()),
             ObserveSegmentAttemptsUseCase(attemptRepository),
             BuildTimeGapSeriesUseCase(attemptRepository),
+            GetAttemptTrackUseCase(attemptRepository),
         )
     }
 }
@@ -256,9 +296,12 @@ private class FakeCompareSegmentRepository : SegmentRepository {
     override suspend fun saveSegments(segments: List<Segment>): List<Long> = emptyList()
 }
 
-private class FakeCompareSegmentAttemptRepository(private val attempts: List<SegmentAttempt>) : SegmentAttemptRepository {
+private class FakeCompareSegmentAttemptRepository(
+    private val attempts: List<SegmentAttempt>,
+    private val tracksByAttemptId: Map<Long, List<TrackPoint>> = emptyMap(),
+) : SegmentAttemptRepository {
     override fun observeAttemptsForSegment(segmentId: Long) = MutableStateFlow(attempts)
-    override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
+    override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = tracksByAttemptId[attemptId].orEmpty()
     override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long) = 0
 }
