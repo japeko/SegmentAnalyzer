@@ -209,7 +209,7 @@ private fun PersonalBestCard(pr: AttemptItem, deltaSeconds: Long?, modifier: Mod
             }
         }
         Text(
-            text = "${pr.dateLabel} · ${pr.rideName}",
+            text = "${pr.dateLabel} · ${pr.lapLabel}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialThemeExtras.textTertiary,
             modifier = Modifier.padding(top = 4.dp),
