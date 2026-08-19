@@ -86,7 +86,7 @@ private fun UnavailableRow(item: AddableAttemptItem, modifier: Modifier = Modifi
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
-            Text(text = "${item.dateLabel} · ${item.lapLabel}", fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+            Text(text = item.dateLabel, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
             Text(text = item.statsLabel, fontFamily = NumericFontFamily, fontSize = 11.5.sp, color = MaterialThemeExtras.textTertiary)
         }
         Text(

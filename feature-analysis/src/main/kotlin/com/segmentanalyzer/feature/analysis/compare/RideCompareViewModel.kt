@@ -100,8 +100,8 @@ class RideCompareViewModel @Inject constructor(
                 lapLabel = lapLabels.getValue(attempt.id),
                 statsLabel = "${attempt.duration.toRideClock()} · %.1f km/h".format(attempt.avgSpeedKmh),
                 statusLabel = when {
-                    attempt.id == currentAttemptId -> "CURRENT"
-                    attempt.id in orderedIds -> "ADDED"
+                    attempt.id == currentAttemptId -> "CURRENT · ${lapLabels.getValue(attempt.id)}"
+                    attempt.id in orderedIds -> "ADDED · ${lapLabels.getValue(attempt.id)}"
                     else -> null
                 },
             )
