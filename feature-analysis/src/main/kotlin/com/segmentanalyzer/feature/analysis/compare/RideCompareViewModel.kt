@@ -97,6 +97,7 @@ class RideCompareViewModel @Inject constructor(
             AddableAttemptItem(
                 id = attempt.id,
                 dateLabel = attempt.startTime.toRideCardDate(),
+                lapLabel = lapLabels.getValue(attempt.id),
                 statsLabel = "${attempt.duration.toRideClock()} · %.1f km/h".format(attempt.avgSpeedKmh),
                 statusLabel = when {
                     attempt.id == currentAttemptId -> "CURRENT"
