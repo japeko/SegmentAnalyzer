@@ -156,6 +156,31 @@ class RideCompareViewModelTest {
     }
 
     @Test
+    fun `the Personal Best default chip can be removed, and re-added via the picker`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val pb = attempt(2, seconds = 2688, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, pb))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.chips.any { it.attemptId == 2L })
+
+        viewModel.onRemoveAttempt(2L)
+        advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.chips.size)
+        assertEquals(false, viewModel.uiState.value.chips.any { it.attemptId == 2L })
+
+        viewModel.onAddClick()
+        viewModel.onAddableAttemptSelected(2L)
+        viewModel.onConfirmAdd()
+        advanceUntilIdle()
+
+        val chip = viewModel.uiState.value.chips.first { it.attemptId == 2L }
+        assertEquals(AttemptRole.PERSONAL_BEST, chip.role)
+        collectJob.cancel()
+    }
+
+    @Test
     fun `total time row marks the fastest attempt as best`() = runTest(dispatcher) {
         val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
         val faster = attempt(2, seconds = 2688, startTime = Instant.parse("2026-08-05T00:00:00Z"))

@@ -34,14 +34,16 @@ class RideCompareViewModel @Inject constructor(
     private val currentAttemptId: Long = checkNotNull(savedStateHandle["anchorAttemptId"])
 
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val excludedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val addSheetState = MutableStateFlow(AddSheetState())
 
     val uiState: StateFlow<RideCompareUiState> = combine(
         observeSegments().map { segments -> segments.find { it.id == segmentId } },
         observeSegmentAttempts(segmentId),
         selectedIds,
+        excludedIds,
         addSheetState,
-    ) { segment, attempts, selected, sheet ->
+    ) { segment, attempts, selected, excluded, sheet ->
         if (segment == null || attempts.isEmpty()) {
             return@combine RideCompareUiState(isLoading = true)
         }
@@ -59,10 +61,13 @@ class RideCompareViewModel @Inject constructor(
             else -> AttemptRole.SELECTED
         }
 
+        // Current is always shown — it's the screen's anchor. Personal Best/Previous are only
+        // defaults; the user can dismiss either one (onRemoveAttempt), and re-add it later via
+        // the picker if they want it back.
         val defaultIds = listOfNotNull(
             current?.id,
-            personalBest?.id?.takeIf { it != current?.id },
-            previous?.id?.takeIf { it != current?.id && it != personalBest?.id },
+            personalBest?.id?.takeIf { it != current?.id && it !in excluded },
+            previous?.id?.takeIf { it != current?.id && it != personalBest?.id && it !in excluded },
         )
         val orderedIds = (defaultIds + selected.filter { it !in defaultIds }).distinct()
         val lapLabels = lapLabelsByAttemptId(attempts)
@@ -141,9 +146,15 @@ class RideCompareViewModel @Inject constructor(
         addSheetState.value = AddSheetState()
     }
 
-    /** Only manually-added (SELECTED) chips can be removed — Current/Personal Best/Previous are the fixed defaults. */
+    /**
+     * Removes a chip from the comparison — a manually-added one, or a Personal Best/Previous
+     * default (Current can't be removed; it's the screen's anchor and the UI never offers it).
+     * Excluding a default's id keeps it from being auto-picked again; re-adding it via the picker
+     * still works, since [selectedIds] is checked independently of [excludedIds].
+     */
     fun onRemoveAttempt(attemptId: Long) {
         selectedIds.value = selectedIds.value - attemptId
+        excludedIds.value = excludedIds.value + attemptId
     }
 }
 

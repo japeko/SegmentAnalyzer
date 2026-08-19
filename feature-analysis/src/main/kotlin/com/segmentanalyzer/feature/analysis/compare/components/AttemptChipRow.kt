@@ -68,7 +68,7 @@ private fun AttemptChipItem(chip: AttemptChip, onRemoveClick: (Long) -> Unit, mo
                     color = MaterialThemeExtras.textTertiary,
                 )
             }
-            if (chip.role == AttemptRole.SELECTED) {
+            if (chip.role != AttemptRole.CURRENT) {
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = "Remove from comparison",
