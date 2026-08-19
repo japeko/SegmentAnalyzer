@@ -19,13 +19,17 @@ import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.feature.analysis.compare.TimeGapSeriesUi
 import kotlin.math.abs
 
-/** One line per non-Current attempt: seconds ahead (negative, below zero-line) or behind (positive) Current, by distance. */
+/**
+ * One line per non-Current attempt: seconds ahead (negative, below zero-line) or behind
+ * (positive) Current, by distance. Current itself is always exactly 0 relative to itself, so it's
+ * drawn as a flat line in its own chip color ([currentColorIndex]) rather than plotted as a series.
+ */
 @Composable
-fun TimeGapChart(series: List<TimeGapSeriesUi>, modifier: Modifier = Modifier) {
-    val zeroLineColor = MaterialTheme.colorScheme.outline
+fun TimeGapChart(series: List<TimeGapSeriesUi>, currentColorIndex: Int = 0, modifier: Modifier = Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val extras = MaterialThemeExtras
+    val zeroLineColor = extras.compareColor(currentColorIndex, primary, tertiary)
     val seriesColors = series.map { extras.compareColor(it.colorIndex, primary, tertiary) }
 
     Canvas(
@@ -49,7 +53,8 @@ fun TimeGapChart(series: List<TimeGapSeriesUi>, modifier: Modifier = Modifier) {
             color = zeroLineColor,
             start = Offset(padding, zeroY),
             end = Offset(padding + w, zeroY),
-            strokeWidth = 1.dp.toPx(),
+            strokeWidth = 2.5.dp.toPx(),
+            cap = StrokeCap.Round,
         )
 
         series.forEachIndexed { seriesIndex, s ->

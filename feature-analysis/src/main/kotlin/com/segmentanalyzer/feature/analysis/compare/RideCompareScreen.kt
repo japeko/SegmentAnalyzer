@@ -77,7 +77,14 @@ fun RideCompareScreen(
                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp),
                     )
                 }
-                item { TimeGapChart(series = uiState.timeGapSeries, modifier = Modifier.padding(horizontal = 16.dp)) }
+                item {
+                    val currentColorIndex = uiState.chips.find { it.role == AttemptRole.CURRENT }?.colorIndex ?: 0
+                    TimeGapChart(
+                        series = uiState.timeGapSeries,
+                        currentColorIndex = currentColorIndex,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
             }
 
             if (uiState.statRows.isNotEmpty()) {
