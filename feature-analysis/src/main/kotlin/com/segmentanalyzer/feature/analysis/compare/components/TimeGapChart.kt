@@ -2,7 +2,9 @@ package com.segmentanalyzer.feature.analysis.compare.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,15 +59,19 @@ fun TimeGapChart(
                     if (w <= 0f) return 0f
                     return ((x - padding) / w).coerceIn(0f, 1f)
                 }
-                detectDragGestures(
-                    onDragStart = { offset -> onFractionSelected(fractionForX(offset.x)) },
-                    onDrag = { change, _ ->
+                // Claim the gesture on the very first touch (not detectDragGestures' touch-slop
+                // start), and consume every move immediately — otherwise the parent LazyColumn's
+                // vertical scroll wins any drag that isn't perfectly horizontal.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    onFractionSelected(fractionForX(down.position.x))
+                    drag(down.id) { change ->
                         onFractionSelected(fractionForX(change.position.x))
                         change.consume()
-                    },
-                    onDragEnd = { onFractionSelected(null) },
-                    onDragCancel = { onFractionSelected(null) },
-                )
+                    }
+                    onFractionSelected(null)
+                }
             },
     ) {
         if (series.isEmpty() || series.all { it.points.isEmpty() }) return@Canvas
