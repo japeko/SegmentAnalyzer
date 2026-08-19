@@ -15,6 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,6 +53,8 @@ fun RideCompareScreen(
             )
         },
     ) { padding ->
+        var scrubFraction by remember { mutableStateOf<Float?>(null) }
+
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item {
                 AttemptChipRow(
@@ -62,6 +68,7 @@ fun RideCompareScreen(
                 item {
                     RoutePreviewCard(
                         routePoints = uiState.routePoints,
+                        highlightFraction = scrubFraction,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                     )
                 }
@@ -82,6 +89,8 @@ fun RideCompareScreen(
                     TimeGapChart(
                         series = uiState.timeGapSeries,
                         currentColorIndex = currentColorIndex,
+                        selectedFraction = scrubFraction,
+                        onFractionSelected = { scrubFraction = it },
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }

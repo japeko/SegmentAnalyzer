@@ -11,7 +11,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,10 +28,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.segmentanalyzer.domain.model.LatLng
+import com.segmentanalyzer.domain.util.pointAtFraction
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -37,6 +44,7 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
@@ -46,25 +54,34 @@ private const val RASTER_SOURCE_ID = "osm-raster-source"
 private const val RASTER_LAYER_ID = "osm-raster-layer"
 private const val ROUTE_SOURCE_ID = "segment-route-source"
 private const val ROUTE_LAYER_ID = "segment-route-layer"
+private const val HIGHLIGHT_SOURCE_ID = "segment-highlight-source"
+private const val HIGHLIGHT_LAYER_ID = "segment-highlight-layer"
 private const val BOUNDS_PADDING_PX = 48
 
 /**
  * A real map (plain OpenStreetMap raster tiles — no API key/hosted style needed) showing a
  * segment's route, drawn from Strava's decoded polyline when available, else just a straight
  * line between the two endpoint coordinates. Shared between Segment Detail and Compare Rides.
+ *
+ * [highlightFraction] (0f..1f), when non-null, draws a marker that distance-fraction of the way
+ * along the route — used to sync a position scrubbed on a chart (e.g. Compare Rides' Time Gap
+ * chart) onto the map.
  */
 @Composable
-fun RoutePreviewCard(routePoints: List<LatLng>, modifier: Modifier = Modifier) {
+fun RoutePreviewCard(routePoints: List<LatLng>, highlightFraction: Float? = null, modifier: Modifier = Modifier) {
     if (routePoints.size < 2) return
 
     val routeColor = MaterialTheme.colorScheme.primary.toArgb()
+    val highlightStrokeColor = MaterialTheme.colorScheme.surface.toArgb()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
 
     val mapView = remember {
         MapView(context).apply {
             onCreate(null)
             getMapAsync { map ->
+                maplibreMap = map
                 map.setStyle(Style.Builder()) { style ->
                     style.addSource(RasterSource(RASTER_SOURCE_ID, TileSet("osm", OSM_TILE_URL), OSM_TILE_SIZE))
                     style.addLayer(RasterLayer(RASTER_LAYER_ID, RASTER_SOURCE_ID))
@@ -80,10 +97,33 @@ fun RoutePreviewCard(routePoints: List<LatLng>, modifier: Modifier = Modifier) {
                         ),
                     )
 
+                    style.addSource(GeoJsonSource(HIGHLIGHT_SOURCE_ID, FeatureCollection.fromFeatures(emptyArray())))
+                    style.addLayer(
+                        CircleLayer(HIGHLIGHT_LAYER_ID, HIGHLIGHT_SOURCE_ID).withProperties(
+                            PropertyFactory.circleRadius(7f),
+                            PropertyFactory.circleColor(routeColor),
+                            PropertyFactory.circleStrokeColor(highlightStrokeColor),
+                            PropertyFactory.circleStrokeWidth(2f),
+                        ),
+                    )
+
                     val boundsBuilder = LatLngBounds.Builder()
                     routePoints.forEach { boundsBuilder.include(MapLibreLatLng(it.latitude, it.longitude)) }
                     map.moveCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), BOUNDS_PADDING_PX))
                 }
+            }
+        }
+    }
+
+    LaunchedEffect(highlightFraction, routePoints) {
+        val map = maplibreMap ?: return@LaunchedEffect
+        val point = highlightFraction?.let { pointAtFraction(routePoints, it) }
+        map.getStyle { style ->
+            val source = style.getSourceAs<GeoJsonSource>(HIGHLIGHT_SOURCE_ID) ?: return@getStyle
+            if (point != null) {
+                source.setGeoJson(Feature.fromGeometry(Point.fromLngLat(point.longitude, point.latitude)))
+            } else {
+                source.setGeoJson(FeatureCollection.fromFeatures(emptyArray()))
             }
         }
     }
