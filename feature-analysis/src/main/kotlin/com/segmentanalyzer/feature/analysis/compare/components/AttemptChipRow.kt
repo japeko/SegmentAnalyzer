@@ -55,7 +55,11 @@ private fun AttemptChipItem(chip: AttemptChip, modifier: Modifier = Modifier) {
             Column(modifier = Modifier.size(9.dp).clip(CircleShape).background(color)) {}
             Column {
                 Text(text = chip.role.label(), fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
-                Text(text = chip.dateLabel, fontSize = 9.5.sp, color = MaterialThemeExtras.textTertiary)
+                Text(
+                    text = "${chip.dateLabel} · ${chip.lapLabel}",
+                    fontSize = 9.5.sp,
+                    color = MaterialThemeExtras.textTertiary,
+                )
             }
         }
     }

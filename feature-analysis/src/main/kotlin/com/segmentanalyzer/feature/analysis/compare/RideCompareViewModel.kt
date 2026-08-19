@@ -9,6 +9,7 @@ import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
 import com.segmentanalyzer.domain.util.routePoints
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,10 +65,17 @@ class RideCompareViewModel @Inject constructor(
             previous?.id?.takeIf { it != current?.id && it != personalBest?.id },
         )
         val orderedIds = (defaultIds + selected.filter { it !in defaultIds }).distinct()
+        val lapLabels = lapLabelsByAttemptId(attempts)
 
         val chips = orderedIds.mapIndexedNotNull { index, id ->
             attempts.find { it.id == id }?.let { attempt ->
-                AttemptChip(attemptId = id, role = roleFor(id), dateLabel = attempt.startTime.toRideCardDate(), colorIndex = index)
+                AttemptChip(
+                    attemptId = id,
+                    role = roleFor(id),
+                    dateLabel = attempt.startTime.toRideCardDate(),
+                    lapLabel = lapLabels.getValue(id),
+                    colorIndex = index,
+                )
             }
         }
 

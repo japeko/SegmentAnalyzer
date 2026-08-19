@@ -8,6 +8,7 @@ import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
 import com.segmentanalyzer.domain.util.routePoints
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -72,16 +73,6 @@ class SegmentDetailViewModel @Inject constructor(
 private fun normalizedSpeed(seconds: Long, min: Long?, max: Long?): Float {
     if (min == null || max == null || max == min) return 1f
     return 1f - (seconds - min).toFloat() / (max - min).toFloat()
-}
-
-/** "Ride 1", "Ride 2", ... per rideId, in chronological order — numbers each ride's own laps. */
-private fun lapLabelsByAttemptId(chronologicalAttempts: List<SegmentAttempt>): Map<Long, String> {
-    val lapNumberByRideId = mutableMapOf<Long, Int>()
-    return chronologicalAttempts.associate { attempt ->
-        val lapNumber = (lapNumberByRideId[attempt.rideId] ?: 0) + 1
-        lapNumberByRideId[attempt.rideId] = lapNumber
-        attempt.id to "Ride $lapNumber"
-    }
 }
 
 private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Long?, lapLabel: String): AttemptItem = AttemptItem(

@@ -5,7 +5,14 @@ import com.segmentanalyzer.domain.usecase.TimeGapPoint
 
 enum class AttemptRole { CURRENT, PERSONAL_BEST, PREVIOUS, SELECTED }
 
-data class AttemptChip(val attemptId: Long, val role: AttemptRole, val dateLabel: String, val colorIndex: Int)
+data class AttemptChip(
+    val attemptId: Long,
+    val role: AttemptRole,
+    val dateLabel: String,
+    /** "Ride 1", "Ride 2", ... — this attempt's lap number among all attempts from the same ride. */
+    val lapLabel: String,
+    val colorIndex: Int,
+)
 
 data class TimeGapSeriesUi(val attemptId: Long, val colorIndex: Int, val points: List<TimeGapPoint>)
 

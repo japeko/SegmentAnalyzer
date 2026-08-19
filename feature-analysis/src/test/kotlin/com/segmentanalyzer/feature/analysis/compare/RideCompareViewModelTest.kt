@@ -90,6 +90,24 @@ class RideCompareViewModelTest {
     }
 
     @Test
+    fun `chips are lap-labeled the same way as the Segment Detail attempts list`() = runTest(dispatcher) {
+        // Two laps of the same ride (rideId 9) plus a lap from a different ride (rideId 5).
+        val lap1 = attempt(1, seconds = 106, startTime = Instant.parse("2025-05-13T06:00:00Z")).copy(rideId = 9)
+        val lap2 = attempt(2, seconds = 108, startTime = Instant.parse("2025-05-13T06:10:00Z")).copy(rideId = 9)
+        val otherRide = attempt(3, seconds = 120, startTime = Instant.parse("2025-05-14T06:00:00Z")).copy(rideId = 5)
+        val viewModel = viewModel(currentAttemptId = 2L, attempts = listOf(lap1, lap2, otherRide))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val chips = viewModel.uiState.value.chips
+        assertEquals("Ride 2", chips.first { it.attemptId == 2L }.lapLabel)
+        // Not shown as a default chip, but its own numbering is independent of rideId 9's laps.
+        assertEquals(false, chips.any { it.attemptId == 3L })
+        collectJob.cancel()
+    }
+
+    @Test
     fun `adding an attempt from the picker includes it as a selected chip`() = runTest(dispatcher) {
         val current = attempt(1, seconds = 2700, startTime = Instant.parse("2026-08-16T00:00:00Z"))
         val older = attempt(2, seconds = 2800, startTime = Instant.parse("2026-06-06T00:00:00Z"))
