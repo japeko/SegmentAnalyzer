@@ -1,4 +1,4 @@
-package com.segmentanalyzer.feature.segments.detail.components
+package com.segmentanalyzer.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -49,9 +49,9 @@ private const val ROUTE_LAYER_ID = "segment-route-layer"
 private const val BOUNDS_PADDING_PX = 48
 
 /**
- * A real map (plain OpenStreetMap raster tiles — no API key/hosted style needed) showing the
+ * A real map (plain OpenStreetMap raster tiles — no API key/hosted style needed) showing a
  * segment's route, drawn from Strava's decoded polyline when available, else just a straight
- * line between the two endpoint coordinates.
+ * line between the two endpoint coordinates. Shared between Segment Detail and Compare Rides.
  */
 @Composable
 fun RoutePreviewCard(routePoints: List<LatLng>, modifier: Modifier = Modifier) {

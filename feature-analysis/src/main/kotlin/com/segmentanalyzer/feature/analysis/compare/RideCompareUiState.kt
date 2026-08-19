@@ -1,5 +1,6 @@
 package com.segmentanalyzer.feature.analysis.compare
 
+import com.segmentanalyzer.domain.model.LatLng
 import com.segmentanalyzer.domain.usecase.TimeGapPoint
 
 enum class AttemptRole { CURRENT, PERSONAL_BEST, PREVIOUS, SELECTED }
@@ -23,6 +24,7 @@ data class AddableAttemptItem(
 data class RideCompareUiState(
     val isLoading: Boolean = true,
     val segmentName: String = "",
+    val routePoints: List<LatLng> = emptyList(),
     val chips: List<AttemptChip> = emptyList(),
     val timeGapSeries: List<TimeGapSeriesUi> = emptyList(),
     val statRows: List<CompareStatRow> = emptyList(),

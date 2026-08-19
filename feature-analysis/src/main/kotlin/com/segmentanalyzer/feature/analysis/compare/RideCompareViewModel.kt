@@ -9,6 +9,7 @@ import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.util.routePoints
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,6 +101,7 @@ class RideCompareViewModel @Inject constructor(
         RideCompareUiState(
             isLoading = false,
             segmentName = segment.name,
+            routePoints = segment.routePoints(),
             chips = chips,
             timeGapSeries = timeGapSeries,
             statRows = buildStatRows(chips, attempts),

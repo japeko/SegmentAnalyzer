@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
+import com.segmentanalyzer.core.ui.RoutePreviewCard
 import com.segmentanalyzer.feature.analysis.compare.components.AttemptChipRow
 import com.segmentanalyzer.feature.analysis.compare.components.CompareStatsCard
 import com.segmentanalyzer.feature.analysis.compare.components.TimeGapChart
@@ -55,6 +56,15 @@ fun RideCompareScreen(
                     onAddClick = onAddClick,
                     modifier = Modifier.padding(start = 16.dp, top = 6.dp),
                 )
+            }
+
+            if (uiState.routePoints.size >= 2) {
+                item {
+                    RoutePreviewCard(
+                        routePoints = uiState.routePoints,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    )
+                }
             }
 
             if (uiState.timeGapSeries.isNotEmpty()) {

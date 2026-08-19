@@ -32,11 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
+import com.segmentanalyzer.core.ui.RoutePreviewCard
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.feature.segments.detail.components.AttemptRow
 import com.segmentanalyzer.feature.segments.detail.components.ProgressChart
-import com.segmentanalyzer.feature.segments.detail.components.RoutePreviewCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
