@@ -140,6 +140,11 @@ class RideCompareViewModel @Inject constructor(
         addSheetState.value.selectedAddableId?.let { id -> selectedIds.value = selectedIds.value + id }
         addSheetState.value = AddSheetState()
     }
+
+    /** Only manually-added (SELECTED) chips can be removed — Current/Personal Best/Previous are the fixed defaults. */
+    fun onRemoveAttempt(attemptId: Long) {
+        selectedIds.value = selectedIds.value - attemptId
+    }
 }
 
 private fun buildStatRows(chips: List<AttemptChip>, attempts: List<SegmentAttempt>): List<CompareStatRow> {

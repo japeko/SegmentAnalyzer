@@ -1,6 +1,7 @@
 package com.segmentanalyzer.feature.analysis.compare.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,18 +30,23 @@ import com.segmentanalyzer.feature.analysis.compare.AttemptChip
 import com.segmentanalyzer.feature.analysis.compare.AttemptRole
 
 @Composable
-fun AttemptChipRow(chips: List<AttemptChip>, onAddClick: () -> Unit, modifier: Modifier = Modifier) {
+fun AttemptChipRow(
+    chips: List<AttemptChip>,
+    onAddClick: () -> Unit,
+    onRemoveClick: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        chips.forEach { chip -> AttemptChipItem(chip) }
+        chips.forEach { chip -> AttemptChipItem(chip, onRemoveClick = onRemoveClick) }
         AddChip(onClick = onAddClick)
     }
 }
 
 @Composable
-private fun AttemptChipItem(chip: AttemptChip, modifier: Modifier = Modifier) {
+private fun AttemptChipItem(chip: AttemptChip, onRemoveClick: (Long) -> Unit, modifier: Modifier = Modifier) {
     val color = MaterialThemeExtras.compareColor(chip.colorIndex, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
 
     Surface(
@@ -59,6 +66,15 @@ private fun AttemptChipItem(chip: AttemptChip, modifier: Modifier = Modifier) {
                     text = "${chip.dateLabel} · ${chip.lapLabel}",
                     fontSize = 9.5.sp,
                     color = MaterialThemeExtras.textTertiary,
+                )
+            }
+            if (chip.role == AttemptRole.SELECTED) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Remove from comparison",
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clickable { onRemoveClick(chip.attemptId) },
                 )
             }
         }

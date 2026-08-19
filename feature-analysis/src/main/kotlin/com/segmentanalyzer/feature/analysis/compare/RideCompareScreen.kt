@@ -35,6 +35,7 @@ fun RideCompareScreen(
     uiState: RideCompareUiState,
     onBackClick: () -> Unit,
     onAddClick: () -> Unit,
+    onRemoveClick: (Long) -> Unit,
     onDismissAddSheet: () -> Unit,
     onAddableAttemptSelected: (Long) -> Unit,
     onConfirmAdd: () -> Unit,
@@ -60,6 +61,7 @@ fun RideCompareScreen(
                 AttemptChipRow(
                     chips = uiState.chips,
                     onAddClick = onAddClick,
+                    onRemoveClick = onRemoveClick,
                     modifier = Modifier.padding(start = 16.dp, top = 6.dp),
                 )
             }

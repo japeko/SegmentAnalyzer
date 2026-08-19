@@ -18,6 +18,7 @@ fun RideCompareRoute(
         uiState = uiState,
         onBackClick = onBackClick,
         onAddClick = viewModel::onAddClick,
+        onRemoveClick = viewModel::onRemoveAttempt,
         onDismissAddSheet = viewModel::onDismissAddSheet,
         onAddableAttemptSelected = viewModel::onAddableAttemptSelected,
         onConfirmAdd = viewModel::onConfirmAdd,

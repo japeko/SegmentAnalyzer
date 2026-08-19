@@ -131,6 +131,31 @@ class RideCompareViewModelTest {
     }
 
     @Test
+    fun `a manually-added chip can be removed again`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2700, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        // Later than Current and not the fastest, so it's SELECTED (not a default chip) once added.
+        val extra = attempt(2, seconds = 2900, startTime = Instant.parse("2026-08-20T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, extra))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onAddClick()
+        viewModel.onAddableAttemptSelected(2L)
+        viewModel.onConfirmAdd()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.chips.any { it.attemptId == 2L })
+
+        viewModel.onRemoveAttempt(2L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(false, state.chips.any { it.attemptId == 2L })
+        assertEquals(null, state.addableAttempts.first { it.id == 2L }.statusLabel)
+        collectJob.cancel()
+    }
+
+    @Test
     fun `total time row marks the fastest attempt as best`() = runTest(dispatcher) {
         val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
         val faster = attempt(2, seconds = 2688, startTime = Instant.parse("2026-08-05T00:00:00Z"))
