@@ -94,7 +94,14 @@ fun SegmentDetailScreen(
                     }
                 }
                 item { StatsRow(segment = segment, attemptCount = uiState.attempts.size) }
-                item { RoutePreviewCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) }
+                if (uiState.routePoints.size >= 2) {
+                    item {
+                        RoutePreviewCard(
+                            routePoints = uiState.routePoints,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                        )
+                    }
+                }
             }
 
             uiState.personalBest?.let { pr ->

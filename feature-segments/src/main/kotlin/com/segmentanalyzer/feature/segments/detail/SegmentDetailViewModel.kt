@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
+import com.segmentanalyzer.domain.model.LatLng
+import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.util.decodePolyline
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -50,6 +53,7 @@ class SegmentDetailViewModel @Inject constructor(
         SegmentDetailUiState(
             isLoading = false,
             segment = segment,
+            routePoints = segment?.routePoints().orEmpty(),
             personalBest = personalBest?.toItem(personalBest.duration.seconds, personalBest.id),
             personalBestDeltaSeconds = personalBestDeltaSeconds,
             progressPoints = progressPoints,
@@ -66,6 +70,22 @@ class SegmentDetailViewModel @Inject constructor(
 private fun normalizedSpeed(seconds: Long, min: Long?, max: Long?): Float {
     if (min == null || max == null || max == min) return 1f
     return 1f - (seconds - min).toFloat() / (max - min).toFloat()
+}
+
+/** The segment's route: Strava's decoded polyline if available, else just the two endpoints. */
+private fun Segment.routePoints(): List<LatLng> {
+    val decoded = polyline?.let { decodePolyline(it) }.orEmpty()
+    if (decoded.size >= 2) return decoded
+
+    val startLat = startLatitude
+    val startLon = startLongitude
+    val endLat = endLatitude
+    val endLon = endLongitude
+    return if (startLat != null && startLon != null && endLat != null && endLon != null) {
+        listOf(LatLng(startLat, startLon), LatLng(endLat, endLon))
+    } else {
+        emptyList()
+    }
 }
 
 private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Long?): AttemptItem = AttemptItem(
