@@ -56,7 +56,7 @@ fun AttemptRow(item: AttemptItem, onClick: (Long) -> Unit, modifier: Modifier = 
                     }
                 }
                 Text(
-                    text = item.rideName,
+                    text = item.lapLabel,
                     fontSize = 11.sp,
                     color = MaterialThemeExtras.textTertiary,
                     modifier = Modifier.padding(top = 2.dp),

@@ -48,14 +48,18 @@ class SegmentDetailViewModel @Inject constructor(
             )
         }
 
+        val lapLabels = lapLabelsByAttemptId(chronological)
+
         SegmentDetailUiState(
             isLoading = false,
             segment = segment,
             routePoints = segment?.routePoints().orEmpty(),
-            personalBest = personalBest?.toItem(personalBest.duration.seconds, personalBest.id),
+            personalBest = personalBest?.toItem(personalBest.duration.seconds, personalBest.id, lapLabels.getValue(personalBest.id)),
             personalBestDeltaSeconds = personalBestDeltaSeconds,
             progressPoints = progressPoints,
-            attempts = chronological.map { it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id) },
+            attempts = chronological.map {
+                it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
+            },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -70,11 +74,22 @@ private fun normalizedSpeed(seconds: Long, min: Long?, max: Long?): Float {
     return 1f - (seconds - min).toFloat() / (max - min).toFloat()
 }
 
-private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Long?): AttemptItem = AttemptItem(
+/** "Ride 1", "Ride 2", ... per rideId, in chronological order — numbers each ride's own laps. */
+private fun lapLabelsByAttemptId(chronologicalAttempts: List<SegmentAttempt>): Map<Long, String> {
+    val lapNumberByRideId = mutableMapOf<Long, Int>()
+    return chronologicalAttempts.associate { attempt ->
+        val lapNumber = (lapNumberByRideId[attempt.rideId] ?: 0) + 1
+        lapNumberByRideId[attempt.rideId] = lapNumber
+        attempt.id to "Ride $lapNumber"
+    }
+}
+
+private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Long?, lapLabel: String): AttemptItem = AttemptItem(
     id = id,
     rideId = rideId,
     rideName = rideName,
     dateLabel = startTime.toRideCardDate(),
+    lapLabel = lapLabel,
     durationLabel = duration.toRideClock(),
     deltaVsPrSeconds = duration.seconds - personalBestSeconds,
     isPersonalBest = id == personalBestId,

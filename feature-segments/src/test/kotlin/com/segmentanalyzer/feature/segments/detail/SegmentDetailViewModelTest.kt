@@ -91,6 +91,37 @@ class SegmentDetailViewModelTest {
     }
 
     @Test
+    fun `laps from the same ride are numbered Ride 1, Ride 2, etc in chronological order`() = runTest(dispatcher) {
+        val attempts = listOf(
+            SegmentAttempt(
+                id = 1, segmentId = 1, rideId = 99, rideName = "19112671911_ACTIVITY", rideSource = ActivitySource.FIT_FILE,
+                startTime = Instant.parse("2025-05-13T06:00:00Z"), duration = Duration.ofSeconds(106),
+                avgSpeedKmh = 20.0, elevationGainMeters = 0.0, avgPowerWatts = null,
+            ),
+            SegmentAttempt(
+                id = 2, segmentId = 1, rideId = 99, rideName = "19112671911_ACTIVITY", rideSource = ActivitySource.FIT_FILE,
+                startTime = Instant.parse("2025-05-13T06:10:00Z"), duration = Duration.ofSeconds(108),
+                avgSpeedKmh = 20.0, elevationGainMeters = 0.0, avgPowerWatts = null,
+            ),
+            SegmentAttempt(
+                id = 3, segmentId = 1, rideId = 42, rideName = "Other Ride", rideSource = ActivitySource.GPX_FILE,
+                startTime = Instant.parse("2025-05-14T06:00:00Z"), duration = Duration.ofSeconds(120),
+                avgSpeedKmh = 20.0, elevationGainMeters = 0.0, avgPowerWatts = null,
+            ),
+        )
+        val viewModel = viewModel(attempts)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("Ride 1", state.attempts.first { it.id == 1L }.lapLabel)
+        assertEquals("Ride 2", state.attempts.first { it.id == 2L }.lapLabel)
+        assertEquals("Ride 1", state.attempts.first { it.id == 3L }.lapLabel) // different rideId, own numbering
+        collectJob.cancel()
+    }
+
+    @Test
     fun `no attempts yields an empty state without a personal best`() = runTest(dispatcher) {
         val viewModel = viewModel(emptyList())
 

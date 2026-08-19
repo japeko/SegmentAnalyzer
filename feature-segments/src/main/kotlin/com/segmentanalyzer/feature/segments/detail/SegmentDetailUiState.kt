@@ -19,6 +19,8 @@ data class AttemptItem(
     val rideId: Long,
     val rideName: String,
     val dateLabel: String,
+    /** "Ride 1", "Ride 2", ... — this attempt's lap number among all attempts from the same ride. */
+    val lapLabel: String,
     val durationLabel: String,
     val deltaVsPrSeconds: Long,
     val isPersonalBest: Boolean,
