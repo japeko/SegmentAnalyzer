@@ -1,12 +1,10 @@
 package com.segmentanalyzer.feature.importer.gpx
 
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -17,22 +15,20 @@ fun GpxFileImportRoute(
     viewModel: GpxFileImportViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
-    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    // GetContent (ACTION_GET_CONTENT) rather than OpenDocument (ACTION_OPEN_DOCUMENT): the latter
+    // opens the Storage Access Framework's DocumentsUI tree, whose "Downloads" grid view requires
+    // a two-step tap (select, then a separate "Select" button) that reads as "can't pick a file"
+    // — GetContent is a single-tap chooser and needs no persistable URI grant since the file is
+    // read immediately below, not held onto.
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        try {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        } catch (e: SecurityException) {
-            // Some document providers don't support persistable grants — fine, we only need to
-            // read the file once, right now, for the import below.
-        }
         viewModel.onFileSelected(uri.toString())
     }
 
     GpxFileImportScreen(
         uiState = uiState,
-        onChooseFileClick = { pickFile.launch(arrayOf("*/*")) },
+        onChooseFileClick = { pickFile.launch("*/*") },
         onBackClick = onBackClick,
         modifier = modifier,
     )
