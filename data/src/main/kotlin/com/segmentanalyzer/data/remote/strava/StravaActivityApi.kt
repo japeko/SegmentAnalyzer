@@ -44,13 +44,13 @@ internal class StravaActivityApi @Inject constructor(
         afterEpochSeconds: Long,
         beforeEpochSeconds: Long,
     ): List<StravaActivitySummaryDto> = get(
-        "$ACTIVITIES_URL?after=$afterEpochSeconds&before=$beforeEpochSeconds&per_page=30",
+        "$ATHLETE_ACTIVITIES_URL?after=$afterEpochSeconds&before=$beforeEpochSeconds&per_page=30",
         accessToken,
         "activity list",
     )
 
     fun fetchActivityDetail(accessToken: String, activityId: Long): StravaActivityDetailDto =
-        get("$ACTIVITIES_URL/$activityId", accessToken, "activity detail")
+        get("$ACTIVITY_URL/$activityId", accessToken, "activity detail")
 
     private inline fun <reified T> get(url: String, accessToken: String, what: String): T {
         val request = Request.Builder()
@@ -75,6 +75,8 @@ internal class StravaActivityApi @Inject constructor(
     }
 
     private companion object {
-        const val ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities"
+        /** The athlete-scoped activity list — NOT the same base path as the single-activity detail endpoint below. */
+        const val ATHLETE_ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities"
+        const val ACTIVITY_URL = "https://www.strava.com/api/v3/activities"
     }
 }
