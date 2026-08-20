@@ -2,6 +2,7 @@ package com.segmentanalyzer.feature.history.detail
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,17 +11,20 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -35,6 +39,7 @@ import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.detail.components.MatchedSegmentRow
+import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +47,7 @@ fun RideDetailScreen(
     uiState: RideDetailUiState,
     onBackClick: () -> Unit,
     onSegmentClick: (Long) -> Unit,
+    onFetchStravaSegmentsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -128,6 +134,57 @@ fun RideDetailScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
+            }
+
+            item {
+                Text(
+                    text = "Strava Segment Times",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialThemeExtras.textTertiary,
+                    modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
+                )
+            }
+            stravaEffortsSection(uiState.stravaSegmentEfforts, onFetchStravaSegmentsClick)
+        }
+    }
+}
+
+private fun LazyListScope.stravaEffortsSection(
+    state: StravaEffortsUiState,
+    onFetchClick: () -> Unit,
+) {
+    when (state) {
+        StravaEffortsUiState.Idle -> item {
+            OutlinedButton(onClick = onFetchClick, modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text("Get Strava segment data")
+            }
+        }
+
+        StravaEffortsUiState.Loading -> item {
+            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+
+        is StravaEffortsUiState.Error -> item {
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Button(onClick = onFetchClick, modifier = Modifier.padding(top = 8.dp)) {
+                    Text("Retry")
+                }
+            }
+        }
+
+        is StravaEffortsUiState.Loaded -> if (state.efforts.isEmpty()) {
+            item { EmptyMessage("No matching Strava activity found for this ride.") }
+        } else {
+            items(state.efforts) { effort ->
+                StravaSegmentEffortRow(item = effort, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
         }
     }

@@ -1,14 +1,18 @@
 package com.segmentanalyzer.feature.history.detail
 
 import androidx.lifecycle.SavedStateHandle
+import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
+import com.segmentanalyzer.domain.repository.StravaActivityRepository
+import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
@@ -115,15 +119,77 @@ class RideDetailViewModelTest {
         collectJob.cancel()
     }
 
-    private fun viewModel(ride: Ride?, hasTrack: Boolean, matches: List<RideSegmentMatch>): RideDetailViewModel {
+    @Test
+    fun `fetching Strava segments shows loading then the fetched efforts`() = runTest(dispatcher) {
+        val efforts = listOf(
+            StravaSegmentEffort(
+                segmentName = "Skyline Climb",
+                elapsedTime = Duration.ofMinutes(4),
+                distanceMeters = 1_200.0,
+                komRank = null,
+                prRank = 2,
+            ),
+        )
+        val viewModel = viewModel(
+            ride = ride,
+            hasTrack = true,
+            matches = emptyList(),
+            stravaResult = Result.success(efforts),
+        )
+
+        viewModel.uiState.test {
+            skipItems(1)
+            assertEquals(StravaEffortsUiState.Idle, awaitItem().stravaSegmentEfforts)
+
+            viewModel.onFetchStravaSegmentsClick()
+
+            assertEquals(StravaEffortsUiState.Loading, awaitItem().stravaSegmentEfforts)
+            val loaded = awaitItem().stravaSegmentEfforts
+            assertEquals(1, (loaded as StravaEffortsUiState.Loaded).efforts.size)
+            assertEquals("Skyline Climb", loaded.efforts.first().segmentName)
+            assertEquals(2, loaded.efforts.first().prRank)
+        }
+    }
+
+    @Test
+    fun `a failed Strava fetch shows the error message`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            ride = ride,
+            hasTrack = true,
+            matches = emptyList(),
+            stravaResult = Result.failure(IllegalStateException("Strava session expired")),
+        )
+
+        viewModel.uiState.test {
+            skipItems(1)
+            assertEquals(StravaEffortsUiState.Idle, awaitItem().stravaSegmentEfforts)
+
+            viewModel.onFetchStravaSegmentsClick()
+
+            assertEquals(StravaEffortsUiState.Loading, awaitItem().stravaSegmentEfforts)
+            assertEquals(
+                StravaEffortsUiState.Error("Strava session expired"),
+                awaitItem().stravaSegmentEfforts,
+            )
+        }
+    }
+
+    private fun viewModel(
+        ride: Ride?,
+        hasTrack: Boolean,
+        matches: List<RideSegmentMatch>,
+        stravaResult: Result<List<StravaSegmentEffort>> = Result.success(emptyList()),
+    ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
         val rideRepository = FakeRideDetailRideRepository(ride, hasTrack)
         val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(matches)
+        val stravaActivityRepository = FakeStravaActivityRepository(stravaResult)
         return RideDetailViewModel(
             savedStateHandle,
             ObserveRideUseCase(rideRepository),
             ObserveRideHasTrackUseCase(rideRepository),
             ObserveSegmentMatchesForRideUseCase(segmentAttemptRepository),
+            FetchStravaSegmentEffortsUseCase(stravaActivityRepository),
         )
     }
 }
@@ -147,4 +213,10 @@ private class FakeRideDetailSegmentAttemptRepository(
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0
+}
+
+private class FakeStravaActivityRepository(
+    private val result: Result<List<StravaSegmentEffort>>,
+) : StravaActivityRepository {
+    override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = result
 }
