@@ -23,7 +23,7 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
             runCatching {
                 val session = validStravaSession(sessionStore, authApi) ?: throw StravaSessionExpiredException()
                 segmentApi.fetchStarredSegments(session.accessToken)
-                    .filter { it.activityType == "Ride" }
+                    .filter { it.isBikeSegment() }
                     .map { it.toDomain(polyline = fetchPolylineOrNull(session.accessToken, it.id.toString())) }
             }
         }
@@ -38,6 +38,14 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
         map?.polyline?.takeIf { it.isNotBlank() } ?: map?.summaryPolyline?.takeIf { it.isNotBlank() }
     }.getOrNull()
 }
+
+/**
+ * Strava tags segments with a narrower activity_type enum than activities — historically just
+ * "Ride"/"Run", but e-bike segments come back as "EBikeRide", not "Ride". Match on "Ride" as a
+ * substring so any bike variant Strava adds is included rather than silently dropped, while
+ * "Run" (and anything else non-bike) is still excluded.
+ */
+internal fun StravaSegmentDto.isBikeSegment(): Boolean = activityType.contains("Ride")
 
 private fun StravaSegmentDto.toDomain(polyline: String?): Segment = Segment(
     id = 0,
