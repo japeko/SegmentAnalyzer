@@ -1,0 +1,80 @@
+package com.segmentanalyzer.data.remote.strava
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.IOException
+import javax.inject.Inject
+
+@Serializable
+internal data class StravaActivitySummaryDto(
+    val id: Long,
+    @SerialName("start_date") val startDate: String,
+)
+
+@Serializable
+internal data class StravaSegmentEffortDto(
+    val name: String,
+    @SerialName("elapsed_time") val elapsedTime: Int,
+    val distance: Double,
+    @SerialName("kom_rank") val komRank: Int? = null,
+    @SerialName("pr_rank") val prRank: Int? = null,
+)
+
+@Serializable
+internal data class StravaActivityDetailDto(
+    @SerialName("segment_efforts") val segmentEfforts: List<StravaSegmentEffortDto> = emptyList(),
+)
+
+/**
+ * Fetches the athlete's activities and per-activity segment effort data from Strava's official
+ * REST API. Requires the `activity:read` OAuth scope — the narrower `read` scope this app
+ * originally requested only covers public profile/segment data, not activities.
+ */
+internal class StravaActivityApi @Inject constructor(
+    private val okHttpClient: OkHttpClient,
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    /** Activities starting within [afterEpochSeconds, beforeEpochSeconds]. */
+    fun fetchActivities(
+        accessToken: String,
+        afterEpochSeconds: Long,
+        beforeEpochSeconds: Long,
+    ): List<StravaActivitySummaryDto> = get(
+        "$ACTIVITIES_URL?after=$afterEpochSeconds&before=$beforeEpochSeconds&per_page=30",
+        accessToken,
+        "activity list",
+    )
+
+    fun fetchActivityDetail(accessToken: String, activityId: Long): StravaActivityDetailDto =
+        get("$ACTIVITIES_URL/$activityId", accessToken, "activity detail")
+
+    private inline fun <reified T> get(url: String, accessToken: String, what: String): T {
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        val body = try {
+            okHttpClient.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw StravaApiException("HTTP ${response.code}: $text")
+                text
+            }
+        } catch (e: IOException) {
+            throw StravaApiException(e.message ?: "network error", e)
+        }
+        return try {
+            json.decodeFromString(body)
+        } catch (e: Exception) {
+            throw StravaApiException("couldn't parse Strava's $what response", e)
+        }
+    }
+
+    private companion object {
+        const val ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities"
+    }
+}
