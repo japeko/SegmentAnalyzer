@@ -8,14 +8,22 @@ import com.segmentanalyzer.data.local.dao.RideDao
 import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptDao
 import com.segmentanalyzer.data.local.dao.SegmentDao
+import com.segmentanalyzer.data.local.dao.StravaSegmentEffortDao
 import com.segmentanalyzer.data.local.entity.RideEntity
 import com.segmentanalyzer.data.local.entity.RidePointEntity
 import com.segmentanalyzer.data.local.entity.SegmentAttemptEntity
 import com.segmentanalyzer.data.local.entity.SegmentEntity
+import com.segmentanalyzer.data.local.entity.StravaSegmentEffortEntity
 
 @Database(
-    entities = [RideEntity::class, SegmentEntity::class, RidePointEntity::class, SegmentAttemptEntity::class],
-    version = 6,
+    entities = [
+        RideEntity::class,
+        SegmentEntity::class,
+        RidePointEntity::class,
+        SegmentAttemptEntity::class,
+        StravaSegmentEffortEntity::class,
+    ],
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(RideTypeConverters::class)
@@ -24,6 +32,7 @@ abstract class SegmentAnalyzerDatabase : RoomDatabase() {
     abstract fun segmentDao(): SegmentDao
     abstract fun ridePointDao(): RidePointDao
     abstract fun segmentAttemptDao(): SegmentAttemptDao
+    abstract fun stravaSegmentEffortDao(): StravaSegmentEffortDao
 
     companion object {
         const val DATABASE_NAME = "segment_analyzer.db"

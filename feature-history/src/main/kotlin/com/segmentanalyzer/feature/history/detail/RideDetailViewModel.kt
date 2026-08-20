@@ -12,6 +12,7 @@ import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
+import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +27,7 @@ class RideDetailViewModel @Inject constructor(
     observeRide: ObserveRideUseCase,
     observeRideHasTrack: ObserveRideHasTrackUseCase,
     observeSegmentMatchesForRide: ObserveSegmentMatchesForRideUseCase,
+    observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
 ) : ViewModel() {
 
@@ -33,21 +35,28 @@ class RideDetailViewModel @Inject constructor(
 
     /** The ride from the most recent [uiState] emission, so onFetchStravaSegmentsClick can read it without a lag-prone second subscription. */
     private var latestRide: Ride? = null
-    private val stravaEffortsState = MutableStateFlow<StravaEffortsUiState>(StravaEffortsUiState.Idle)
+
+    /**
+     * Overrides the cache-derived Strava state once a fetch has been triggered in this
+     * ViewModel instance (Loading/Loaded/Error). Null means "show whatever's cached," so a ride
+     * with previously-fetched data opens already populated instead of forcing another fetch.
+     */
+    private val stravaEffortsOverride = MutableStateFlow<StravaEffortsUiState?>(null)
 
     val uiState = combine(
         observeRide(rideId),
         observeRideHasTrack(rideId),
         observeSegmentMatchesForRide(rideId),
-        stravaEffortsState,
-    ) { ride, hasTrack, matches, stravaEfforts ->
+        observeStravaSegmentEfforts(rideId),
+        stravaEffortsOverride,
+    ) { ride, hasTrack, matches, cachedEfforts, override ->
         latestRide = ride
         RideDetailUiState(
             isLoading = false,
             ride = ride?.toInfo(),
             hasTrack = hasTrack,
             matchedSegments = matches.map { it.toItem() },
-            stravaSegmentEfforts = stravaEfforts,
+            stravaSegmentEfforts = override ?: cachedEfforts.toUiState(),
         )
     }.stateIn(
         scope = viewModelScope,
@@ -57,9 +66,9 @@ class RideDetailViewModel @Inject constructor(
 
     fun onFetchStravaSegmentsClick() {
         val ride = latestRide ?: return
-        stravaEffortsState.value = StravaEffortsUiState.Loading
+        stravaEffortsOverride.value = StravaEffortsUiState.Loading
         viewModelScope.launch {
-            stravaEffortsState.value = fetchStravaSegmentEfforts(ride).fold(
+            stravaEffortsOverride.value = fetchStravaSegmentEfforts(ride).fold(
                 onSuccess = { efforts -> StravaEffortsUiState.Loaded(efforts.map { it.toItem() }) },
                 onFailure = { throwable ->
                     StravaEffortsUiState.Error(throwable.message ?: "Couldn't fetch Strava segment data.")
@@ -68,6 +77,9 @@ class RideDetailViewModel @Inject constructor(
         }
     }
 }
+
+private fun List<StravaSegmentEffort>.toUiState(): StravaEffortsUiState =
+    if (isEmpty()) StravaEffortsUiState.Idle else StravaEffortsUiState.Loaded(map { it.toItem() })
 
 private fun Ride.toInfo(): RideDetailInfo = RideDetailInfo(
     name = name,

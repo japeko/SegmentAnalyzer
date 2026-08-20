@@ -12,14 +12,17 @@ import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
+import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
+import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -152,6 +155,29 @@ class RideDetailViewModelTest {
     }
 
     @Test
+    fun `previously cached Strava efforts show immediately without needing a fetch`() = runTest(dispatcher) {
+        val cached = listOf(
+            StravaSegmentEffort(
+                segmentName = "Fireroad Descent",
+                elapsedTime = Duration.ofMinutes(2),
+                distanceMeters = 800.0,
+                komRank = 4,
+                prRank = null,
+            ),
+        )
+        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), cachedEfforts = cached)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = (viewModel.uiState.value.stravaSegmentEfforts as StravaEffortsUiState.Loaded)
+        assertEquals(1, state.efforts.size)
+        assertEquals("Fireroad Descent", state.efforts.first().segmentName)
+        assertEquals(4, state.efforts.first().komRank)
+        collectJob.cancel()
+    }
+
+    @Test
     fun `a failed Strava fetch shows the error message`() = runTest(dispatcher) {
         val viewModel = viewModel(
             ride = ride,
@@ -179,17 +205,20 @@ class RideDetailViewModelTest {
         hasTrack: Boolean,
         matches: List<RideSegmentMatch>,
         stravaResult: Result<List<StravaSegmentEffort>> = Result.success(emptyList()),
+        cachedEfforts: List<StravaSegmentEffort> = emptyList(),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
         val rideRepository = FakeRideDetailRideRepository(ride, hasTrack)
         val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(matches)
         val stravaActivityRepository = FakeStravaActivityRepository(stravaResult)
+        val stravaEffortRepository = FakeStravaSegmentEffortRepository(mutableMapOf(1L to cachedEfforts))
         return RideDetailViewModel(
             savedStateHandle,
             ObserveRideUseCase(rideRepository),
             ObserveRideHasTrackUseCase(rideRepository),
             ObserveSegmentMatchesForRideUseCase(segmentAttemptRepository),
-            FetchStravaSegmentEffortsUseCase(stravaActivityRepository),
+            ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
+            FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
         )
     }
 }
@@ -219,4 +248,17 @@ private class FakeStravaActivityRepository(
     private val result: Result<List<StravaSegmentEffort>>,
 ) : StravaActivityRepository {
     override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = result
+}
+
+private class FakeStravaSegmentEffortRepository(
+    initial: Map<Long, List<StravaSegmentEffort>> = emptyMap(),
+) : StravaSegmentEffortRepository {
+    private val state = MutableStateFlow(initial)
+
+    override fun observeEffortsForRide(rideId: Long): Flow<List<StravaSegmentEffort>> =
+        state.map { it[rideId].orEmpty() }
+
+    override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) {
+        state.value = state.value + (rideId to efforts)
+    }
 }

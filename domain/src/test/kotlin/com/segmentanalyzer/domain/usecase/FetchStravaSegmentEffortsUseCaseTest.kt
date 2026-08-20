@@ -5,6 +5,9 @@ import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
+import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -37,26 +40,34 @@ private fun effort(name: String) = StravaSegmentEffort(
 class FetchStravaSegmentEffortsUseCaseTest {
 
     @Test
-    fun `returns the segment efforts fetched for the ride`() = runTest {
+    fun `returns the segment efforts fetched for the ride and caches them`() = runTest {
         val efforts = listOf(effort("Skyline Climb"), effort("Fireroad Descent"))
-        val useCase = FetchStravaSegmentEffortsUseCase(FakeStravaActivityRepository(Result.success(efforts)))
+        val effortRepository = FakeStravaSegmentEffortRepository()
+        val useCase = FetchStravaSegmentEffortsUseCase(
+            FakeStravaActivityRepository(Result.success(efforts)),
+            effortRepository,
+        )
 
         val result = useCase(ride)
 
         assertTrue(result.isSuccess)
         assertEquals(efforts, result.getOrNull())
+        assertEquals(efforts, effortRepository.saved[ride.id])
     }
 
     @Test
-    fun `surfaces a fetch failure`() = runTest {
+    fun `surfaces a fetch failure without caching anything`() = runTest {
+        val effortRepository = FakeStravaSegmentEffortRepository()
         val useCase = FetchStravaSegmentEffortsUseCase(
             FakeStravaActivityRepository(Result.failure(IllegalStateException("session expired"))),
+            effortRepository,
         )
 
         val result = useCase(ride)
 
         assertTrue(result.isFailure)
         assertEquals("session expired", result.exceptionOrNull()?.message)
+        assertTrue(effortRepository.saved.isEmpty())
     }
 }
 
@@ -64,4 +75,15 @@ private class FakeStravaActivityRepository(
     private val result: Result<List<StravaSegmentEffort>>,
 ) : StravaActivityRepository {
     override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = result
+}
+
+private class FakeStravaSegmentEffortRepository : StravaSegmentEffortRepository {
+    val saved = mutableMapOf<Long, List<StravaSegmentEffort>>()
+
+    override fun observeEffortsForRide(rideId: Long): Flow<List<StravaSegmentEffort>> =
+        MutableStateFlow(saved[rideId].orEmpty())
+
+    override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) {
+        saved[rideId] = efforts
+    }
 }

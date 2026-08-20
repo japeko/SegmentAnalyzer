@@ -7,6 +7,7 @@ import com.segmentanalyzer.data.local.dao.RideDao
 import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptDao
 import com.segmentanalyzer.data.local.dao.SegmentDao
+import com.segmentanalyzer.data.local.dao.StravaSegmentEffortDao
 import com.segmentanalyzer.data.seed.RideSeedCallback
 import dagger.Module
 import dagger.Provides
@@ -49,4 +50,8 @@ object DatabaseModule {
 
     @Provides
     fun provideSegmentAttemptDao(database: SegmentAnalyzerDatabase): SegmentAttemptDao = database.segmentAttemptDao()
+
+    @Provides
+    fun provideStravaSegmentEffortDao(database: SegmentAnalyzerDatabase): StravaSegmentEffortDao =
+        database.stravaSegmentEffortDao()
 }
