@@ -56,11 +56,20 @@ private fun GarminActivityDto.toRideOrNull(): Ride? {
     )
 }
 
-/** Maps Garmin's activity type key to ours, or null if it isn't a cycling activity at all. */
-private fun String.toActivityTypeOrNull(): ActivityType? = when {
+/**
+ * Maps Garmin's activity type key to ours, or null if it isn't a bike ride at all.
+ *
+ * Deliberately broad so every bike variant Garmin has (indoor/virtual, e-bike, BMX, track,
+ * recumbent, hand-cycling, ...) is imported as [ActivityType.OTHER] rather than silently
+ * dropped just because it has no dedicated category here yet. "motorcycling" is excluded
+ * explicitly since it would otherwise match on "cycling".
+ */
+internal fun String.toActivityTypeOrNull(): ActivityType? = when {
+    contains("motorcyc") -> null
     contains("mountain") || contains("downhill") || contains("enduro") -> ActivityType.MTB
     contains("gravel") || contains("cyclocross") -> ActivityType.GRAVEL
     contains("road") || this == "cycling" -> ActivityType.ROAD
-    contains("cycling") || contains("biking") || contains("bike") -> ActivityType.OTHER
+    contains("cycling") || contains("biking") || contains("bike") ||
+        contains("virtual_ride") || contains("bmx") -> ActivityType.OTHER
     else -> null
 }
