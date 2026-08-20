@@ -19,6 +19,14 @@ interface RideDao {
     @Query("SELECT COUNT(*) FROM rides")
     suspend fun count(): Int
 
+    /**
+     * Whether a ride starting at [startTimeEpochMillis] is already stored. Used to de-duplicate
+     * FIT/GPX imports, which have no [RideEntity.externalId] to rely on for the unique index
+     * below (SQLite treats every NULL as distinct, so that index never catches them).
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM rides WHERE startTimeEpochMillis = :startTimeEpochMillis)")
+    suspend fun existsWithStartTime(startTimeEpochMillis: Long): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(rides: List<RideEntity>)
 

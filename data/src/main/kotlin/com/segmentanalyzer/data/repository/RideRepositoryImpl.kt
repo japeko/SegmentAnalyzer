@@ -32,6 +32,9 @@ class RideRepositoryImpl @Inject constructor(
         rideDao.insertIfNew(rides.map { it.toEntity() }).count { it != -1L }
 
     override suspend fun saveRide(ride: Ride): Long? = database.withTransaction {
+        if (ride.externalId == null && rideDao.existsWithStartTime(ride.startTime.toEpochMilli())) {
+            return@withTransaction null
+        }
         val id = rideDao.insertIfNew(listOf(ride.toEntity())).first()
         if (id == -1L) return@withTransaction null
         if (ride.track.isNotEmpty()) {

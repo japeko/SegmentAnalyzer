@@ -20,6 +20,10 @@ interface RideRepository {
      */
     suspend fun saveRides(rides: List<Ride>): Int
 
-    /** Saves a single ride and its track (if any). Returns the new row id, or null if it was a duplicate. */
+    /**
+     * Saves a single ride and its track (if any). Returns the new row id, or null if it was a
+     * duplicate — matched by [Ride.externalId] when present, otherwise by start time (local
+     * FIT/GPX imports have no externalId).
+     */
     suspend fun saveRide(ride: Ride): Long?
 }
