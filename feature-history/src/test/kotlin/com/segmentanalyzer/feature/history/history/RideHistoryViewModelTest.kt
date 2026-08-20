@@ -8,6 +8,7 @@ import com.segmentanalyzer.domain.usecase.ObserveMonthlySummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -82,6 +83,8 @@ class RideHistoryViewModelTest {
 private class FakeRideRepository(rides: List<Ride>) : RideRepository {
     private val flow = MutableStateFlow(rides)
     override fun observeRides() = flow
+    override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
 }

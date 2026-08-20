@@ -4,6 +4,7 @@ import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.repository.RideRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -60,6 +61,8 @@ class ObserveMonthlySummaryUseCaseTest {
 private class FakeRideRepository(rides: List<Ride>) : RideRepository {
     private val flow = MutableStateFlow(rides)
     override fun observeRides() = flow
+    override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
 }

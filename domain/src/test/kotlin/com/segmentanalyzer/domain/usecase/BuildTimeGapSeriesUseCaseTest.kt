@@ -84,6 +84,7 @@ class BuildTimeGapSeriesUseCaseTest {
 
 private class FakeTimeGapRepository(private val tracksByAttemptId: Map<Long, List<TrackPoint>>) : SegmentAttemptRepository {
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
+    override fun observeMatchesForRide(rideId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.RideSegmentMatch>())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = tracksByAttemptId.getValue(attemptId)
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0

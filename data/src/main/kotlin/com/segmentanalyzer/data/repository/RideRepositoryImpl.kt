@@ -22,6 +22,12 @@ class RideRepositoryImpl @Inject constructor(
     override fun observeRides(): Flow<List<Ride>> =
         rideDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
+    override fun observeRide(rideId: Long): Flow<Ride?> =
+        rideDao.rideById(rideId).map { entity -> entity?.toDomain() }
+
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> =
+        ridePointDao.observeHasTrack(rideId)
+
     override suspend fun saveRides(rides: List<Ride>): Int =
         rideDao.insertIfNew(rides.map { it.toEntity() }).count { it != -1L }
 

@@ -70,6 +70,8 @@ private class FakeImportRideRepository(private val newCount: Int) : RideReposito
         private set
 
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
+    override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
 
     override suspend fun saveRides(rides: List<Ride>): Int {
         saveCallCount++

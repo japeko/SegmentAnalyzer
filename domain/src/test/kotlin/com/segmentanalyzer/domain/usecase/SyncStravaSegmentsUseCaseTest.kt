@@ -78,6 +78,7 @@ private class FakeSegmentRepository(private val newCount: Int) : SegmentReposito
 
 private class FakeSyncSegmentAttemptRepository : SegmentAttemptRepository {
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
+    override fun observeMatchesForRide(rideId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.RideSegmentMatch>())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0

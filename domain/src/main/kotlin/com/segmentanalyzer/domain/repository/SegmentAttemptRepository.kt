@@ -1,5 +1,6 @@
 package com.segmentanalyzer.domain.repository
 
+import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
 import kotlinx.coroutines.flow.Flow
@@ -7,6 +8,9 @@ import kotlinx.coroutines.flow.Flow
 /** Matches locally-imported ride tracks against starred segments' start/end coordinates. */
 interface SegmentAttemptRepository {
     fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>>
+
+    /** Segments [rideId] passed through, chronological. */
+    fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>>
 
     /** The attempt's sub-track (entry..exit), distance re-based so the first point is 0. */
     suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint>

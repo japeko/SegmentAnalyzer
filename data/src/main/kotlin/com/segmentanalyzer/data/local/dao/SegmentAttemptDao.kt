@@ -15,6 +15,13 @@ data class SegmentAttemptWithRide(
     val rideSource: ActivitySource,
 )
 
+data class SegmentAttemptWithSegment(
+    @Embedded val attempt: SegmentAttemptEntity,
+    val segmentName: String,
+    val segmentDistanceMeters: Double,
+    val isPersonalBest: Boolean,
+)
+
 @Dao
 interface SegmentAttemptDao {
 
@@ -32,6 +39,18 @@ interface SegmentAttemptDao {
         """,
     )
     fun observeForSegment(segmentId: Long): Flow<List<SegmentAttemptWithRide>>
+
+    @Query(
+        """
+        SELECT a.*, s.name AS segmentName, s.distanceMeters AS segmentDistanceMeters,
+          (a.durationMillis = (SELECT MIN(durationMillis) FROM segment_attempts WHERE segmentId = a.segmentId)) AS isPersonalBest
+        FROM segment_attempts a
+        JOIN segments s ON s.id = a.segmentId
+        WHERE a.rideId = :rideId
+        ORDER BY a.startTimeEpochMillis ASC
+        """,
+    )
+    fun observeForRide(rideId: Long): Flow<List<SegmentAttemptWithSegment>>
 
     @Query("SELECT * FROM segment_attempts WHERE id = :attemptId")
     suspend fun attemptById(attemptId: Long): SegmentAttemptEntity?

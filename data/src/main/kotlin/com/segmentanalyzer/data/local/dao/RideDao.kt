@@ -13,6 +13,9 @@ interface RideDao {
     @Query("SELECT * FROM rides ORDER BY startTimeEpochMillis DESC")
     fun observeAll(): Flow<List<RideEntity>>
 
+    @Query("SELECT * FROM rides WHERE id = :rideId")
+    fun rideById(rideId: Long): Flow<RideEntity?>
+
     @Query("SELECT COUNT(*) FROM rides")
     suspend fun count(): Int
 

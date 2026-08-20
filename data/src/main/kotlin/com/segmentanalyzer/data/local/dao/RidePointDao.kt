@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import com.segmentanalyzer.data.local.entity.RidePointEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RidePointDao {
@@ -17,4 +18,7 @@ interface RidePointDao {
     /** Every ride id that has at least one stored track point (Garmin/Strava rides have none). */
     @Query("SELECT DISTINCT rideId FROM ride_points")
     suspend fun rideIdsWithTracks(): List<Long>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM ride_points WHERE rideId = :rideId)")
+    fun observeHasTrack(rideId: Long): Flow<Boolean>
 }

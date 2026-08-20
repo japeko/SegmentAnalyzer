@@ -73,6 +73,8 @@ private class FakeGpxRideRepository : RideRepository {
     private var nextId = 1L
 
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
+    override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
 
     override suspend fun saveRides(rides: List<Ride>): Int {
         savedRides += rides
@@ -87,6 +89,7 @@ private class FakeGpxRideRepository : RideRepository {
 
 private class FakeGpxSegmentAttemptRepository : SegmentAttemptRepository {
     override fun observeAttemptsForSegment(segmentId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentAttempt>())
+    override fun observeMatchesForRide(rideId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.RideSegmentMatch>())
     override suspend fun trackPointsForAttempt(attemptId: Long) = emptyList<com.segmentanalyzer.domain.model.TrackPoint>()
     override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long) = 0

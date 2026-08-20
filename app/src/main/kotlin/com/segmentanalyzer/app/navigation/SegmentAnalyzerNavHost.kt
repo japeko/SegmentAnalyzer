@@ -14,6 +14,7 @@ import androidx.navigation.navArgument
 import com.segmentanalyzer.feature.analysis.compare.RideCompareRoute
 import com.segmentanalyzer.feature.auth.garmin.GarminLoginRoute
 import com.segmentanalyzer.feature.auth.strava.StravaCallbackRoute
+import com.segmentanalyzer.feature.history.detail.RideDetailRoute
 import com.segmentanalyzer.feature.history.history.RideHistoryRoute
 import com.segmentanalyzer.feature.history.records.RecordsRoute
 import com.segmentanalyzer.feature.importer.ImportSourceRoute
@@ -31,6 +32,7 @@ private const val FIT_FILE_IMPORT_ROUTE = "fit_file_import"
 private const val GPX_FILE_IMPORT_ROUTE = "gpx_file_import"
 private const val SEGMENT_DETAIL_ROUTE = "segment_detail"
 private const val RIDE_COMPARE_ROUTE = "ride_compare"
+private const val RIDE_DETAIL_ROUTE = "ride_detail"
 
 /** Must match the intent-filter path in AndroidManifest.xml (minus the code/error query args). */
 const val STRAVA_CALLBACK_ROUTE_BASE = "strava_callback"
@@ -55,7 +57,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
     ) {
         composable(TopLevelDestination.Rides.route) {
             RideHistoryRoute(
-                onRideClick = { /* Ride Analysis screen isn't implemented yet. */ },
+                onRideClick = { rideId -> navController.navigate("$RIDE_DETAIL_ROUTE/$rideId") },
                 onSearchClick = { /* Search isn't implemented yet. */ },
                 onImportClick = { navController.navigate(IMPORT_SOURCE_ROUTE) },
             )
@@ -110,6 +112,15 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onAttemptClick = { segmentId, attemptId ->
                     navController.navigate("$RIDE_COMPARE_ROUTE/$segmentId?anchorAttemptId=$attemptId")
                 },
+            )
+        }
+        composable(
+            route = "$RIDE_DETAIL_ROUTE/{rideId}",
+            arguments = listOf(navArgument("rideId") { type = NavType.LongType }),
+        ) {
+            RideDetailRoute(
+                onBackClick = { navController.popBackStack() },
+                onSegmentClick = { segmentId -> navController.navigate("$SEGMENT_DETAIL_ROUTE/$segmentId") },
             )
         }
         composable(

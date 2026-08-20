@@ -7,7 +7,9 @@ import com.segmentanalyzer.data.local.dao.SegmentAttemptWithRide
 import com.segmentanalyzer.data.local.dao.SegmentDao
 import com.segmentanalyzer.data.local.entity.RidePointEntity
 import com.segmentanalyzer.data.local.entity.SegmentAttemptEntity
+import com.segmentanalyzer.data.local.dao.SegmentAttemptWithSegment
 import com.segmentanalyzer.data.local.entity.SegmentEntity
+import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
@@ -29,6 +31,9 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
 
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> =
         segmentAttemptDao.observeForSegment(segmentId).map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> =
+        segmentAttemptDao.observeForRide(rideId).map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> =
         withContext(dispatcherProvider.io) {
@@ -99,6 +104,17 @@ private fun RidePointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = T
     heartRateBpm = heartRateBpm,
     cadenceRpm = cadenceRpm,
     powerWatts = powerWatts,
+)
+
+private fun SegmentAttemptWithSegment.toDomain(): RideSegmentMatch = RideSegmentMatch(
+    attemptId = attempt.id,
+    segmentId = attempt.segmentId,
+    segmentName = segmentName,
+    segmentDistanceMeters = segmentDistanceMeters,
+    startTime = Instant.ofEpochMilli(attempt.startTimeEpochMillis),
+    duration = Duration.ofMillis(attempt.durationMillis),
+    avgSpeedKmh = attempt.avgSpeedKmh,
+    isPersonalBest = isPersonalBest,
 )
 
 private fun SegmentAttemptWithRide.toDomain(): SegmentAttempt = SegmentAttempt(

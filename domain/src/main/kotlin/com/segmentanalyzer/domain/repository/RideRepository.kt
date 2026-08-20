@@ -8,6 +8,12 @@ interface RideRepository {
     /** All rides, most recent first. */
     fun observeRides(): Flow<List<Ride>>
 
+    /** A single ride by id, or null if it doesn't exist. [Ride.track] is not populated. */
+    fun observeRide(rideId: Long): Flow<Ride?>
+
+    /** Whether [rideId] has a stored GPS track (only FIT/GPX-imported rides do). */
+    fun observeHasTrack(rideId: Long): Flow<Boolean>
+
     /**
      * Saves imported rides, skipping ones already present (matched by [Ride.externalId]).
      * Returns how many were newly inserted.
