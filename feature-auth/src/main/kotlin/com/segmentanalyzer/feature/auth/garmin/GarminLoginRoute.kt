@@ -22,11 +22,7 @@ fun GarminLoginRoute(
 
     GarminLoginScreen(
         uiState = uiState,
-        onUsernameChanged = viewModel::onUsernameChanged,
-        onPasswordChanged = viewModel::onPasswordChanged,
-        onMfaCodeChanged = viewModel::onMfaCodeChanged,
-        onConnectClick = viewModel::onConnectClick,
-        onSubmitMfaCodeClick = viewModel::onSubmitMfaCodeClick,
+        onWebViewUrlChanged = viewModel::onWebViewUrlChanged,
         onBackClick = onBackClick,
         modifier = modifier,
     )

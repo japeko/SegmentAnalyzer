@@ -1,17 +1,18 @@
 package com.segmentanalyzer.feature.auth.garmin
 
 import app.cash.turbine.test
-import com.segmentanalyzer.domain.model.GarminConnectResult
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
-import com.segmentanalyzer.domain.usecase.ConnectGarminAccountUseCase
+import com.segmentanalyzer.domain.usecase.CompleteGarminSignInUseCase
+import com.segmentanalyzer.domain.usecase.GetGarminSignInUrlUseCase
 import com.segmentanalyzer.domain.usecase.GetLastGarminUsernameUseCase
-import com.segmentanalyzer.domain.usecase.SubmitGarminMfaCodeUseCase
+import com.segmentanalyzer.domain.usecase.IsGarminSignInCompleteUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -38,101 +39,106 @@ class GarminLoginViewModelTest {
     }
 
     @Test
-    fun `successful connect updates state to connected`() = runTest(dispatcher) {
-        val viewModel = viewModel(FakeGarminAccountRepository())
+    fun `initial state carries the sign-in url and last username`() = runTest(dispatcher) {
+        val viewModel = viewModel(FakeGarminAccountRepository(lastUsername = "rider@example.com"))
 
-        viewModel.onUsernameChanged("rider@example.com")
-        viewModel.onPasswordChanged("hunter2")
-
-        viewModel.uiState.test {
-            assertTrue(awaitItem().canSubmit)
-
-            viewModel.onConnectClick()
-
-            assertTrue(awaitItem().isLoading)
-            val result = awaitItem()
-            assertTrue(result.isConnected)
-            assertNull(result.errorMessage)
-        }
+        val state = viewModel.uiState.value
+        assertEquals("rider@example.com", state.username)
+        assertEquals("https://sso.garmin.com/sso/signin?fake=true", state.signInUrl)
+        assertEquals(false, state.isConnected)
     }
 
     @Test
-    fun `failed connect surfaces the error message`() = runTest(dispatcher) {
-        val repository = FakeGarminAccountRepository(connectResult = Result.failure(IllegalStateException("bad credentials")))
+    fun `a non-completion url is ignored`() = runTest(dispatcher) {
+        val repository = FakeGarminAccountRepository()
         val viewModel = viewModel(repository)
 
-        viewModel.onUsernameChanged("rider@example.com")
-        viewModel.onPasswordChanged("wrong")
+        viewModel.onWebViewUrlChanged("https://sso.garmin.com/sso/signin")
+
+        assertEquals(false, viewModel.uiState.value.isExchangingToken)
+        assertNull(repository.lastCompleteSignIn)
+    }
+
+    @Test
+    fun `a completion url exchanges the ticket and connects`() = runTest(dispatcher) {
+        val repository = FakeGarminAccountRepository()
+        val viewModel = viewModel(repository)
 
         viewModel.uiState.test {
-            assertTrue(awaitItem().canSubmit)
+            assertEquals(false, awaitItem().isExchangingToken)
 
-            viewModel.onConnectClick()
+            viewModel.onWebViewUrlChanged("https://connect.garmin.com/modern?ticket=ST-1-abc")
 
-            assertTrue(awaitItem().isLoading)
-            val result = awaitItem()
-            assertEquals(false, result.isConnected)
-            assertEquals("bad credentials", result.errorMessage)
+            assertTrue(awaitItem().isExchangingToken)
+            val connected = awaitItem()
+            assertEquals(false, connected.isExchangingToken)
+            assertTrue(connected.isConnected)
+            assertEquals("" to "https://connect.garmin.com/modern?ticket=ST-1-abc", repository.lastCompleteSignIn)
         }
     }
 
     @Test
-    fun `MFA-required response moves to the code step, then submitting it connects`() = runTest(dispatcher) {
+    fun `a failed exchange surfaces the error message`() = runTest(dispatcher) {
         val repository = FakeGarminAccountRepository(
-            connectResult = Result.success(GarminConnectResult.MfaRequired),
-            mfaResult = Result.success(Unit),
+            completeSignInResult = Result.failure(IllegalStateException("Garmin Connect login failed: HTTP 500")),
         )
         val viewModel = viewModel(repository)
 
-        viewModel.onUsernameChanged("rider@example.com")
-        viewModel.onPasswordChanged("hunter2")
-
         viewModel.uiState.test {
-            assertTrue(awaitItem().canSubmit)
+            assertEquals(false, awaitItem().isExchangingToken)
 
-            viewModel.onConnectClick()
+            viewModel.onWebViewUrlChanged("https://connect.garmin.com/modern?ticket=ST-1-abc")
 
-            assertTrue(awaitItem().isLoading)
-            val awaitingMfa = awaitItem()
-            assertEquals(GarminLoginStep.MfaCode, awaitingMfa.step)
-            assertEquals(false, awaitingMfa.isConnected)
-
-            viewModel.onMfaCodeChanged("123456")
-            awaitItem() // mfaCode field update
-
-            viewModel.onSubmitMfaCodeClick()
-
-            assertTrue(awaitItem().isLoading)
-            val connected = awaitItem()
-            assertTrue(connected.isConnected)
-            assertEquals("123456", repository.lastMfaCode)
+            assertTrue(awaitItem().isExchangingToken)
+            val failed = awaitItem()
+            assertEquals(false, failed.isExchangingToken)
+            assertEquals(false, failed.isConnected)
+            assertEquals("Garmin Connect login failed: HTTP 500", failed.errorMessage)
         }
     }
+
+    @Test
+    fun `further url changes are ignored once already connected`() = runTest(dispatcher) {
+        val repository = FakeGarminAccountRepository()
+        val viewModel = viewModel(repository)
+
+        viewModel.onWebViewUrlChanged("https://connect.garmin.com/modern?ticket=ST-1-abc")
+        viewModel.onWebViewUrlChanged("https://connect.garmin.com/modern?ticket=ST-2-def")
+        advanceUntilIdle()
+
+        assertEquals(1, repository.completeSignInCallCount)
+    }
+
+    private fun viewModel(repository: GarminAccountRepository) = GarminLoginViewModel(
+        CompleteGarminSignInUseCase(repository),
+        IsGarminSignInCompleteUseCase(repository),
+        GetGarminSignInUrlUseCase(repository),
+        GetLastGarminUsernameUseCase(repository),
+    )
 }
 
-private fun viewModel(repository: GarminAccountRepository) = GarminLoginViewModel(
-    ConnectGarminAccountUseCase(repository),
-    SubmitGarminMfaCodeUseCase(repository),
-    GetLastGarminUsernameUseCase(repository),
-)
-
 private class FakeGarminAccountRepository(
-    private val connectResult: Result<GarminConnectResult> = Result.success(GarminConnectResult.Connected),
-    private val mfaResult: Result<Unit> = Result.success(Unit),
+    private val lastUsername: String? = null,
+    private val completeSignInResult: Result<Unit> = Result.success(Unit),
 ) : GarminAccountRepository {
     private val state = MutableStateFlow<GarminConnectionState>(GarminConnectionState.Disconnected)
-    var lastMfaCode: String? = null
+    var lastCompleteSignIn: Pair<String, String>? = null
+        private set
+    var completeSignInCallCount = 0
         private set
 
     override fun observeConnectionState(): Flow<GarminConnectionState> = state
 
-    override fun lastUsername(): String? = null
+    override fun lastUsername(): String? = lastUsername
 
-    override suspend fun connect(username: String, password: String): Result<GarminConnectResult> = connectResult
+    override fun signInUrl(): String = "https://sso.garmin.com/sso/signin?fake=true"
 
-    override suspend fun submitMfaCode(code: String): Result<Unit> {
-        lastMfaCode = code
-        return mfaResult
+    override fun isSignInComplete(url: String): Boolean = url.contains("ticket=")
+
+    override suspend fun completeSignIn(username: String, completionUrl: String): Result<Unit> {
+        completeSignInCallCount++
+        lastCompleteSignIn = username to completionUrl
+        return completeSignInResult
     }
 
     override suspend fun disconnect() {

@@ -1,7 +1,6 @@
 package com.segmentanalyzer.feature.settings
 
 import app.cash.turbine.test
-import com.segmentanalyzer.domain.model.GarminConnectResult
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
@@ -141,10 +140,11 @@ private class FakeGarminAccountRepository(
 
     override fun lastUsername(): String? = null
 
-    override suspend fun connect(username: String, password: String): Result<GarminConnectResult> =
-        Result.success(GarminConnectResult.Connected)
+    override fun signInUrl(): String = "https://sso.garmin.com/sso/signin?fake=true"
 
-    override suspend fun submitMfaCode(code: String): Result<Unit> = Result.success(Unit)
+    override fun isSignInComplete(url: String): Boolean = false
+
+    override suspend fun completeSignIn(username: String, completionUrl: String): Result<Unit> = Result.success(Unit)
 
     override suspend fun disconnect() {
         state.value = GarminConnectionState.Disconnected

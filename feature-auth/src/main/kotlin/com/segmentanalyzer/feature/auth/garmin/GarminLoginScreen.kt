@@ -1,48 +1,49 @@
 package com.segmentanalyzer.feature.auth.garmin
 
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GarminLoginScreen(
     uiState: GarminLoginUiState,
-    onUsernameChanged: (String) -> Unit,
-    onPasswordChanged: (String) -> Unit,
-    onMfaCodeChanged: (String) -> Unit,
-    onConnectClick: () -> Unit,
-    onSubmitMfaCodeClick: () -> Unit,
+    onWebViewUrlChanged: (String) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var retryCount by rememberSaveable { mutableIntStateOf(0) }
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -56,108 +57,119 @@ fun GarminLoginScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            when (uiState.step) {
-                GarminLoginStep.Credentials -> CredentialsForm(
-                    uiState = uiState,
-                    onUsernameChanged = onUsernameChanged,
-                    onPasswordChanged = onPasswordChanged,
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (uiState.signInUrl.isNotBlank() && !uiState.isConnected) {
+                GarminSignInWebView(
+                    url = uiState.signInUrl,
+                    reloadKey = retryCount,
+                    onUrlChanged = onWebViewUrlChanged,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                GarminLoginStep.MfaCode -> MfaCodeForm(
-                    uiState = uiState,
-                    onMfaCodeChanged = onMfaCodeChanged,
-                )
+            }
+
+            if (uiState.isExchangingToken) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = "Finishing sign-in…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
+                }
             }
 
             if (uiState.errorMessage != null) {
-                Text(
-                    text = uiState.errorMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            Button(
-                onClick = if (uiState.step == GarminLoginStep.Credentials) onConnectClick else onSubmitMfaCodeClick,
-                enabled = uiState.canSubmit,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text(if (uiState.step == GarminLoginStep.Credentials) "Connect" else "Submit code")
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(text = uiState.errorMessage, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Button(onClick = { retryCount++ }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Try again")
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * A WebView showing Garmin's real sign-in page — Cloudflare's bot-detection JS challenge on that
+ * page needs a real browser engine, which raw HTTP requests can't provide. [reloadKey] changing
+ * forces a brand new WebView instance (and so a fresh sign-in attempt), since a used ticket can't
+ * be replayed — this is inside `key()` rather than relying on `AndroidView`'s `update`, since
+ * `update` re-runs on any unrelated recomposition (e.g. the loading overlay toggling), which would
+ * otherwise reload the page on every state change, not just an explicit retry.
+ */
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun CredentialsForm(
-    uiState: GarminLoginUiState,
-    onUsernameChanged: (String) -> Unit,
-    onPasswordChanged: (String) -> Unit,
+private fun GarminSignInWebView(
+    url: String,
+    reloadKey: Int,
+    onUrlChanged: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = "Sign in with your Garmin Connect account to import rides. Your password " +
-            "is sent directly to Garmin and is never stored on this device.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    key(reloadKey) {
+        AndroidView(
+            modifier = modifier,
+            factory = { context ->
+                WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.useWideViewPort = true
+                    settings.loadWithOverviewMode = true
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            url?.let(onUrlChanged)
+                        }
 
-    OutlinedTextField(
-        value = uiState.username,
-        onValueChange = onUsernameChanged,
-        label = { Text("Email or username") },
-        singleLine = true,
-        enabled = !uiState.isLoading,
-        modifier = Modifier.fillMaxWidth(),
-    )
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            // Garmin's sign-in URL still carries id=gauth-widget — confirmed live
+                            // that this serves the *embeddable widget* markup (meant to sit inside
+                            // a small container on a host page), a fixed narrow width left-aligned
+                            // in body, not a normal responsive mobile page. useWideViewPort /
+                            // loadWithOverviewMode don't touch this — it's not a viewport-scaling
+                            // issue. Center it directly instead.
+                            view?.evaluateJavascript(
+                                "document.body.style.display='flex';" +
+                                    "document.body.style.flexDirection='column';" +
+                                    "document.body.style.alignItems='center';",
+                                null,
+                            )
+                        }
 
-    var passwordVisible by remember { mutableStateOf(false) }
+                        override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                            url?.let(onUrlChanged)
+                        }
 
-    OutlinedTextField(
-        value = uiState.password,
-        onValueChange = onPasswordChanged,
-        label = { Text("Password") },
-        singleLine = true,
-        enabled = !uiState.isLoading,
-        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        trailingIcon = {
-            TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                Text(if (passwordVisible) "Hide" else "Show")
-            }
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun MfaCodeForm(uiState: GarminLoginUiState, onMfaCodeChanged: (String) -> Unit) {
-    Text(
-        text = "Garmin sent a verification code to your email. Enter it below to finish connecting.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-
-    OutlinedTextField(
-        value = uiState.mfaCode,
-        onValueChange = onMfaCodeChanged,
-        label = { Text("Verification code") },
-        singleLine = true,
-        enabled = !uiState.isLoading,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth(),
-    )
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                            val requestUrl = request?.url?.toString() ?: return false
+                            requestUrl.let(onUrlChanged)
+                            // A CAS ticket is single-use: if we let the WebView keep navigating,
+                            // Garmin's own client-side JS (confirmed live — it bounces
+                            // /modern -> /app) redeems the ticket itself first, so our own
+                            // OAuth1 exchange 401s with "ticket not recognized". Stop the WebView
+                            // right here so we get first (and only) use of it.
+                            val isTicketUrl = requestUrl.contains("ticket=")
+                            if (isTicketUrl) Log.d("GarminSso", "WebView reached a ticket URL, halting further navigation: $requestUrl")
+                            return isTicketUrl
+                        }
+                    }
+                    loadUrl(url)
+                }
+            },
+        )
+    }
 }

@@ -3,8 +3,7 @@ package com.segmentanalyzer.data.repository
 import com.segmentanalyzer.common.DispatcherProvider
 import com.segmentanalyzer.data.local.GarminSessionStore
 import com.segmentanalyzer.data.remote.garmin.GarminSsoClient
-import com.segmentanalyzer.data.remote.garmin.GarminSsoStep
-import com.segmentanalyzer.domain.model.GarminConnectResult
+import com.segmentanalyzer.data.remote.garmin.GarminSsoException
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import kotlinx.coroutines.flow.Flow
@@ -21,26 +20,23 @@ internal class GarminAccountRepositoryImpl @Inject constructor(
 
     override fun lastUsername(): String? = sessionStore.lastUsername()
 
-    override suspend fun connect(username: String, password: String): Result<GarminConnectResult> =
-        withContext(dispatcherProvider.io) {
-            sessionStore.saveLastUsername(username)
-            runCatching { ssoClient.login(username, password).toDomainResult() }
-        }
+    override fun signInUrl(): String = ssoClient.signinUrl()
 
-    override suspend fun submitMfaCode(code: String): Result<Unit> =
+    override fun isSignInComplete(url: String): Boolean = ssoClient.ticketFrom(url) != null
+
+    override suspend fun completeSignIn(username: String, completionUrl: String): Result<Unit> =
         withContext(dispatcherProvider.io) {
-            runCatching { sessionStore.save(ssoClient.submitMfaCode(code).session) }
+            runCatching {
+                val ticket = ssoClient.ticketFrom(completionUrl)
+                    ?: throw GarminSsoException.Unexpected("no ticket in the sign-in completion URL")
+                val service = ssoClient.serviceFrom(completionUrl)
+                    ?: throw GarminSsoException.Unexpected("couldn't resolve the ticket's service URL")
+                sessionStore.saveLastUsername(username)
+                sessionStore.save(ssoClient.completeSession(username, ticket, service))
+            }
         }
 
     override suspend fun disconnect() {
         withContext(dispatcherProvider.io) { sessionStore.clear() }
-    }
-
-    private fun GarminSsoStep.toDomainResult(): GarminConnectResult = when (this) {
-        is GarminSsoStep.LoggedIn -> {
-            sessionStore.save(session)
-            GarminConnectResult.Connected
-        }
-        GarminSsoStep.MfaRequired -> GarminConnectResult.MfaRequired
     }
 }

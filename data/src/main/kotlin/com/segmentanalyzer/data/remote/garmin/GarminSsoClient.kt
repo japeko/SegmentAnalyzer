@@ -1,8 +1,7 @@
 package com.segmentanalyzer.data.remote.garmin
 
 import android.util.Log
-import okhttp3.FormBody
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -12,76 +11,43 @@ import java.time.Instant
 import javax.inject.Inject
 
 /**
- * Logs in to Garmin Connect via its unofficial SSO web flow: CSRF-protected form login, then
- * exchange the resulting service ticket for OAuth1 credentials, then exchange those for an
- * OAuth2 bearer token. Mirrors the reverse-engineered flow used by the garth / python-garminconnect
- * open-source clients, since Garmin has no public OAuth API for third-party apps — endpoint shapes
- * here are undocumented and Garmin can change them without notice.
+ * Completes Garmin Connect's unofficial SSO flow: given the CAS-style "ticket" produced once a
+ * rider finishes signing in (in a WebView showing Garmin's real page — see [signinUrl] and
+ * [ticketFrom]), exchange it for OAuth1 credentials, then OAuth2 tokens. Mirrors the
+ * reverse-engineered flow used by the garth / python-garminconnect open-source clients, since
+ * Garmin has no public OAuth API for third-party apps — endpoint shapes here are undocumented and
+ * Garmin can change them without notice.
  *
- * Accounts with multi-factor auth enabled get an extra round trip: [login] returns
- * [GarminSsoStep.MfaRequired] instead of throwing, and the in-progress login (its MFA-page CSRF
- * token) is held here until [submitMfaCode] completes it. This relies on the same [OkHttpClient]
- * (and its cookie jar) being reused between the two calls, which holds since this class is only
- * ever constructed once, injected into the singleton `GarminAccountRepositoryImpl`.
+ * Sign-in itself is deliberately *not* done via raw HTTP requests here: Garmin's `/sso/signin`
+ * endpoint is now behind Cloudflare's bot-detection JS challenge (confirmed live — the response
+ * embeds a `/cdn-cgi/challenge-platform/...` script), which only a real browser engine can satisfy.
+ * A WebView is a real browser engine; a plain OkHttp POST is not.
  */
 internal class GarminSsoClient @Inject constructor(
     private val okHttpClient: OkHttpClient,
 ) {
-    private var pendingMfa: PendingMfa? = null
+    /** The URL to load in a WebView for the rider to sign in on Garmin's real page. */
+    fun signinUrl(): String = "$SSO_BASE_URL/signin?" + encodeQuery(SIGNIN_PARAMS)
 
-    // Garmin's SSO is a classic CAS-style flow: success/MFA/failure is signaled by a redirect's
-    // Location header (e.g. a "...?ticket=..." target), not by the body of whatever page that
-    // redirect ultimately lands on. OkHttp follows redirects by default, which was silently
-    // throwing that signal away and leaving us looking at a generic landing-page shell instead.
-    private val noRedirectClient by lazy {
-        okHttpClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
+    /** True once [url] (observed as the WebView navigates) carries a completed-login ticket. */
+    fun ticketFrom(url: String): String? = TICKET_REGEX.find(url)?.groupValues?.get(1)
+
+    /**
+     * The service a ticket in [url] was actually issued for — [url] itself minus the `ticket`
+     * query param. Confirmed live that this is *not* always `SIGNIN_PARAMS["service"]`: Garmin's
+     * own client-side JS sometimes redirects `/modern` → `/app` and re-issues the ticket against
+     * `/app` instead, and Garmin 401s a `preauthorized` call whose `login-url` doesn't exactly
+     * match whatever service the ticket was really issued for.
+     */
+    fun serviceFrom(url: String): String? {
+        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        if (httpUrl.queryParameter("ticket") == null) return null
+        return httpUrl.newBuilder().removeAllQueryParameters("ticket").build().toString()
     }
 
-    suspend fun login(username: String, password: String): GarminSsoStep {
-        seedEmbedCookies()
-        val csrfToken = fetchCsrfToken()
-        return when (val result = submitCredentials(username, password, csrfToken)) {
-            is CredentialsResult.Ticket -> GarminSsoStep.LoggedIn(completeSession(username, result.ticket))
-            is CredentialsResult.MfaRequired -> {
-                pendingMfa = PendingMfa(username, result.csrfToken, result.pageUrl)
-                GarminSsoStep.MfaRequired
-            }
-        }
-    }
-
-    suspend fun submitMfaCode(code: String): GarminSsoStep.LoggedIn {
-        val pending = pendingMfa ?: throw GarminSsoException.Unexpected("no Garmin login is in progress")
-        Log.d(TAG, "submitting MFA code to ${pending.pageUrl} with csrf=${pending.csrfToken.take(8)}...")
-        val body = FormBody.Builder()
-            .add("mfa-code", code)
-            .add("embed", "false")
-            .add("_csrf", pending.csrfToken)
-            .add("fromPage", "setupEnterMfaCode")
-            .build()
-        val request = Request.Builder()
-            .url(pending.pageUrl)
-            .header("Referer", pending.pageUrl)
-            .post(body)
-            .build()
-        val response = executeNoRedirect(request)
-        val ticket = resolveTicket(response) ?: run {
-            Log.d(
-                TAG,
-                "MFA code not accepted: HTTP ${response.code}, Location=${response.location}, " +
-                    "body starts with: ${response.body.take(1500)}",
-            )
-            if (response.code == 429) throw GarminSsoException.Unexpected(RATE_LIMITED_MESSAGE)
-            throw GarminSsoException.Unexpected(
-                "that code wasn't accepted — check it and try again (see logcat tag \"$TAG\")",
-            )
-        }
-        pendingMfa = null
-        return GarminSsoStep.LoggedIn(completeSession(pending.username, ticket))
-    }
-
-    private fun completeSession(username: String, ticket: String): GarminSession {
+    suspend fun completeSession(username: String, ticket: String, service: String): GarminSession {
         val consumer = fetchOAuthConsumer()
-        val (oauth1Token, oauth1Secret) = exchangeTicketForOAuth1(ticket, consumer)
+        val (oauth1Token, oauth1Secret) = exchangeTicketForOAuth1(ticket, service, consumer)
         val (accessToken, refreshToken, expiresInSeconds) =
             exchangeOAuth1ForOAuth2(oauth1Token, oauth1Secret, consumer)
         return GarminSession(
@@ -92,123 +58,13 @@ internal class GarminSsoClient @Inject constructor(
         )
     }
 
-    /**
-     * Garmin's embed widget expects to be primed with cookies from `/sso/embed` before `/sso/signin`
-     * is ever touched. Skipping this (as this client did until now) still lets the sign-in page and
-     * CSRF token load fine, but the session apparently isn't fully valid — Garmin accepts the
-     * credentials POST and even the MFA redirect, but the MFA code POST silently bounces back to a
-     * fresh sign-in instead of completing, which matches losing track of an incompletely-seeded flow.
-     */
-    private fun seedEmbedCookies() {
-        val params = linkedMapOf("id" to "gauth-widget", "embedWidget" to "true")
-        val url = "$SSO_BASE_URL/embed?" + encodeQuery(params)
-        executeHtml(Request.Builder().url(url).get().build())
-    }
-
-    private fun fetchCsrfToken(): String {
-        val html = executeHtml(Request.Builder().url(signinUrl()).get().build())
-        return CSRF_REGEX.find(html)?.groupValues?.get(1)
-            ?: throw GarminSsoException.Unexpected("no CSRF token on the sign-in page")
-    }
-
-    private fun submitCredentials(username: String, password: String, csrfToken: String): CredentialsResult {
-        val body = FormBody.Builder()
-            .add("username", username)
-            .add("password", password)
-            .add("embed", "false")
-            .add("_csrf", csrfToken)
-            .build()
-        val request = Request.Builder()
-            .url(signinUrl())
-            .header("Referer", signinUrl())
-            .post(body)
-            .build()
-        val response = executeNoRedirect(request)
-
-        resolveTicket(response)?.let { return CredentialsResult.Ticket(it) }
-
-        if (response.location?.let { MFA_MARKER_REGEX.containsMatchIn(it) } == true) {
-            val mfaPageUrl = resolve(response.location)
-            val mfaPageHtml = executeHtml(Request.Builder().url(mfaPageUrl).get().build())
-            logForms(mfaPageHtml)
-            val mfaCsrfToken = CSRF_REGEX.find(mfaPageHtml)?.groupValues?.get(1)
-                ?: throw GarminSsoException.Unexpected("no CSRF token on the MFA page")
-            return CredentialsResult.MfaRequired(mfaCsrfToken, mfaPageUrl)
-        }
-        if (MFA_MARKER_REGEX.containsMatchIn(response.body)) {
-            val mfaCsrfToken = CSRF_REGEX.find(response.body)?.groupValues?.get(1)
-                ?: throw GarminSsoException.Unexpected("no CSRF token on the MFA page")
-            return CredentialsResult.MfaRequired(mfaCsrfToken, signinUrl())
-        }
-
-        Log.d(
-            TAG,
-            "unrecognized sign-in response: HTTP ${response.code}, Location=${response.location}, " +
-                "body starts with: ${response.body.take(1500)}",
-        )
-
-        if (response.code == 429) throw GarminSsoException.Unexpected(RATE_LIMITED_MESSAGE)
-
-        // Genuinely wrong credentials land back on a page titled "Sign In" with no ticket and no
-        // MFA marker. Anything else unrecognized (Garmin changed the page, a captcha, a locked
-        // account, ...) shouldn't be silently mislabeled as bad credentials — surface what Garmin
-        // actually returned instead so it's fixable.
-        val title = TITLE_REGEX.find(response.body)?.groupValues?.get(1)?.trim()
-        if (response.code !in 300..399 && (title == null || title.equals("Sign In", ignoreCase = true))) {
-            throw GarminSsoException.InvalidCredentials
-        }
-        throw GarminSsoException.Unexpected(
-            "unrecognized response from Garmin (HTTP ${response.code}" +
-                (response.location?.let { ", redirected to: $it" } ?: "") +
-                (title?.let { ", page title: \"$it\"" } ?: "") +
-                ") — see logcat tag \"$TAG\" for the full response",
-        )
-    }
-
-    /** Logs every `<form>` tag and `<input>` field name/value found, chunked to survive logcat's per-entry size limit. */
-    private fun logForms(html: String) {
-        val forms = FORM_TAG_REGEX.findAll(html).map { it.value }.joinToString("\n")
-        val inputs = INPUT_TAG_REGEX.findAll(html).map { it.value }.joinToString("\n")
-        val combined = "forms:\n$forms\n\ninputs:\n$inputs"
-        combined.chunked(1000).forEachIndexed { index, chunk ->
-            Log.d(TAG, "page form fields [$index]: $chunk")
-        }
-    }
-
-    /** A ticket can show up either in a redirect's target URL or embedded in a 200 page's body. */
-    private fun ticketFrom(response: RawResponse): String? =
-        response.location?.let { TICKET_REGEX.find(it)?.groupValues?.get(1) }
-            ?: TICKET_REGEX.find(response.body)?.groupValues?.get(1)
-
-    /**
-     * The ticket can be more than one redirect away — e.g. a successful MFA code POST redirects
-     * to `/sso/login?logintoken=...`, which itself redirects again to the final ticket URL. Follow
-     * up to [maxHops] further redirects (as plain GETs) looking for a ticket at each step.
-     */
-    private fun resolveTicket(initial: RawResponse, maxHops: Int = 5): String? {
-        var response = initial
-        repeat(maxHops + 1) {
-            ticketFrom(response)?.let { return it }
-            val location = response.location ?: return null
-            response = executeNoRedirect(Request.Builder().url(resolve(location)).get().build())
-        }
-        return null
-    }
-
-    private fun resolve(location: String): String =
-        if (location.startsWith("http")) {
-            location
-        } else {
-            signinUrl().toHttpUrl().resolve(location)?.toString() ?: location
-        }
-
-    private fun exchangeTicketForOAuth1(ticket: String, consumer: OAuthConsumer): Pair<String, String> {
+    private fun exchangeTicketForOAuth1(ticket: String, service: String, consumer: OAuthConsumer): Pair<String, String> {
         val url = "$OAUTH_BASE_URL/preauthorized"
         val params = linkedMapOf(
-            // Must match the "service" a ticket was actually issued for (SIGNIN_PARAMS) — Garmin
-            // validates the two match and 401s otherwise, per its own (helpfully explicit) error.
+            // Must match the service the ticket was actually issued for — Garmin validates the
+            // two match and 401s otherwise, per its own (helpfully explicit) error.
             "ticket" to ticket,
-            "login-url" to SIGNIN_PARAMS.getValue("service"),
+            "login-url" to service,
             "accepts-mfa-tokens" to "true",
         )
         val authHeader = GarminOAuth1Signer.authorizationHeader(
@@ -268,26 +124,6 @@ internal class GarminSsoClient @Inject constructor(
             ?: throw GarminSsoException.Unexpected("couldn't resolve Garmin's OAuth1 consumer credentials")
     }
 
-    /** SSO web pages always return 200, success/failure is distinguished by page content. */
-    private fun executeHtml(request: Request): String = try {
-        okHttpClient.newCall(request).execute().use { it.body?.string().orEmpty() }
-    } catch (e: IOException) {
-        throw GarminSsoException.Unavailable(e.message ?: "network error")
-    }
-
-    /** Like [executeHtml] but doesn't follow redirects, so the Location header stays inspectable. */
-    private fun executeNoRedirect(request: Request): RawResponse = try {
-        noRedirectClient.newCall(request).execute().use { response ->
-            RawResponse(
-                code = response.code,
-                location = response.header("Location"),
-                body = response.body?.string().orEmpty(),
-            )
-        }
-    } catch (e: IOException) {
-        throw GarminSsoException.Unavailable(e.message ?: "network error")
-    }
-
     private fun executeApi(request: Request): String = try {
         okHttpClient.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -302,21 +138,12 @@ internal class GarminSsoClient @Inject constructor(
         throw GarminSsoException.Unavailable(e.message ?: "network error")
     }
 
-    private fun signinUrl(): String = "$SSO_BASE_URL/signin?" + encodeQuery(SIGNIN_PARAMS)
-
     private fun encodeQuery(params: Map<String, String>): String =
         params.entries.joinToString("&") { (key, value) ->
             "${GarminOAuth1Signer.percentEncode(key)}=${GarminOAuth1Signer.percentEncode(value)}"
         }
 
     private data class OAuthConsumer(val key: String, val secret: String)
-    private data class PendingMfa(val username: String, val csrfToken: String, val pageUrl: String)
-    private data class RawResponse(val code: Int, val location: String?, val body: String)
-
-    private sealed class CredentialsResult {
-        data class Ticket(val ticket: String) : CredentialsResult()
-        data class MfaRequired(val csrfToken: String, val pageUrl: String) : CredentialsResult()
-    }
 
     private companion object {
         const val TAG = "GarminSso"
@@ -361,18 +188,7 @@ internal class GarminSsoClient @Inject constructor(
             "initialFocus" to "true",
         )
 
-        val CSRF_REGEX = Regex("""name="_csrf"\s+value="([^"]+)"""")
         val TICKET_REGEX = Regex("""ticket=([^"'&]+)""")
-        val TITLE_REGEX = Regex("""<title>(.*?)</title>""", RegexOption.IGNORE_CASE)
-        val FORM_TAG_REGEX = Regex("""<form\b[^>]*>""", RegexOption.IGNORE_CASE)
-        val INPUT_TAG_REGEX = Regex("""<input\b[^>]*>""", RegexOption.IGNORE_CASE)
-
-        // Broad on purpose: Garmin's exact MFA marker/URL is unverified against a live account,
-        // so this matches on any of several plausible signals rather than one exact string.
-        val MFA_MARKER_REGEX = Regex(
-            """verifyMFA|loginEnterMfaCode|mfa-code|two-factor|verification code""",
-            RegexOption.IGNORE_CASE,
-        )
         fun queryFieldRegex(field: String) = Regex("""(?:^|&)$field=([^&]+)""")
         fun jsonStringField(field: String) = Regex(""""$field"\s*:\s*"([^"]+)"""")
         fun jsonNumberField(field: String) = Regex(""""$field"\s*:\s*(\d+)""")

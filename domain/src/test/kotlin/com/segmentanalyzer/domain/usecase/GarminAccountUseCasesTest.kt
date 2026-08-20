@@ -1,6 +1,5 @@
 package com.segmentanalyzer.domain.usecase
 
-import com.segmentanalyzer.domain.model.GarminConnectResult
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import kotlinx.coroutines.flow.Flow
@@ -8,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -27,14 +27,31 @@ class GarminAccountUseCasesTest {
     }
 
     @Test
-    fun `connect use case delegates credentials to repository`() = runTest {
+    fun `sign-in url use case delegates to repository`() = runTest {
         val repository = FakeGarminAccountRepository()
-        val useCase = ConnectGarminAccountUseCase(repository)
+        val useCase = GetGarminSignInUrlUseCase(repository)
 
-        val result = useCase("rider@example.com", "hunter2")
+        assertEquals("https://sso.garmin.com/sso/signin?fake=true", useCase())
+    }
+
+    @Test
+    fun `sign-in complete use case delegates to repository`() = runTest {
+        val repository = FakeGarminAccountRepository()
+        val useCase = IsGarminSignInCompleteUseCase(repository)
+
+        assertFalse(useCase("https://connect.garmin.com/modern"))
+        assertTrue(useCase("https://connect.garmin.com/modern?ticket=ST-1-abc"))
+    }
+
+    @Test
+    fun `complete sign-in use case delegates the completion url to repository`() = runTest {
+        val repository = FakeGarminAccountRepository()
+        val useCase = CompleteGarminSignInUseCase(repository)
+
+        val result = useCase("rider@example.com", "https://connect.garmin.com/modern?ticket=ST-1-abc")
 
         assertTrue(result.isSuccess)
-        assertEquals("rider@example.com" to "hunter2", repository.lastConnectAttempt)
+        assertEquals("rider@example.com" to "https://connect.garmin.com/modern?ticket=ST-1-abc", repository.lastCompleteSignIn)
     }
 
     @Test
@@ -51,19 +68,21 @@ class GarminAccountUseCasesTest {
 
 private class FakeGarminAccountRepository : GarminAccountRepository {
     val state = MutableStateFlow<GarminConnectionState>(GarminConnectionState.Disconnected)
-    var lastConnectAttempt: Pair<String, String>? = null
+    var lastCompleteSignIn: Pair<String, String>? = null
 
     override fun observeConnectionState(): Flow<GarminConnectionState> = state
 
     override fun lastUsername(): String? = null
 
-    override suspend fun connect(username: String, password: String): Result<GarminConnectResult> {
-        lastConnectAttempt = username to password
-        state.value = GarminConnectionState.Connected(username, Instant.EPOCH)
-        return Result.success(GarminConnectResult.Connected)
-    }
+    override fun signInUrl(): String = "https://sso.garmin.com/sso/signin?fake=true"
 
-    override suspend fun submitMfaCode(code: String): Result<Unit> = Result.success(Unit)
+    override fun isSignInComplete(url: String): Boolean = url.contains("ticket=")
+
+    override suspend fun completeSignIn(username: String, completionUrl: String): Result<Unit> {
+        lastCompleteSignIn = username to completionUrl
+        state.value = GarminConnectionState.Connected(username, Instant.EPOCH)
+        return Result.success(Unit)
+    }
 
     override suspend fun disconnect() {
         state.value = GarminConnectionState.Disconnected

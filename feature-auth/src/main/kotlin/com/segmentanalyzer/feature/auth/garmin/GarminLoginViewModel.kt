@@ -2,10 +2,10 @@ package com.segmentanalyzer.feature.auth.garmin
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.segmentanalyzer.domain.model.GarminConnectResult
-import com.segmentanalyzer.domain.usecase.ConnectGarminAccountUseCase
+import com.segmentanalyzer.domain.usecase.CompleteGarminSignInUseCase
+import com.segmentanalyzer.domain.usecase.GetGarminSignInUrlUseCase
 import com.segmentanalyzer.domain.usecase.GetLastGarminUsernameUseCase
-import com.segmentanalyzer.domain.usecase.SubmitGarminMfaCodeUseCase
+import com.segmentanalyzer.domain.usecase.IsGarminSignInCompleteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,65 +15,33 @@ import javax.inject.Inject
 
 @HiltViewModel
 class GarminLoginViewModel @Inject constructor(
-    private val connectGarminAccount: ConnectGarminAccountUseCase,
-    private val submitGarminMfaCode: SubmitGarminMfaCodeUseCase,
+    private val completeGarminSignIn: CompleteGarminSignInUseCase,
+    private val isGarminSignInComplete: IsGarminSignInCompleteUseCase,
+    getGarminSignInUrl: GetGarminSignInUrlUseCase,
     getLastGarminUsername: GetLastGarminUsernameUseCase,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(GarminLoginUiState(username = getLastGarminUsername().orEmpty()))
+    private val username = getLastGarminUsername().orEmpty()
+
+    private val _uiState = MutableStateFlow(GarminLoginUiState(username = username, signInUrl = getGarminSignInUrl()))
     val uiState: StateFlow<GarminLoginUiState> = _uiState.asStateFlow()
 
-    fun onUsernameChanged(value: String) {
-        _uiState.value = _uiState.value.copy(username = value, errorMessage = null)
-    }
-
-    fun onPasswordChanged(value: String) {
-        _uiState.value = _uiState.value.copy(password = value, errorMessage = null)
-    }
-
-    fun onMfaCodeChanged(value: String) {
-        _uiState.value = _uiState.value.copy(mfaCode = value, errorMessage = null)
-    }
-
-    fun onConnectClick() {
+    /** Called with every URL the sign-in WebView navigates to; completes the login once it's the ticket redirect. */
+    fun onWebViewUrlChanged(url: String) {
         val current = _uiState.value
-        if (!current.canSubmit) return
+        if (current.isExchangingToken || current.isConnected) return
+        if (!isGarminSignInComplete(url)) return
 
-        _uiState.value = current.copy(isLoading = true, errorMessage = null)
+        _uiState.value = current.copy(isExchangingToken = true, errorMessage = null)
         viewModelScope.launch {
-            connectGarminAccount(current.username.trim(), current.password).fold(
-                onSuccess = { result ->
-                    _uiState.value = when (result) {
-                        GarminConnectResult.Connected ->
-                            _uiState.value.copy(isLoading = false, isConnected = true)
-                        GarminConnectResult.MfaRequired ->
-                            _uiState.value.copy(isLoading = false, step = GarminLoginStep.MfaCode)
-                    }
-                },
-                onFailure = { throwable ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = throwable.message ?: "Couldn't connect to Garmin Connect.",
-                    )
-                },
-            )
-        }
-    }
-
-    fun onSubmitMfaCodeClick() {
-        val current = _uiState.value
-        if (!current.canSubmit) return
-
-        _uiState.value = current.copy(isLoading = true, errorMessage = null)
-        viewModelScope.launch {
-            submitGarminMfaCode(current.mfaCode.trim()).fold(
+            completeGarminSignIn(username, url).fold(
                 onSuccess = {
-                    _uiState.value = _uiState.value.copy(isLoading = false, isConnected = true)
+                    _uiState.value = _uiState.value.copy(isExchangingToken = false, isConnected = true)
                 },
                 onFailure = { throwable ->
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = throwable.message ?: "That code wasn't accepted.",
+                        isExchangingToken = false,
+                        errorMessage = throwable.message ?: "Couldn't connect to Garmin Connect.",
                     )
                 },
             )
