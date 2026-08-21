@@ -43,7 +43,9 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
             val attempt = segmentAttemptDao.attemptById(attemptId) ?: return@withContext emptyList()
             val stravaEffortExternalId = attempt.stravaEffortExternalId
             if (stravaEffortExternalId != null) {
-                return@withContext stravaSegmentEffortPointDao.forEffort(stravaEffortExternalId).map { it.toDomain() }
+                val stravaPoints = stravaSegmentEffortPointDao.forEffort(stravaEffortExternalId)
+                val baseDistance = stravaPoints.firstOrNull()?.distanceMeters ?: 0.0
+                return@withContext stravaPoints.map { it.toDomain(baseDistance) }
             }
 
             val points = ridePointDao.pointsForRide(attempt.rideId)
@@ -157,14 +159,21 @@ private fun RidePointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = T
  * see [com.segmentanalyzer.domain.model.StravaSegmentEffortPoint]), and no real wall-clock time
  * for the effort itself, only elapsed seconds — [elapsedSecondsCurve] in
  * [com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase] only needs deltas between
- * timestamps, so an arbitrary shared epoch is fine.
+ * timestamps, so an arbitrary shared epoch is fine. [distanceMeters] is re-based by
+ * [baseDistanceMeters] the same way [RidePointEntity.toDomain] re-bases a local sub-track —
+ * Strava's own `distance` stream for `/segment_efforts/{id}/streams` isn't reliably re-based to 0
+ * at the effort's start, so without this every point here could land far outside the
+ * `0..segment.distanceMeters` range [com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase]
+ * samples, making every lookup clamp to the same first-point value — a real bug that showed up as
+ * a Time Gap chart comparing two Strava-derived attempts rendering as a flat zero line the whole
+ * way, despite a real difference in their actual finish times.
  */
-private fun StravaSegmentEffortPointEntity.toDomain(): TrackPoint = TrackPoint(
+private fun StravaSegmentEffortPointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = TrackPoint(
     latitude = latitude,
     longitude = longitude,
     elevationMeters = null,
     timestamp = Instant.EPOCH.plusSeconds(timeSeconds.toLong()),
-    cumulativeDistanceMeters = distanceMeters,
+    cumulativeDistanceMeters = distanceMeters - baseDistanceMeters,
 )
 
 private fun SegmentAttemptWithSegment.toDomain(): RideSegmentMatch = RideSegmentMatch(
