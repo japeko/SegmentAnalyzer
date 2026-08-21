@@ -28,7 +28,7 @@ internal class StravaAccountRepositoryImpl @Inject constructor(
             "&redirect_uri=$encodedRedirect" +
             "&response_type=code" +
             "&approval_prompt=auto" +
-            "&scope=read,activity:read"
+            "&scope=read,activity:read_all"
     }
 
     override suspend fun exchangeAuthorizationCode(code: String): Result<Unit> =

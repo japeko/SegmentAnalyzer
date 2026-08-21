@@ -36,8 +36,9 @@ internal data class StravaActivityDetailDto(
 
 /**
  * Fetches the athlete's activities and per-activity segment effort data from Strava's official
- * REST API. Requires the `activity:read` OAuth scope — the narrower `read` scope this app
- * originally requested only covers public profile/segment data, not activities.
+ * REST API. Requires the `activity:read_all` OAuth scope — the narrower `read` scope this app
+ * originally requested only covers public profile/segment data, not activities. `activity:read`
+ * alone was tried first but left `GET /segments/{id}/all_efforts` returning an empty list.
  */
 internal class StravaActivityApi @Inject constructor(
     private val okHttpClient: OkHttpClient,
