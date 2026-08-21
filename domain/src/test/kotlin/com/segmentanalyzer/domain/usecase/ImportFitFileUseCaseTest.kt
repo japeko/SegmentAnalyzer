@@ -97,4 +97,5 @@ private class FakeFitSegmentAttemptRepository : SegmentAttemptRepository {
         segmentId: Long, rideId: Long, startTime: java.time.Instant, duration: java.time.Duration,
         avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
     ) = Unit
+    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
 }

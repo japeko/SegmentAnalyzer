@@ -89,7 +89,11 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
             val track = points.map { it.toDomain(0.0) }
 
             val matches = segmentDao.getAll().flatMap { segment -> segment.toAttempts(rideId, track) }
-            segmentAttemptDao.insertIfNew(matches).count { it != -1L }
+            val newCount = segmentAttemptDao.insertIfNew(matches).count { it != -1L }
+            matches.distinctBy { it.segmentId }.forEach {
+                segmentAttemptDao.deleteStravaAttemptsForRideSegment(it.segmentId, rideId)
+            }
+            newCount
         }
 
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int =
@@ -101,8 +105,15 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
                 val track = ridePointDao.pointsForRide(rideId).map { it.toDomain(0.0) }
                 segment.toAttempts(rideId, track)
             }
-            segmentAttemptDao.insertIfNew(matches).count { it != -1L }
+            val newCount = segmentAttemptDao.insertIfNew(matches).count { it != -1L }
+            matches.distinctBy { it.rideId }.forEach {
+                segmentAttemptDao.deleteStravaAttemptsForRideSegment(segmentId, it.rideId)
+            }
+            newCount
         }
+
+    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long): Boolean =
+        withContext(dispatcherProvider.io) { segmentAttemptDao.hasLocalAttempt(segmentId, rideId) }
 }
 
 private fun SegmentEntity.toAttempts(rideId: Long, track: List<TrackPoint>): List<SegmentAttemptEntity> {

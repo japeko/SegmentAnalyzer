@@ -10,6 +10,7 @@ import com.segmentanalyzer.data.local.dao.SegmentDao
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortDao
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortPointDao
 import com.segmentanalyzer.data.seed.RideSeedCallback
+import com.segmentanalyzer.data.seed.SegmentAttemptCleanupCallback
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,6 +29,7 @@ object DatabaseModule {
         @ApplicationContext context: Context,
         rideDaoProvider: Provider<RideDao>,
         seedCallbackFactory: Provider<RideSeedCallback>,
+        segmentAttemptCleanupCallbackFactory: Provider<SegmentAttemptCleanupCallback>,
     ): SegmentAnalyzerDatabase =
         Room.databaseBuilder(
             context,
@@ -35,6 +37,7 @@ object DatabaseModule {
             SegmentAnalyzerDatabase.DATABASE_NAME,
         )
             .addCallback(seedCallbackFactory.get())
+            .addCallback(segmentAttemptCleanupCallbackFactory.get())
             // Pre-release (0.1.0), no real user data yet — destructive migration is fine until
             // the schema settles and proper migrations are worth writing.
             .fallbackToDestructiveMigration(dropAllTables = true)

@@ -15,7 +15,11 @@ import javax.inject.Inject
  * by saving it as a pseudo-[com.segmentanalyzer.domain.model.SegmentAttempt], reusing the entire
  * existing attempt/Compare Rides flow instead of building a parallel one. A no-op if the effort's
  * ride isn't found, its segment can't be resolved even after fetching (see
- * [findOrFetchSegmentId]), or it has no track (nothing to compare).
+ * [findOrFetchSegmentId]), it has no track (nothing to compare), or the ride already has a real
+ * GPS-matched attempt for that segment — a Strava-derived pseudo-attempt for the very same lap
+ * would be a near-duplicate of the real one (near-identical time/track), which in Compare Rides
+ * just buries the real "Current" reference under an all-but-identical "Personal Best" line
+ * instead of adding a useful comparison.
  */
 class SaveStravaSegmentEffortAttemptUseCase @Inject constructor(
     private val segmentRepository: SegmentRepository,
@@ -27,6 +31,7 @@ class SaveStravaSegmentEffortAttemptUseCase @Inject constructor(
     suspend operator fun invoke(rideId: Long, effort: StravaSegmentEffort, detail: StravaSegmentEffortDetail) {
         if (detail.track.isEmpty()) return
         val segmentId = findOrFetchSegmentId(effort.segmentExternalId) ?: return
+        if (segmentAttemptRepository.hasLocalAttempt(segmentId, rideId)) return
         val ride = rideRepository.observeRide(rideId).first() ?: return
 
         segmentAttemptRepository.saveStravaEffortAttempt(

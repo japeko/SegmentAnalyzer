@@ -43,4 +43,11 @@ interface SegmentAttemptRepository {
         avgPowerWatts: Double?,
         effortExternalId: String,
     )
+
+    /**
+     * True if [rideId] already has a real GPS-matched attempt (not Strava-derived) for
+     * [segmentId] — a Strava-derived pseudo-attempt is skipped in that case, since it would be a
+     * near-duplicate of the real one for the same lap.
+     */
+    suspend fun hasLocalAttempt(segmentId: Long, rideId: Long): Boolean
 }
