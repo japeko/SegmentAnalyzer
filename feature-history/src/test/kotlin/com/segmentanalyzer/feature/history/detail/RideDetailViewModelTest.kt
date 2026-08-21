@@ -9,6 +9,7 @@ import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
@@ -379,4 +380,13 @@ private class FakeStravaSegmentEffortRepository(
             efforts.map { if (it.effortExternalId == effortExternalId) it.copy(detail = detail) else it }
         }
     }
+
+    private val tracks = mutableMapOf<String, List<StravaSegmentEffortPoint>>()
+
+    override suspend fun saveEffortTrack(effortExternalId: String, points: List<StravaSegmentEffortPoint>) {
+        tracks[effortExternalId] = points
+    }
+
+    override suspend fun trackForEffort(effortExternalId: String): List<StravaSegmentEffortPoint> =
+        tracks[effortExternalId].orEmpty()
 }

@@ -5,6 +5,7 @@ import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import kotlinx.coroutines.flow.Flow
@@ -93,5 +94,11 @@ private class FakeStravaSegmentEffortRepository : StravaSegmentEffortRepository 
     }
 
     override suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail) =
+        throw UnsupportedOperationException("not used in this test")
+
+    override suspend fun saveEffortTrack(effortExternalId: String, points: List<StravaSegmentEffortPoint>) =
+        throw UnsupportedOperationException("not used in this test")
+
+    override suspend fun trackForEffort(effortExternalId: String): List<StravaSegmentEffortPoint> =
         throw UnsupportedOperationException("not used in this test")
 }

@@ -1,9 +1,12 @@
 package com.segmentanalyzer.data.repository
 
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortDao
+import com.segmentanalyzer.data.local.dao.StravaSegmentEffortPointDao
 import com.segmentanalyzer.data.local.entity.StravaSegmentEffortEntity
+import com.segmentanalyzer.data.local.entity.StravaSegmentEffortPointEntity
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -12,6 +15,7 @@ import javax.inject.Inject
 
 internal class StravaSegmentEffortRepositoryImpl @Inject constructor(
     private val dao: StravaSegmentEffortDao,
+    private val pointDao: StravaSegmentEffortPointDao,
 ) : StravaSegmentEffortRepository {
 
     override fun observeEffortsForRide(rideId: Long): Flow<List<StravaSegmentEffort>> =
@@ -32,6 +36,32 @@ internal class StravaSegmentEffortRepositoryImpl @Inject constructor(
             avgCadenceRpm = detail.avgCadenceRpm,
         )
     }
+
+    override suspend fun saveEffortTrack(effortExternalId: String, points: List<StravaSegmentEffortPoint>) {
+        pointDao.replaceForEffort(
+            effortExternalId,
+            points.mapIndexed { index, point ->
+                StravaSegmentEffortPointEntity(
+                    effortExternalId = effortExternalId,
+                    sequence = index,
+                    timeSeconds = point.timeSeconds,
+                    distanceMeters = point.distanceMeters,
+                    latitude = point.latitude,
+                    longitude = point.longitude,
+                )
+            },
+        )
+    }
+
+    override suspend fun trackForEffort(effortExternalId: String): List<StravaSegmentEffortPoint> =
+        pointDao.forEffort(effortExternalId).map {
+            StravaSegmentEffortPoint(
+                timeSeconds = it.timeSeconds,
+                distanceMeters = it.distanceMeters,
+                latitude = it.latitude,
+                longitude = it.longitude,
+            )
+        }
 }
 
 internal fun StravaSegmentEffortEntity.toDomain(): StravaSegmentEffort = StravaSegmentEffort(

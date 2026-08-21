@@ -12,4 +12,6 @@ data class StravaSegmentEffortDetail(
     val avgWatts: Double?,
     val avgHeartRateBpm: Double?,
     val avgCadenceRpm: Double?,
+    /** This effort's recorded GPS route, for the Segments page — empty if never fetched. */
+    val track: List<StravaSegmentEffortPoint> = emptyList(),
 )

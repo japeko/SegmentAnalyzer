@@ -3,6 +3,7 @@ package com.segmentanalyzer.domain.usecase
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,7 @@ private val detail = StravaSegmentEffortDetail(
     avgWatts = 210.0,
     avgHeartRateBpm = 152.0,
     avgCadenceRpm = 78.0,
+    track = listOf(StravaSegmentEffortPoint(timeSeconds = 0, distanceMeters = 0.0, latitude = 60.1, longitude = 24.9)),
 )
 
 class FetchStravaSegmentEffortDetailUseCaseTest {
@@ -36,6 +38,7 @@ class FetchStravaSegmentEffortDetailUseCaseTest {
         assertTrue(result.isSuccess)
         assertEquals(detail, result.getOrNull())
         assertEquals(detail, effortRepository.saved["effort-1"])
+        assertEquals(detail.track, effortRepository.savedTracks["effort-1"])
     }
 
     @Test
@@ -63,6 +66,7 @@ private class FakeStravaActivityDetailRepository(
 
 private class FakeStravaSegmentEffortDetailRepository : StravaSegmentEffortRepository {
     val saved = mutableMapOf<String, StravaSegmentEffortDetail>()
+    val savedTracks = mutableMapOf<String, List<StravaSegmentEffortPoint>>()
 
     override fun observeEffortsForRide(rideId: Long): Flow<List<StravaSegmentEffort>> = MutableStateFlow(emptyList())
     override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) = Unit
@@ -70,4 +74,11 @@ private class FakeStravaSegmentEffortDetailRepository : StravaSegmentEffortRepos
     override suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail) {
         saved[effortExternalId] = detail
     }
+
+    override suspend fun saveEffortTrack(effortExternalId: String, points: List<StravaSegmentEffortPoint>) {
+        savedTracks[effortExternalId] = points
+    }
+
+    override suspend fun trackForEffort(effortExternalId: String): List<StravaSegmentEffortPoint> =
+        savedTracks[effortExternalId].orEmpty()
 }

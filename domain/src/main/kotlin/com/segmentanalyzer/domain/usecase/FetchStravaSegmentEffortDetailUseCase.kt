@@ -18,5 +18,6 @@ class FetchStravaSegmentEffortDetailUseCase @Inject constructor(
     suspend operator fun invoke(effortExternalId: String): Result<StravaSegmentEffortDetail> =
         stravaActivityRepository.fetchEffortDetail(effortExternalId).onSuccess { detail ->
             stravaSegmentEffortRepository.saveEffortDetail(effortExternalId, detail)
+            stravaSegmentEffortRepository.saveEffortTrack(effortExternalId, detail.track)
         }
 }

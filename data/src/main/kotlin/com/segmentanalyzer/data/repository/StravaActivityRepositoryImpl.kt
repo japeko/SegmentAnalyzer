@@ -10,9 +10,15 @@ import com.segmentanalyzer.data.remote.strava.StravaStreamDto
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSessionExpiredException
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -82,7 +88,8 @@ private fun StravaSegmentEffortDto.toDomain(): StravaSegmentEffort = StravaSegme
  * summaries stay null rather than averaging in phantom zeros.
  */
 private fun List<StravaStreamDto>.toDetail(): StravaSegmentEffortDetail {
-    fun streamOrNull(type: String): List<Double>? = find { it.type == type }?.data?.takeIf { it.isNotEmpty() }
+    fun rawStream(type: String): List<JsonElement>? = find { it.type == type }?.data?.takeIf { it.isNotEmpty() }
+    fun streamOrNull(type: String): List<Double>? = rawStream(type)?.map { it.jsonPrimitive.double }
 
     val velocitySmooth = streamOrNull("velocity_smooth").orEmpty()
     val altitude = streamOrNull("altitude").orEmpty()
@@ -95,5 +102,24 @@ private fun List<StravaStreamDto>.toDetail(): StravaSegmentEffortDetail {
         avgWatts = streamOrNull("watts")?.average(),
         avgHeartRateBpm = streamOrNull("heartrate")?.average(),
         avgCadenceRpm = streamOrNull("cadence")?.average(),
+        track = toTrack(rawStream("time"), rawStream("distance"), rawStream("latlng")),
     )
+}
+
+private fun toTrack(
+    time: List<JsonElement>?,
+    distance: List<JsonElement>?,
+    latlng: List<JsonElement>?,
+): List<StravaSegmentEffortPoint> {
+    if (time == null || distance == null || latlng == null) return emptyList()
+    val count = minOf(time.size, distance.size, latlng.size)
+    return (0 until count).map { i ->
+        val point = latlng[i].jsonArray
+        StravaSegmentEffortPoint(
+            timeSeconds = time[i].jsonPrimitive.int,
+            distanceMeters = distance[i].jsonPrimitive.double,
+            latitude = point[0].jsonPrimitive.double,
+            longitude = point[1].jsonPrimitive.double,
+        )
+    }
 }

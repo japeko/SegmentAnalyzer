@@ -2,6 +2,7 @@ package com.segmentanalyzer.domain.repository
 
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
 import kotlinx.coroutines.flow.Flow
 
 /** Local cache of Strava segment effort data, fetched on demand via [StravaActivityRepository]. */
@@ -18,4 +19,10 @@ interface StravaSegmentEffortRepository {
      * (e.g. its ride's effort list was refreshed and replaced it before this returned).
      */
     suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail)
+
+    /** Replaces the cached GPS track for the effort with [effortExternalId] with [points]. */
+    suspend fun saveEffortTrack(effortExternalId: String, points: List<StravaSegmentEffortPoint>)
+
+    /** The cached GPS track for the effort with [effortExternalId], for the Segments page. */
+    suspend fun trackForEffort(effortExternalId: String): List<StravaSegmentEffortPoint>
 }
