@@ -62,6 +62,8 @@ class SyncStravaSegmentsUseCaseTest {
 
 private class FakeStravaSegmentRepository(private val result: Result<List<Segment>>) : StravaSegmentRepository {
     override suspend fun fetchStarredSegments(): Result<List<Segment>> = result
+    override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
 private class FakeSegmentRepository(private val newCount: Int) : SegmentRepository {

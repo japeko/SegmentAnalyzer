@@ -4,6 +4,7 @@ import com.segmentanalyzer.common.DispatcherProvider
 import com.segmentanalyzer.data.local.StravaSessionStore
 import com.segmentanalyzer.data.remote.strava.StravaAuthApi
 import com.segmentanalyzer.data.remote.strava.StravaSegmentApi
+import com.segmentanalyzer.data.remote.strava.StravaSegmentDetailDto
 import com.segmentanalyzer.data.remote.strava.StravaSegmentDto
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
@@ -37,6 +38,14 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
         val map = segmentApi.fetchSegmentDetail(accessToken, segmentId).map
         map?.polyline?.takeIf { it.isNotBlank() } ?: map?.summaryPolyline?.takeIf { it.isNotBlank() }
     }.getOrNull()
+
+    override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val session = validStravaSession(sessionStore, authApi) ?: throw StravaSessionExpiredException()
+                segmentApi.fetchSegmentDetail(session.accessToken, segmentExternalId).toDomain()
+            }
+        }
 }
 
 /**
@@ -63,4 +72,22 @@ private fun StravaSegmentDto.toDomain(polyline: String?): Segment = Segment(
     endLatitude = endLatLng?.getOrNull(0),
     endLongitude = endLatLng?.getOrNull(1),
     polyline = polyline,
+)
+
+private fun StravaSegmentDetailDto.toDomain(): Segment = Segment(
+    id = 0,
+    externalId = id.toString(),
+    name = name,
+    distanceMeters = distance,
+    averageGradePercent = averageGrade,
+    maximumGradePercent = maximumGrade,
+    elevationGainMeters = ((elevationHigh ?: 0.0) - (elevationLow ?: 0.0)).coerceAtLeast(0.0),
+    climbCategory = climbCategory,
+    city = city,
+    state = state,
+    startLatitude = startLatLng?.getOrNull(0),
+    startLongitude = startLatLng?.getOrNull(1),
+    endLatitude = endLatLng?.getOrNull(0),
+    endLongitude = endLatLng?.getOrNull(1),
+    polyline = map?.polyline?.takeIf { it.isNotBlank() } ?: map?.summaryPolyline?.takeIf { it.isNotBlank() },
 )

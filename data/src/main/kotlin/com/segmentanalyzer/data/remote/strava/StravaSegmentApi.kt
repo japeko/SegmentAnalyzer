@@ -31,8 +31,27 @@ internal data class StravaPolylineMapDto(
     @SerialName("summary_polyline") val summaryPolyline: String? = null,
 )
 
+/**
+ * `GET /segments/{id}` returns the full segment representation (same fields as
+ * [StravaSegmentDto] from the starred list) plus [map] — the polyline the starred list omits.
+ * Used both to backfill a starred segment's polyline and, standalone, to fetch a segment the user
+ * hasn't starred/synced yet (see [com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase]).
+ */
 @Serializable
 internal data class StravaSegmentDetailDto(
+    val id: Long,
+    val name: String,
+    @SerialName("activity_type") val activityType: String,
+    val distance: Double,
+    @SerialName("average_grade") val averageGrade: Double,
+    @SerialName("maximum_grade") val maximumGrade: Double,
+    @SerialName("elevation_high") val elevationHigh: Double? = null,
+    @SerialName("elevation_low") val elevationLow: Double? = null,
+    @SerialName("climb_category") val climbCategory: Int = 0,
+    val city: String? = null,
+    val state: String? = null,
+    @SerialName("start_latlng") val startLatLng: List<Double>? = null,
+    @SerialName("end_latlng") val endLatLng: List<Double>? = null,
     val map: StravaPolylineMapDto? = null,
 )
 

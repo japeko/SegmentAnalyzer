@@ -332,8 +332,10 @@ class RideDetailViewModelTest {
             FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository, stravaEffortRepository),
             com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase(
                 FakeRideDetailSegmentRepository(),
+                FakeRideDetailStravaSegmentRepository(),
                 rideRepository,
                 segmentAttemptRepository,
+                com.segmentanalyzer.domain.usecase.MatchNewSegmentsToRidesUseCase(segmentAttemptRepository),
             ),
         )
     }
@@ -379,6 +381,15 @@ private class FakeRideDetailSegmentRepository(
 ) : com.segmentanalyzer.domain.repository.SegmentRepository {
     override fun observeSegments(): Flow<List<com.segmentanalyzer.domain.model.Segment>> = MutableStateFlow(segments)
     override suspend fun saveSegments(segments: List<com.segmentanalyzer.domain.model.Segment>): List<Long> = emptyList()
+}
+
+private class FakeRideDetailStravaSegmentRepository :
+    com.segmentanalyzer.domain.repository.StravaSegmentRepository {
+    override suspend fun fetchStarredSegments(): Result<List<com.segmentanalyzer.domain.model.Segment>> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+
+    override suspend fun fetchSegment(segmentExternalId: String): Result<com.segmentanalyzer.domain.model.Segment> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
 private class FakeStravaActivityRepository(

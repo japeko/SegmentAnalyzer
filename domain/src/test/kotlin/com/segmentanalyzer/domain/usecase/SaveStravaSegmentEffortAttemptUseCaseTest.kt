@@ -13,6 +13,7 @@ import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
+import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -76,8 +77,10 @@ class SaveStravaSegmentEffortAttemptUseCaseTest {
         val attemptRepository = FakeSaveAttemptSegmentAttemptRepository()
         val useCase = SaveStravaSegmentEffortAttemptUseCase(
             FakeSaveAttemptSegmentRepository(listOf(segment)),
+            FakeSaveAttemptStravaSegmentRepository(),
             FakeSaveAttemptRideRepository(ride),
             attemptRepository,
+            MatchNewSegmentsToRidesUseCase(attemptRepository),
         )
 
         useCase(ride.id, effort, detail)
@@ -94,12 +97,34 @@ class SaveStravaSegmentEffortAttemptUseCaseTest {
     }
 
     @Test
-    fun `is a no-op when the effort's segment isn't locally known`() = runTest {
+    fun `fetches and saves the segment from Strava first when it isn't synced locally yet`() = runTest {
+        val attemptRepository = FakeSaveAttemptSegmentAttemptRepository()
+        val segmentRepository = FakeSaveAttemptSegmentRepository(emptyList())
+        val useCase = SaveStravaSegmentEffortAttemptUseCase(
+            segmentRepository,
+            FakeSaveAttemptStravaSegmentRepository(Result.success(segment)),
+            FakeSaveAttemptRideRepository(ride),
+            attemptRepository,
+            MatchNewSegmentsToRidesUseCase(attemptRepository),
+        )
+
+        useCase(ride.id, effort, detail)
+
+        assertEquals(listOf(segment.externalId), segmentRepository.savedExternalIds)
+        val saved = attemptRepository.saved.single()
+        assertEquals(segmentRepository.assignedId, saved.segmentId)
+        assertTrue("expected the newly-fetched segment to be matched against local rides", attemptRepository.matchedSegmentIds.contains(segmentRepository.assignedId))
+    }
+
+    @Test
+    fun `is a no-op when the segment isn't known locally and the Strava fetch fails`() = runTest {
         val attemptRepository = FakeSaveAttemptSegmentAttemptRepository()
         val useCase = SaveStravaSegmentEffortAttemptUseCase(
             FakeSaveAttemptSegmentRepository(emptyList()),
+            FakeSaveAttemptStravaSegmentRepository(Result.failure(IllegalStateException("not found"))),
             FakeSaveAttemptRideRepository(ride),
             attemptRepository,
+            MatchNewSegmentsToRidesUseCase(attemptRepository),
         )
 
         useCase(ride.id, effort, detail)
@@ -112,8 +137,10 @@ class SaveStravaSegmentEffortAttemptUseCaseTest {
         val attemptRepository = FakeSaveAttemptSegmentAttemptRepository()
         val useCase = SaveStravaSegmentEffortAttemptUseCase(
             FakeSaveAttemptSegmentRepository(listOf(segment)),
+            FakeSaveAttemptStravaSegmentRepository(),
             FakeSaveAttemptRideRepository(ride = null),
             attemptRepository,
+            MatchNewSegmentsToRidesUseCase(attemptRepository),
         )
 
         useCase(ride.id, effort, detail)
@@ -126,8 +153,10 @@ class SaveStravaSegmentEffortAttemptUseCaseTest {
         val attemptRepository = FakeSaveAttemptSegmentAttemptRepository()
         val useCase = SaveStravaSegmentEffortAttemptUseCase(
             FakeSaveAttemptSegmentRepository(listOf(segment)),
+            FakeSaveAttemptStravaSegmentRepository(),
             FakeSaveAttemptRideRepository(ride),
             attemptRepository,
+            MatchNewSegmentsToRidesUseCase(attemptRepository),
         )
 
         useCase(ride.id, effort, detail.copy(track = emptyList()))
@@ -147,9 +176,28 @@ private data class SavedStravaAttempt(
     val effortExternalId: String,
 )
 
-private class FakeSaveAttemptSegmentRepository(private val segments: List<Segment>) : SegmentRepository {
-    override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(segments)
-    override suspend fun saveSegments(segments: List<Segment>): List<Long> = emptyList()
+private class FakeSaveAttemptSegmentRepository(initial: List<Segment>) : SegmentRepository {
+    private val state = MutableStateFlow(initial)
+    val savedExternalIds = mutableListOf<String>()
+    var assignedId: Long = 100
+
+    override fun observeSegments(): Flow<List<Segment>> = state
+
+    override suspend fun saveSegments(segments: List<Segment>): List<Long> {
+        savedExternalIds += segments.map { it.externalId }
+        val saved = segments.map { it.copy(id = assignedId) }
+        state.value = state.value + saved
+        return saved.map { it.id }
+    }
+}
+
+private class FakeSaveAttemptStravaSegmentRepository(
+    private val fetchResult: Result<Segment> = Result.failure(UnsupportedOperationException("not used in this test")),
+) : StravaSegmentRepository {
+    override suspend fun fetchStarredSegments(): Result<List<Segment>> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+
+    override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> = fetchResult
 }
 
 private class FakeSaveAttemptRideRepository(private val ride: Ride?) : RideRepository {
@@ -162,12 +210,17 @@ private class FakeSaveAttemptRideRepository(private val ride: Ride?) : RideRepos
 
 private class FakeSaveAttemptSegmentAttemptRepository : SegmentAttemptRepository {
     val saved = mutableListOf<SavedStravaAttempt>()
+    val matchedSegmentIds = mutableListOf<Long>()
 
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
     override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> = MutableStateFlow(emptyList())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
-    override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0
+
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int {
+        matchedSegmentIds += segmentId
+        return 0
+    }
 
     override suspend fun saveStravaEffortAttempt(
         segmentId: Long,
