@@ -148,9 +148,19 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
             ),
         ) {
             val backToSettings = {
+                // Must match the bottom-nav tab switch's own navigate options exactly (see
+                // SegmentAnalyzerApp) — this is also a jump to a top-level destination, just
+                // triggered by the Strava OAuth deep link instead of a tab tap. Without
+                // saveState/restoreState here, this leaves the NavController's saved-state
+                // registry inconsistent with what the bottom nav itself expects: confirmed live,
+                // this made the Rides tab silently stop responding to taps after connecting both
+                // Garmin and Strava in the same session, until the app was force-restarted.
                 navController.navigate(TopLevelDestination.Settings.route) {
-                    popUpTo(navController.graph.findStartDestination().id)
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
                     launchSingleTop = true
+                    restoreState = true
                 }
             }
             StravaCallbackRoute(onConnected = backToSettings, onBackToSettingsClick = backToSettings)
