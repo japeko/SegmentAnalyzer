@@ -39,6 +39,9 @@ class RideDetailViewModel @Inject constructor(
     /** The ride from the most recent [uiState] emission, so onFetchStravaSegmentsClick can read it without a lag-prone second subscription. */
     private var latestRide: Ride? = null
 
+    /** The Strava efforts from the most recent cache emission, so a click can check for already-persisted detail first. */
+    private var latestEfforts: List<StravaSegmentEffort> = emptyList()
+
     /**
      * Overrides the cache-derived Strava state once a fetch has been triggered in this
      * ViewModel instance (Loading/Loaded/Error). Null means "show whatever's cached," so a ride
@@ -57,6 +60,7 @@ class RideDetailViewModel @Inject constructor(
         stravaEffortsOverride,
     ) { ride, hasTrack, matches, cachedEfforts, override ->
         latestRide = ride
+        latestEfforts = cachedEfforts
         CoreRideDetail(
             ride = ride?.toInfo(),
             hasTrack = hasTrack,
@@ -95,12 +99,19 @@ class RideDetailViewModel @Inject constructor(
 
     /**
      * Toggles the pace/power/HR detail panel for one segment-effort row (identified by
-     * [effortIndex], since a ride can pass through the same segment more than once): expands and
-     * fetches it, or collapses it if already open.
+     * [effortIndex], since a ride can pass through the same segment more than once): shows
+     * already-cached detail immediately, fetches (and persists) it if not cached yet, or
+     * collapses the panel if it's already open.
      */
     fun onStravaSegmentEffortClick(effortIndex: Int, effortExternalId: String) {
         if (expandedSegmentEffortDetail.value?.effortIndex == effortIndex) {
             expandedSegmentEffortDetail.value = null
+            return
+        }
+        val cachedDetail = latestEfforts.find { it.effortExternalId == effortExternalId }?.detail
+        if (cachedDetail != null) {
+            expandedSegmentEffortDetail.value =
+                ExpandedSegmentEffortDetail(effortIndex, effortExternalId, StravaEffortDetailUiState.Loaded(cachedDetail.toItem()))
             return
         }
         expandedSegmentEffortDetail.value =

@@ -1,6 +1,7 @@
 package com.segmentanalyzer.domain.repository
 
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
+import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import kotlinx.coroutines.flow.Flow
 
 /** Local cache of Strava segment effort data, fetched on demand via [StravaActivityRepository]. */
@@ -10,4 +11,11 @@ interface StravaSegmentEffortRepository {
 
     /** Replaces the cached efforts for [rideId] with [efforts]. */
     suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>)
+
+    /**
+     * Saves [detail] for the effort with [effortExternalId] — the data used to compare this
+     * effort against the same segment on a different ride. A no-op if that effort isn't cached
+     * (e.g. its ride's effort list was refreshed and replaced it before this returned).
+     */
+    suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail)
 }

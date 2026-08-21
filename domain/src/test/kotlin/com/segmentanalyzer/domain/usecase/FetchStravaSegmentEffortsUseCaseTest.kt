@@ -91,4 +91,7 @@ private class FakeStravaSegmentEffortRepository : StravaSegmentEffortRepository 
     override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) {
         saved[rideId] = efforts
     }
+
+    override suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail) =
+        throw UnsupportedOperationException("not used in this test")
 }

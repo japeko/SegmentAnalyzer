@@ -244,6 +244,50 @@ class RideDetailViewModelTest {
     }
 
     @Test
+    fun `clicking an effort with already-cached detail shows it immediately without fetching`() = runTest(dispatcher) {
+        val cachedDetail = StravaSegmentEffortDetail(
+            avgSpeedKmh = 19.0,
+            maxSpeedKmh = 30.0,
+            elevationGainMeters = 1.0,
+            avgWatts = null,
+            avgHeartRateBpm = 133.0,
+            avgCadenceRpm = null,
+        )
+        val cached = listOf(
+            StravaSegmentEffort(
+                effortExternalId = "effort-1",
+                segmentExternalId = "seg-1",
+                segmentName = "Korde Ebike DH ränni 2",
+                elapsedTime = Duration.ofSeconds(66),
+                distanceMeters = 300.0,
+                komRank = null,
+                prRank = null,
+                detail = cachedDetail,
+            ),
+        )
+        val viewModel = viewModel(
+            ride = ride,
+            hasTrack = true,
+            matches = emptyList(),
+            cachedEfforts = cached,
+            detailResult = Result.failure(IllegalStateException("should not be called")),
+        )
+
+        viewModel.uiState.test {
+            skipItems(1)
+            assertEquals(null, awaitItem().expandedSegmentEffortDetail)
+
+            viewModel.onStravaSegmentEffortClick(0, "effort-1")
+
+            // Cache-first: goes straight to Loaded, never Loading, and never calls fetchStravaSegmentEffortDetail.
+            val loaded = awaitItem().expandedSegmentEffortDetail?.state
+            val loadedState = loaded as StravaEffortDetailUiState.Loaded
+            assertEquals("133 bpm", loadedState.detail.avgHeartRateLabel)
+            assertEquals(null, loadedState.detail.avgWattsLabel)
+        }
+    }
+
+    @Test
     fun `a failed segment effort detail fetch shows the error message`() = runTest(dispatcher) {
         val viewModel = viewModel(
             ride = ride,
@@ -284,7 +328,7 @@ class RideDetailViewModelTest {
             ObserveSegmentMatchesForRideUseCase(segmentAttemptRepository),
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
-            FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository),
+            FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository, stravaEffortRepository),
         )
     }
 }
@@ -328,5 +372,11 @@ private class FakeStravaSegmentEffortRepository(
 
     override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) {
         state.value = state.value + (rideId to efforts)
+    }
+
+    override suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail) {
+        state.value = state.value.mapValues { (_, efforts) ->
+            efforts.map { if (it.effortExternalId == effortExternalId) it.copy(detail = detail) else it }
+        }
     }
 }

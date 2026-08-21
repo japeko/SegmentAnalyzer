@@ -33,4 +33,16 @@ data class StravaSegmentEffortEntity(
     val distanceMeters: Double,
     val komRank: Int?,
     val prRank: Int?,
+    /**
+     * Pace/power/HR/cadence detail for this effort, fetched lazily on demand (not with the rest
+     * of the row) — null until the user expands it, so `avgSpeedKmh == null` is what marks "not
+     * fetched yet" versus "fetched." Kept alongside the row (not delete/replaced with the ride's
+     * effort list) precisely so it survives for comparing this effort against another ride's.
+     */
+    val avgSpeedKmh: Double? = null,
+    val maxSpeedKmh: Double? = null,
+    val elevationGainMeters: Double? = null,
+    val avgWatts: Double? = null,
+    val avgHeartRateBpm: Double? = null,
+    val avgCadenceRpm: Double? = null,
 )

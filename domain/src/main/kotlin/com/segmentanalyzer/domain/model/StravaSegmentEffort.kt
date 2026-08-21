@@ -15,4 +15,6 @@ data class StravaSegmentEffort(
     val komRank: Int?,
     /** 1-3 if this is the athlete's personal top-3 time on the segment, else null. */
     val prRank: Int?,
+    /** Pace/power/HR/cadence detail, fetched and cached lazily — null until the user expands this effort. */
+    val detail: StravaSegmentEffortDetail? = null,
 )

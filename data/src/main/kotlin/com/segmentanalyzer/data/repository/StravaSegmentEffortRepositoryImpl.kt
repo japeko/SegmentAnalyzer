@@ -3,6 +3,7 @@ package com.segmentanalyzer.data.repository
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortDao
 import com.segmentanalyzer.data.local.entity.StravaSegmentEffortEntity
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
+import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -19,6 +20,18 @@ internal class StravaSegmentEffortRepositoryImpl @Inject constructor(
     override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) {
         dao.replaceForRide(rideId, efforts.map { it.toEntity(rideId) })
     }
+
+    override suspend fun saveEffortDetail(effortExternalId: String, detail: StravaSegmentEffortDetail) {
+        dao.updateDetail(
+            effortExternalId = effortExternalId,
+            avgSpeedKmh = detail.avgSpeedKmh,
+            maxSpeedKmh = detail.maxSpeedKmh,
+            elevationGainMeters = detail.elevationGainMeters,
+            avgWatts = detail.avgWatts,
+            avgHeartRateBpm = detail.avgHeartRateBpm,
+            avgCadenceRpm = detail.avgCadenceRpm,
+        )
+    }
 }
 
 internal fun StravaSegmentEffortEntity.toDomain(): StravaSegmentEffort = StravaSegmentEffort(
@@ -29,6 +42,16 @@ internal fun StravaSegmentEffortEntity.toDomain(): StravaSegmentEffort = StravaS
     distanceMeters = distanceMeters,
     komRank = komRank,
     prRank = prRank,
+    detail = avgSpeedKmh?.let {
+        StravaSegmentEffortDetail(
+            avgSpeedKmh = it,
+            maxSpeedKmh = maxSpeedKmh ?: 0.0,
+            elevationGainMeters = elevationGainMeters ?: 0.0,
+            avgWatts = avgWatts,
+            avgHeartRateBpm = avgHeartRateBpm,
+            avgCadenceRpm = avgCadenceRpm,
+        )
+    },
 )
 
 internal fun StravaSegmentEffort.toEntity(rideId: Long): StravaSegmentEffortEntity = StravaSegmentEffortEntity(
@@ -40,4 +63,10 @@ internal fun StravaSegmentEffort.toEntity(rideId: Long): StravaSegmentEffortEnti
     distanceMeters = distanceMeters,
     komRank = komRank,
     prRank = prRank,
+    avgSpeedKmh = detail?.avgSpeedKmh,
+    maxSpeedKmh = detail?.maxSpeedKmh,
+    elevationGainMeters = detail?.elevationGainMeters,
+    avgWatts = detail?.avgWatts,
+    avgHeartRateBpm = detail?.avgHeartRateBpm,
+    avgCadenceRpm = detail?.avgCadenceRpm,
 )

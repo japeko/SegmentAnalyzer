@@ -25,4 +25,22 @@ interface StravaSegmentEffortDao {
         deleteForRide(rideId)
         insertAll(efforts)
     }
+
+    @Query(
+        """
+        UPDATE strava_segment_efforts
+        SET avgSpeedKmh = :avgSpeedKmh, maxSpeedKmh = :maxSpeedKmh, elevationGainMeters = :elevationGainMeters,
+            avgWatts = :avgWatts, avgHeartRateBpm = :avgHeartRateBpm, avgCadenceRpm = :avgCadenceRpm
+        WHERE effortExternalId = :effortExternalId
+        """,
+    )
+    suspend fun updateDetail(
+        effortExternalId: String,
+        avgSpeedKmh: Double,
+        maxSpeedKmh: Double,
+        elevationGainMeters: Double,
+        avgWatts: Double?,
+        avgHeartRateBpm: Double?,
+        avgCadenceRpm: Double?,
+    )
 }
