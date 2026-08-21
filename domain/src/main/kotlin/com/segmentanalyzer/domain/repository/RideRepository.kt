@@ -26,4 +26,10 @@ interface RideRepository {
      * FIT/GPX imports have no externalId).
      */
     suspend fun saveRide(ride: Ride): Long?
+
+    /** Renames [rideId] and sets its tag (null clears it). */
+    suspend fun updateRide(rideId: Long, name: String, tag: String?)
+
+    /** Every distinct, non-blank tag currently in use, for autocomplete when editing a ride. */
+    fun observeAllTags(): Flow<List<String>>
 }

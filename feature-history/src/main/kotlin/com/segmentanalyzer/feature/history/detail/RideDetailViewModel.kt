@@ -12,10 +12,12 @@ import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase
+import com.segmentanalyzer.domain.usecase.UpdateRideUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,9 +33,11 @@ class RideDetailViewModel @Inject constructor(
     observeRideHasTrack: ObserveRideHasTrackUseCase,
     observeSegmentMatchesForRide: ObserveSegmentMatchesForRideUseCase,
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
+    observeRideTags: ObserveRideTagsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEffortDetail: FetchStravaSegmentEffortDetailUseCase,
     private val saveStravaSegmentEffortAttempt: SaveStravaSegmentEffortAttemptUseCase,
+    private val updateRide: UpdateRideUseCase,
 ) : ViewModel() {
 
     private val rideId: Long = checkNotNull(savedStateHandle["rideId"])
@@ -54,6 +58,9 @@ class RideDetailViewModel @Inject constructor(
     /** Which effort's full pace/power/HR detail is expanded, and its fetch state. Null = none expanded. */
     private val expandedSegmentEffortDetail = MutableStateFlow<ExpandedSegmentEffortDetail?>(null)
 
+    /** Non-null while the rename/tag dialog is open, holding its in-progress (unsaved) field values. */
+    private val editRequest = MutableStateFlow<EditRideRequest?>(null)
+
     private val coreState = combine(
         observeRide(rideId),
         observeRideHasTrack(rideId),
@@ -71,7 +78,7 @@ class RideDetailViewModel @Inject constructor(
         )
     }
 
-    val uiState = combine(coreState, expandedSegmentEffortDetail) { core, expandedDetail ->
+    val uiState = combine(coreState, expandedSegmentEffortDetail, observeRideTags(), editRequest) { core, expandedDetail, tags, edit ->
         RideDetailUiState(
             isLoading = false,
             ride = core.ride,
@@ -79,6 +86,15 @@ class RideDetailViewModel @Inject constructor(
             matchedSegments = core.matchedSegments,
             stravaSegmentEfforts = core.stravaSegmentEfforts,
             expandedSegmentEffortDetail = expandedDetail,
+            editDialog = edit?.let { request ->
+                EditRideDialogState(
+                    name = request.name,
+                    tag = request.tag,
+                    tagSuggestions = tags.filter {
+                        request.tag.isNotBlank() && it.contains(request.tag, ignoreCase = true) && !it.equals(request.tag, ignoreCase = true)
+                    },
+                )
+            },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -139,7 +155,40 @@ class RideDetailViewModel @Inject constructor(
             )
         }
     }
+
+    fun onEditClick() {
+        val ride = latestRide ?: return
+        editRequest.value = EditRideRequest(name = ride.name, tag = ride.tag.orEmpty())
+    }
+
+    fun onDismissEdit() {
+        editRequest.value = null
+    }
+
+    fun onEditNameChange(name: String) {
+        editRequest.value = editRequest.value?.copy(name = name)
+    }
+
+    fun onEditTagChange(tag: String) {
+        editRequest.value = editRequest.value?.copy(tag = tag)
+    }
+
+    fun onEditTagSuggestionClick(tag: String) {
+        editRequest.value = editRequest.value?.copy(tag = tag)
+    }
+
+    fun onSaveEditClick() {
+        val request = editRequest.value ?: return
+        val trimmedName = request.name.trim()
+        if (trimmedName.isEmpty()) return
+        viewModelScope.launch {
+            updateRide(rideId, trimmedName, request.tag)
+            editRequest.value = null
+        }
+    }
 }
+
+private data class EditRideRequest(val name: String, val tag: String)
 
 private data class CoreRideDetail(
     val ride: RideDetailInfo?,
@@ -162,6 +211,7 @@ private fun Ride.toInfo(): RideDetailInfo = RideDetailInfo(
     avgSpeedKmh = averageSpeedKmh,
     elevationProfile = elevationProfile,
     isPersonalBest = isPersonalBest,
+    tag = tag,
 )
 
 private fun RideSegmentMatch.toItem(): MatchedSegmentItem = MatchedSegmentItem(

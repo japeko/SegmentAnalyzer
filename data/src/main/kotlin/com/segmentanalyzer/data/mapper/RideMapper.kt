@@ -18,6 +18,7 @@ fun RideEntity.toDomain(): Ride = Ride(
     elevationProfile = elevationProfilePreview,
     sourceFilePath = sourceFilePath,
     externalId = externalId,
+    tag = tag,
 )
 
 fun Ride.toEntity(): RideEntity = RideEntity(
@@ -34,4 +35,5 @@ fun Ride.toEntity(): RideEntity = RideEntity(
     elevationProfilePreview = elevationProfile,
     sourceFilePath = sourceFilePath,
     createdAtEpochMillis = Instant.now().toEpochMilli(),
+    tag = tag,
 )

@@ -1,5 +1,7 @@
 package com.segmentanalyzer.feature.history.detail
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +17,13 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,14 +31,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.ui.ElevationSparkline
 import com.segmentanalyzer.core.ui.SourceTag
@@ -51,6 +60,12 @@ fun RideDetailScreen(
     onSegmentClick: (Long) -> Unit,
     onFetchStravaSegmentsClick: () -> Unit,
     onStravaSegmentEffortClick: (Int, String) -> Unit,
+    onEditClick: () -> Unit,
+    onDismissEdit: () -> Unit,
+    onEditNameChange: (String) -> Unit,
+    onEditTagChange: (String) -> Unit,
+    onEditTagSuggestionClick: (String) -> Unit,
+    onSaveEditClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -69,8 +84,13 @@ fun RideDetailScreen(
                             imageVector = Icons.Filled.EmojiEvents,
                             contentDescription = "Personal best",
                             tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.padding(end = 16.dp),
+                            modifier = Modifier.padding(end = 4.dp),
                         )
+                    }
+                    if (uiState.ride != null) {
+                        IconButton(onClick = onEditClick) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Rename or tag this ride")
+                        }
                     }
                 },
             )
@@ -106,6 +126,19 @@ fun RideDetailScreen(
                             color = MaterialThemeExtras.textTertiary,
                             modifier = Modifier.weight(1f),
                         )
+                        if (!ride.tag.isNullOrBlank()) {
+                            Text(
+                                text = ride.tag,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
+                        }
                         SourceTag(source = ride.source)
                     }
                 }
@@ -156,6 +189,71 @@ fun RideDetailScreen(
             )
         }
     }
+
+    uiState.editDialog?.let { dialog ->
+        EditRideDialog(
+            dialog = dialog,
+            onDismiss = onDismissEdit,
+            onNameChange = onEditNameChange,
+            onTagChange = onEditTagChange,
+            onTagSuggestionClick = onEditTagSuggestionClick,
+            onSaveClick = onSaveEditClick,
+        )
+    }
+}
+
+@Composable
+private fun EditRideDialog(
+    dialog: EditRideDialogState,
+    onDismiss: () -> Unit,
+    onNameChange: (String) -> Unit,
+    onTagChange: (String) -> Unit,
+    onTagSuggestionClick: (String) -> Unit,
+    onSaveClick: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Ride") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = dialog.name,
+                    onValueChange = onNameChange,
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = dialog.tag,
+                    onValueChange = onTagChange,
+                    label = { Text("Tag") },
+                    placeholder = { Text("e.g. Race, Training") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                )
+                if (dialog.tagSuggestions.isNotEmpty()) {
+                    Column(modifier = Modifier.padding(top = 4.dp)) {
+                        dialog.tagSuggestions.forEach { suggestion ->
+                            Text(
+                                text = suggestion,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onTagSuggestionClick(suggestion) }
+                                    .padding(vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSaveClick, enabled = dialog.name.isNotBlank()) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 private fun LazyListScope.stravaEffortsSection(

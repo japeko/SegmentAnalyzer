@@ -85,6 +85,9 @@ private class FakeFitRideRepository : RideRepository {
         savedRides += ride
         return nextId++
     }
+
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?) = Unit
+    override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }
 
 private class FakeFitSegmentAttemptRepository : SegmentAttemptRepository {

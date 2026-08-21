@@ -12,6 +12,15 @@ data class RideDetailUiState(
     val stravaSegmentEfforts: StravaEffortsUiState = StravaEffortsUiState.Idle,
     /** The effort (if any) whose full pace/power/HR detail is currently expanded below its row. */
     val expandedSegmentEffortDetail: ExpandedSegmentEffortDetail? = null,
+    /** Non-null while the rename/tag dialog is open. */
+    val editDialog: EditRideDialogState? = null,
+)
+
+/** Live state of the rename/tag dialog — [tagSuggestions] narrows as [tag] is typed. */
+data class EditRideDialogState(
+    val name: String,
+    val tag: String,
+    val tagSuggestions: List<String> = emptyList(),
 )
 
 /** State of an on-demand fetch of this ride's Strava segment effort data. */
@@ -74,6 +83,7 @@ data class RideDetailInfo(
     val avgSpeedKmh: Double,
     val elevationProfile: List<Float>,
     val isPersonalBest: Boolean,
+    val tag: String?,
 )
 
 /** A starred Strava segment this ride passed through. */

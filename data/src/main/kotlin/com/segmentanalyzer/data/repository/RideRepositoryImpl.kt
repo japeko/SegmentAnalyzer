@@ -42,6 +42,11 @@ class RideRepositoryImpl @Inject constructor(
         }
         id
     }
+
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?) =
+        rideDao.updateNameAndTag(rideId, name, tag?.trim()?.takeIf { it.isNotEmpty() })
+
+    override fun observeAllTags(): Flow<List<String>> = rideDao.observeDistinctTags()
 }
 
 private fun TrackPoint.toEntity(rideId: Long, sequence: Int): RidePointEntity = RidePointEntity(

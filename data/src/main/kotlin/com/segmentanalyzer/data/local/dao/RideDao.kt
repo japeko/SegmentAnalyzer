@@ -33,4 +33,10 @@ interface RideDao {
     /** Inserts rides, skipping ones whose [RideEntity.externalId] already exists (-1 per skip). */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfNew(rides: List<RideEntity>): List<Long>
+
+    @Query("UPDATE rides SET name = :name, tag = :tag WHERE id = :rideId")
+    suspend fun updateNameAndTag(rideId: Long, name: String, tag: String?)
+
+    @Query("SELECT DISTINCT tag FROM rides WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC")
+    fun observeDistinctTags(): Flow<List<String>>
 }
