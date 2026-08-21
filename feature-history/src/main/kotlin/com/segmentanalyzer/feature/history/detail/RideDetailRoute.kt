@@ -20,6 +20,7 @@ fun RideDetailRoute(
         onBackClick = onBackClick,
         onSegmentClick = onSegmentClick,
         onFetchStravaSegmentsClick = viewModel::onFetchStravaSegmentsClick,
+        onStravaSegmentEffortClick = viewModel::onStravaSegmentEffortClick,
         modifier = modifier,
     )
 }

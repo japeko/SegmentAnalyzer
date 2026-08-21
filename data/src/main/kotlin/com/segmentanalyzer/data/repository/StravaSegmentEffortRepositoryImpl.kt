@@ -22,6 +22,7 @@ internal class StravaSegmentEffortRepositoryImpl @Inject constructor(
 }
 
 internal fun StravaSegmentEffortEntity.toDomain(): StravaSegmentEffort = StravaSegmentEffort(
+    segmentExternalId = segmentExternalId,
     segmentName = segmentName,
     elapsedTime = Duration.ofSeconds(elapsedTimeSeconds),
     distanceMeters = distanceMeters,
@@ -31,6 +32,7 @@ internal fun StravaSegmentEffortEntity.toDomain(): StravaSegmentEffort = StravaS
 
 internal fun StravaSegmentEffort.toEntity(rideId: Long): StravaSegmentEffortEntity = StravaSegmentEffortEntity(
     rideId = rideId,
+    segmentExternalId = segmentExternalId,
     segmentName = segmentName,
     elapsedTimeSeconds = elapsedTime.seconds,
     distanceMeters = distanceMeters,

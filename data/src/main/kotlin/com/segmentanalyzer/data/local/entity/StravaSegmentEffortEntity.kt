@@ -24,6 +24,8 @@ import androidx.room.PrimaryKey
 data class StravaSegmentEffortEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val rideId: Long,
+    /** Strava's id for the segment this effort was on — not this effort itself. */
+    val segmentExternalId: String,
     val segmentName: String,
     val elapsedTimeSeconds: Long,
     val distanceMeters: Double,

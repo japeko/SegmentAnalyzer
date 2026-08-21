@@ -36,6 +36,15 @@ internal data class StravaSegmentDetailDto(
     val map: StravaPolylineMapDto? = null,
 )
 
+@Serializable
+internal data class StravaSegmentEffortHistoryDto(
+    @SerialName("start_date") val startDate: String,
+    @SerialName("elapsed_time") val elapsedTime: Int,
+    val distance: Double,
+    @SerialName("kom_rank") val komRank: Int? = null,
+    @SerialName("pr_rank") val prRank: Int? = null,
+)
+
 /** Fetches the athlete's starred segments from Strava's official REST API. */
 internal class StravaSegmentApi @Inject constructor(
     private val okHttpClient: OkHttpClient,
@@ -84,6 +93,29 @@ internal class StravaSegmentApi @Inject constructor(
             json.decodeFromString(body)
         } catch (e: Exception) {
             throw StravaApiException("couldn't parse Strava's segment detail response", e)
+        }
+    }
+
+    /** The athlete's own historical efforts on [segmentId], most recent first, up to [perPage]. */
+    fun fetchEffortHistory(accessToken: String, segmentId: String, perPage: Int = 30): List<StravaSegmentEffortHistoryDto> {
+        val request = Request.Builder()
+            .url("$SEGMENT_URL/$segmentId/all_efforts?per_page=$perPage")
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        val body = try {
+            okHttpClient.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw StravaApiException("HTTP ${response.code}: $text")
+                text
+            }
+        } catch (e: IOException) {
+            throw StravaApiException(e.message ?: "network error", e)
+        }
+        return try {
+            json.decodeFromString(body)
+        } catch (e: Exception) {
+            throw StravaApiException("couldn't parse Strava's segment effort history response", e)
         }
     }
 

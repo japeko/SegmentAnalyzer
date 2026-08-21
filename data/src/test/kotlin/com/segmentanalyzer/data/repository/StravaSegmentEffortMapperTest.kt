@@ -13,6 +13,7 @@ class StravaSegmentEffortMapperTest {
         val entity = StravaSegmentEffortEntity(
             id = 7,
             rideId = 42,
+            segmentExternalId = "12345",
             segmentName = "Skyline Climb",
             elapsedTimeSeconds = 245,
             distanceMeters = 1_500.0,
@@ -22,6 +23,7 @@ class StravaSegmentEffortMapperTest {
 
         val domain = entity.toDomain()
 
+        assertEquals("12345", domain.segmentExternalId)
         assertEquals("Skyline Climb", domain.segmentName)
         assertEquals(Duration.ofSeconds(245), domain.elapsedTime)
         assertEquals(1_500.0, domain.distanceMeters, 0.001)
@@ -32,6 +34,7 @@ class StravaSegmentEffortMapperTest {
     @Test
     fun `maps a domain effort to an entity for the given ride, truncating sub-second precision`() {
         val effort = StravaSegmentEffort(
+            segmentExternalId = "67890",
             segmentName = "Fireroad Descent",
             elapsedTime = Duration.ofSeconds(118),
             distanceMeters = 800.0,
@@ -42,6 +45,7 @@ class StravaSegmentEffortMapperTest {
         val entity = effort.toEntity(rideId = 42)
 
         assertEquals(42, entity.rideId)
+        assertEquals("67890", entity.segmentExternalId)
         assertEquals("Fireroad Descent", entity.segmentName)
         assertEquals(118, entity.elapsedTimeSeconds)
         assertEquals(800.0, entity.distanceMeters, 0.001)

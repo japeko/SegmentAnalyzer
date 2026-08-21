@@ -15,12 +15,18 @@ internal data class StravaActivitySummaryDto(
 )
 
 @Serializable
+internal data class StravaSegmentEffortSegmentRefDto(
+    val id: Long,
+)
+
+@Serializable
 internal data class StravaSegmentEffortDto(
     val name: String,
     @SerialName("elapsed_time") val elapsedTime: Int,
     val distance: Double,
     @SerialName("kom_rank") val komRank: Int? = null,
     @SerialName("pr_rank") val prRank: Int? = null,
+    val segment: StravaSegmentEffortSegmentRefDto? = null,
 )
 
 @Serializable

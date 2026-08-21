@@ -1,5 +1,6 @@
 package com.segmentanalyzer.feature.history.detail.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,8 +20,8 @@ import com.segmentanalyzer.core.theme.NumericFontFamily
 import com.segmentanalyzer.feature.history.detail.StravaSegmentEffortItem
 
 @Composable
-fun StravaSegmentEffortRow(item: StravaSegmentEffortItem, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth()) {
+fun StravaSegmentEffortRow(item: StravaSegmentEffortItem, onClick: (String) -> Unit, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth().clickable { onClick(item.segmentExternalId) }) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,

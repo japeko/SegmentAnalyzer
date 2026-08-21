@@ -5,10 +5,15 @@ import com.segmentanalyzer.data.local.StravaSessionStore
 import com.segmentanalyzer.data.remote.strava.StravaAuthApi
 import com.segmentanalyzer.data.remote.strava.StravaSegmentApi
 import com.segmentanalyzer.data.remote.strava.StravaSegmentDto
+import com.segmentanalyzer.data.remote.strava.StravaSegmentEffortHistoryDto
 import com.segmentanalyzer.domain.model.Segment
+import com.segmentanalyzer.domain.model.StravaSegmentEffortHistoryEntry
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import com.segmentanalyzer.domain.repository.StravaSessionExpiredException
 import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 internal class StravaSegmentRepositoryImpl @Inject constructor(
@@ -37,6 +42,14 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
         val map = segmentApi.fetchSegmentDetail(accessToken, segmentId).map
         map?.polyline?.takeIf { it.isNotBlank() } ?: map?.summaryPolyline?.takeIf { it.isNotBlank() }
     }.getOrNull()
+
+    override suspend fun fetchEffortHistory(segmentExternalId: String): Result<List<StravaSegmentEffortHistoryEntry>> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val session = validStravaSession(sessionStore, authApi) ?: throw StravaSessionExpiredException()
+                segmentApi.fetchEffortHistory(session.accessToken, segmentExternalId).map { it.toDomain() }
+            }
+        }
 }
 
 /**
@@ -46,6 +59,14 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
  * "Run" (and anything else non-bike) is still excluded.
  */
 internal fun StravaSegmentDto.isBikeSegment(): Boolean = activityType.contains("Ride")
+
+private fun StravaSegmentEffortHistoryDto.toDomain(): StravaSegmentEffortHistoryEntry = StravaSegmentEffortHistoryEntry(
+    startTime = Instant.from(DateTimeFormatter.ISO_INSTANT.parse(startDate)),
+    elapsedTime = Duration.ofSeconds(elapsedTime.toLong()),
+    distanceMeters = distance,
+    komRank = komRank,
+    prRank = prRank,
+)
 
 private fun StravaSegmentDto.toDomain(polyline: String?): Segment = Segment(
     id = 0,

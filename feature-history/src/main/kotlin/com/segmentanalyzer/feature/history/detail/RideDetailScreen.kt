@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,6 +40,7 @@ import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.detail.components.MatchedSegmentRow
+import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortHistoryPanel
 import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +50,7 @@ fun RideDetailScreen(
     onBackClick: () -> Unit,
     onSegmentClick: (Long) -> Unit,
     onFetchStravaSegmentsClick: () -> Unit,
+    onStravaSegmentEffortClick: (Int, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -145,14 +148,21 @@ fun RideDetailScreen(
                     modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
                 )
             }
-            stravaEffortsSection(uiState.stravaSegmentEfforts, onFetchStravaSegmentsClick)
+            stravaEffortsSection(
+                state = uiState.stravaSegmentEfforts,
+                expandedHistory = uiState.expandedSegmentEffortHistory,
+                onFetchClick = onFetchStravaSegmentsClick,
+                onEffortClick = onStravaSegmentEffortClick,
+            )
         }
     }
 }
 
 private fun LazyListScope.stravaEffortsSection(
     state: StravaEffortsUiState,
+    expandedHistory: ExpandedSegmentEffortHistory?,
     onFetchClick: () -> Unit,
+    onEffortClick: (Int, String) -> Unit,
 ) {
     when (state) {
         StravaEffortsUiState.Idle -> item {
@@ -183,8 +193,20 @@ private fun LazyListScope.stravaEffortsSection(
         is StravaEffortsUiState.Loaded -> if (state.efforts.isEmpty()) {
             item { EmptyMessage("No matching Strava activity found for this ride.") }
         } else {
-            items(state.efforts) { effort ->
-                StravaSegmentEffortRow(item = effort, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            itemsIndexed(state.efforts) { index, effort ->
+                Column {
+                    StravaSegmentEffortRow(
+                        item = effort,
+                        onClick = { onEffortClick(index, effort.segmentExternalId) },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    if (expandedHistory?.effortIndex == index) {
+                        StravaSegmentEffortHistoryPanel(
+                            state = expandedHistory.state,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                }
             }
         }
     }

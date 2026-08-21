@@ -8,6 +8,8 @@ import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
+import com.segmentanalyzer.domain.model.StravaSegmentEffortHistoryEntry
+import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortHistoryUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
@@ -29,6 +31,7 @@ class RideDetailViewModel @Inject constructor(
     observeSegmentMatchesForRide: ObserveSegmentMatchesForRideUseCase,
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
+    private val fetchStravaSegmentEffortHistory: FetchStravaSegmentEffortHistoryUseCase,
 ) : ViewModel() {
 
     private val rideId: Long = checkNotNull(savedStateHandle["rideId"])
@@ -43,7 +46,10 @@ class RideDetailViewModel @Inject constructor(
      */
     private val stravaEffortsOverride = MutableStateFlow<StravaEffortsUiState?>(null)
 
-    val uiState = combine(
+    /** Which segment's full Strava effort history is expanded, and its fetch state. Null = none expanded. */
+    private val expandedSegmentEffortHistory = MutableStateFlow<ExpandedSegmentEffortHistory?>(null)
+
+    private val coreState = combine(
         observeRide(rideId),
         observeRideHasTrack(rideId),
         observeSegmentMatchesForRide(rideId),
@@ -51,12 +57,22 @@ class RideDetailViewModel @Inject constructor(
         stravaEffortsOverride,
     ) { ride, hasTrack, matches, cachedEfforts, override ->
         latestRide = ride
-        RideDetailUiState(
-            isLoading = false,
+        CoreRideDetail(
             ride = ride?.toInfo(),
             hasTrack = hasTrack,
             matchedSegments = matches.map { it.toItem() },
             stravaSegmentEfforts = override ?: cachedEfforts.toUiState(),
+        )
+    }
+
+    val uiState = combine(coreState, expandedSegmentEffortHistory) { core, expandedHistory ->
+        RideDetailUiState(
+            isLoading = false,
+            ride = core.ride,
+            hasTrack = core.hasTrack,
+            matchedSegments = core.matchedSegments,
+            stravaSegmentEfforts = core.stravaSegmentEfforts,
+            expandedSegmentEffortHistory = expandedHistory,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -76,7 +92,43 @@ class RideDetailViewModel @Inject constructor(
             )
         }
     }
+
+    /**
+     * Toggles the full effort-history panel for one segment-effort row (identified by
+     * [effortIndex], since a ride can pass through the same segment more than once): expands and
+     * fetches it, or collapses it if already open.
+     */
+    fun onStravaSegmentEffortClick(effortIndex: Int, segmentExternalId: String) {
+        if (expandedSegmentEffortHistory.value?.effortIndex == effortIndex) {
+            expandedSegmentEffortHistory.value = null
+            return
+        }
+        expandedSegmentEffortHistory.value =
+            ExpandedSegmentEffortHistory(effortIndex, segmentExternalId, StravaEffortHistoryUiState.Loading)
+        viewModelScope.launch {
+            val result = fetchStravaSegmentEffortHistory(segmentExternalId)
+            // The user may have collapsed this panel or opened a different one while the fetch was in flight.
+            if (expandedSegmentEffortHistory.value?.effortIndex != effortIndex) return@launch
+            expandedSegmentEffortHistory.value = ExpandedSegmentEffortHistory(
+                effortIndex,
+                segmentExternalId,
+                result.fold(
+                    onSuccess = { entries -> StravaEffortHistoryUiState.Loaded(entries.map { it.toItem() }) },
+                    onFailure = { throwable ->
+                        StravaEffortHistoryUiState.Error(throwable.message ?: "Couldn't fetch segment history.")
+                    },
+                ),
+            )
+        }
+    }
 }
+
+private data class CoreRideDetail(
+    val ride: RideDetailInfo?,
+    val hasTrack: Boolean,
+    val matchedSegments: List<MatchedSegmentItem>,
+    val stravaSegmentEfforts: StravaEffortsUiState,
+)
 
 private fun List<StravaSegmentEffort>.toUiState(): StravaEffortsUiState =
     if (isEmpty()) StravaEffortsUiState.Idle else StravaEffortsUiState.Loaded(map { it.toItem() })
@@ -106,7 +158,16 @@ private fun RideSegmentMatch.toItem(): MatchedSegmentItem = MatchedSegmentItem(
 )
 
 private fun StravaSegmentEffort.toItem(): StravaSegmentEffortItem = StravaSegmentEffortItem(
+    segmentExternalId = segmentExternalId,
     segmentName = segmentName,
+    elapsedTimeLabel = elapsedTime.toRideClock(),
+    distanceKm = distanceMeters / 1000.0,
+    komRank = komRank,
+    prRank = prRank,
+)
+
+private fun StravaSegmentEffortHistoryEntry.toItem(): StravaSegmentEffortHistoryItem = StravaSegmentEffortHistoryItem(
+    dateLabel = startTime.toRideCardDate(),
     elapsedTimeLabel = elapsedTime.toRideClock(),
     distanceKm = distanceMeters / 1000.0,
     komRank = komRank,

@@ -30,6 +30,7 @@ private val ride = Ride(
 )
 
 private fun effort(name: String) = StravaSegmentEffort(
+    segmentExternalId = "seg-$name",
     segmentName = name,
     elapsedTime = Duration.ofMinutes(5),
     distanceMeters = 1_500.0,

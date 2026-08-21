@@ -1,12 +1,11 @@
 package com.segmentanalyzer.domain.model
 
 import java.time.Duration
+import java.time.Instant
 
-/** One segment effort from a Strava activity — Strava's own timing/ranking for a segment. */
-data class StravaSegmentEffort(
-    /** Strava's id for the segment this effort was on — not this effort itself. */
-    val segmentExternalId: String,
-    val segmentName: String,
+/** One of the athlete's own past efforts on a segment, from Strava's effort history for it. */
+data class StravaSegmentEffortHistoryEntry(
+    val startTime: Instant,
     val elapsedTime: Duration,
     val distanceMeters: Double,
     /** 1-10 if this effort ranks in the segment's current all-time top 10, else null. */

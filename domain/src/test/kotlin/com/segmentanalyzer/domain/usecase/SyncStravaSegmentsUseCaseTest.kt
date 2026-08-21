@@ -2,6 +2,7 @@ package com.segmentanalyzer.domain.usecase
 
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.StravaSegmentEffortHistoryEntry
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
@@ -62,6 +63,8 @@ class SyncStravaSegmentsUseCaseTest {
 
 private class FakeStravaSegmentRepository(private val result: Result<List<Segment>>) : StravaSegmentRepository {
     override suspend fun fetchStarredSegments(): Result<List<Segment>> = result
+    override suspend fun fetchEffortHistory(segmentExternalId: String): Result<List<StravaSegmentEffortHistoryEntry>> =
+        Result.success(emptyList())
 }
 
 private class FakeSegmentRepository(private val newCount: Int) : SegmentRepository {

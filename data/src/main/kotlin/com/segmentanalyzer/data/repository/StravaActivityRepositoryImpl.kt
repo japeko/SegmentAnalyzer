@@ -56,6 +56,7 @@ internal fun List<StravaActivitySummaryDto>.closestTo(target: Instant): StravaAc
 private fun StravaActivitySummaryDto.startDate(): Instant = Instant.from(DateTimeFormatter.ISO_INSTANT.parse(startDate))
 
 private fun StravaSegmentEffortDto.toDomain(): StravaSegmentEffort = StravaSegmentEffort(
+    segmentExternalId = segment?.id?.toString().orEmpty(),
     segmentName = name,
     elapsedTime = Duration.ofSeconds(elapsedTime.toLong()),
     distanceMeters = distance,
