@@ -11,6 +11,11 @@ import androidx.room.PrimaryKey
  * several times within itself produces one row per lap — uniqueness is on
  * (segmentId, rideId, entryPointSequence) so distinct laps of the same ride/segment pair can
  * coexist, while re-running the matcher on already-matched data stays idempotent.
+ *
+ * A row can also be a pseudo-attempt derived from a Strava segment effort rather than local GPS
+ * matching — marked by a non-null [stravaEffortExternalId], with [entryPointSequence]/
+ * [exitPointSequence] left null since its track lives in `strava_segment_effort_points`, not
+ * [RidePointEntity], keyed by [stravaEffortExternalId] instead (see the separate unique index).
  */
 @Entity(
     tableName = "segment_attempts",
@@ -32,6 +37,7 @@ import androidx.room.PrimaryKey
         Index("segmentId"),
         Index("rideId"),
         Index(value = ["segmentId", "rideId", "entryPointSequence"], unique = true),
+        Index(value = ["stravaEffortExternalId"], unique = true),
     ],
 )
 data class SegmentAttemptEntity(
@@ -43,8 +49,10 @@ data class SegmentAttemptEntity(
     val avgSpeedKmh: Double,
     val elevationGainMeters: Double,
     val avgPowerWatts: Double?,
-    /** [RidePointEntity.sequence] at segment entry/exit, so the sub-track can be re-sliced on demand. */
-    val entryPointSequence: Int,
-    val exitPointSequence: Int,
+    /** [RidePointEntity.sequence] at segment entry/exit, so the sub-track can be re-sliced on demand. Null for a Strava-derived row. */
+    val entryPointSequence: Int?,
+    val exitPointSequence: Int?,
     val createdAtEpochMillis: Long,
+    /** Non-null marks this row as derived from a Strava segment effort — see the class doc. */
+    val stravaEffortExternalId: String? = null,
 )

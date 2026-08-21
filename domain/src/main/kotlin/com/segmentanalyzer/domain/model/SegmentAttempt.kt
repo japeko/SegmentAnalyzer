@@ -15,4 +15,6 @@ data class SegmentAttempt(
     val avgSpeedKmh: Double,
     val elevationGainMeters: Double,
     val avgPowerWatts: Double?,
+    /** True if this attempt's stats/track came from a Strava segment effort, not local GPS matching. */
+    val isFromStrava: Boolean = false,
 )

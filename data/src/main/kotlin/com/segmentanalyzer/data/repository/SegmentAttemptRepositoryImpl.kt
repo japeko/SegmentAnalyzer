@@ -5,10 +5,12 @@ import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptWithRide
 import com.segmentanalyzer.data.local.dao.SegmentDao
+import com.segmentanalyzer.data.local.dao.StravaSegmentEffortPointDao
 import com.segmentanalyzer.data.local.entity.RidePointEntity
 import com.segmentanalyzer.data.local.entity.SegmentAttemptEntity
 import com.segmentanalyzer.data.local.dao.SegmentAttemptWithSegment
 import com.segmentanalyzer.data.local.entity.SegmentEntity
+import com.segmentanalyzer.data.local.entity.StravaSegmentEffortPointEntity
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
@@ -26,6 +28,7 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
     private val ridePointDao: RidePointDao,
     private val segmentAttemptDao: SegmentAttemptDao,
     private val segmentDao: SegmentDao,
+    private val stravaSegmentEffortPointDao: StravaSegmentEffortPointDao,
     private val dispatcherProvider: DispatcherProvider,
 ) : SegmentAttemptRepository {
 
@@ -38,14 +41,46 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> =
         withContext(dispatcherProvider.io) {
             val attempt = segmentAttemptDao.attemptById(attemptId) ?: return@withContext emptyList()
+            val stravaEffortExternalId = attempt.stravaEffortExternalId
+            if (stravaEffortExternalId != null) {
+                return@withContext stravaSegmentEffortPointDao.forEffort(stravaEffortExternalId).map { it.toDomain() }
+            }
+
             val points = ridePointDao.pointsForRide(attempt.rideId)
             val subTrack = points.subList(
-                attempt.entryPointSequence.coerceIn(0, points.size),
-                (attempt.exitPointSequence + 1).coerceIn(0, points.size),
+                checkNotNull(attempt.entryPointSequence).coerceIn(0, points.size),
+                (checkNotNull(attempt.exitPointSequence) + 1).coerceIn(0, points.size),
             )
             val baseDistance = subTrack.firstOrNull()?.cumulativeDistanceMeters ?: 0.0
             subTrack.map { it.toDomain(baseDistance) }
         }
+
+    override suspend fun saveStravaEffortAttempt(
+        segmentId: Long,
+        rideId: Long,
+        startTime: Instant,
+        duration: Duration,
+        avgSpeedKmh: Double,
+        elevationGainMeters: Double,
+        avgPowerWatts: Double?,
+        effortExternalId: String,
+    ) = withContext(dispatcherProvider.io) {
+        segmentAttemptDao.replaceStravaEffortAttempt(
+            SegmentAttemptEntity(
+                segmentId = segmentId,
+                rideId = rideId,
+                startTimeEpochMillis = startTime.toEpochMilli(),
+                durationMillis = duration.toMillis(),
+                avgSpeedKmh = avgSpeedKmh,
+                elevationGainMeters = elevationGainMeters,
+                avgPowerWatts = avgPowerWatts,
+                entryPointSequence = null,
+                exitPointSequence = null,
+                createdAtEpochMillis = Instant.now().toEpochMilli(),
+                stravaEffortExternalId = effortExternalId,
+            ),
+        )
+    }
 
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int =
         withContext(dispatcherProvider.io) {
@@ -106,6 +141,21 @@ private fun RidePointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = T
     powerWatts = powerWatts,
 )
 
+/**
+ * Strava doesn't give us elevation/HR/cadence/power per-point here (only time/distance/latlng —
+ * see [com.segmentanalyzer.domain.model.StravaSegmentEffortPoint]), and no real wall-clock time
+ * for the effort itself, only elapsed seconds — [elapsedSecondsCurve] in
+ * [com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase] only needs deltas between
+ * timestamps, so an arbitrary shared epoch is fine.
+ */
+private fun StravaSegmentEffortPointEntity.toDomain(): TrackPoint = TrackPoint(
+    latitude = latitude,
+    longitude = longitude,
+    elevationMeters = null,
+    timestamp = Instant.EPOCH.plusSeconds(timeSeconds.toLong()),
+    cumulativeDistanceMeters = distanceMeters,
+)
+
 private fun SegmentAttemptWithSegment.toDomain(): RideSegmentMatch = RideSegmentMatch(
     attemptId = attempt.id,
     segmentId = attempt.segmentId,
@@ -128,4 +178,5 @@ private fun SegmentAttemptWithRide.toDomain(): SegmentAttempt = SegmentAttempt(
     avgSpeedKmh = attempt.avgSpeedKmh,
     elevationGainMeters = attempt.elevationGainMeters,
     avgPowerWatts = attempt.avgPowerWatts,
+    isFromStrava = attempt.stravaEffortExternalId != null,
 )

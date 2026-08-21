@@ -84,4 +84,5 @@ private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Lon
     durationLabel = duration.toRideClock(),
     deltaVsPrSeconds = duration.seconds - personalBestSeconds,
     isPersonalBest = id == personalBestId,
+    isFromStrava = isFromStrava,
 )

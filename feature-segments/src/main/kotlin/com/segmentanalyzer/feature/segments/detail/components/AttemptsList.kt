@@ -54,6 +54,15 @@ fun AttemptRow(item: AttemptItem, onClick: (Long) -> Unit, modifier: Modifier = 
                             modifier = Modifier.padding(start = 6.dp),
                         )
                     }
+                    if (item.isFromStrava) {
+                        Text(
+                            text = "STRAVA",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            color = MaterialThemeExtras.textTertiary,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
                 }
                 Text(
                     text = item.lapLabel,

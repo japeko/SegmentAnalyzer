@@ -5,6 +5,7 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.segmentanalyzer.data.local.entity.SegmentAttemptEntity
 import com.segmentanalyzer.domain.model.ActivitySource
 import kotlinx.coroutines.flow.Flow
@@ -54,4 +55,17 @@ interface SegmentAttemptDao {
 
     @Query("SELECT * FROM segment_attempts WHERE id = :attemptId")
     suspend fun attemptById(attemptId: Long): SegmentAttemptEntity?
+
+    @Insert
+    suspend fun insert(attempt: SegmentAttemptEntity): Long
+
+    @Query("DELETE FROM segment_attempts WHERE stravaEffortExternalId = :effortExternalId")
+    suspend fun deleteForStravaEffort(effortExternalId: String)
+
+    /** Atomically replaces the pseudo-attempt for [attempt]'s `stravaEffortExternalId` with [attempt]. */
+    @Transaction
+    suspend fun replaceStravaEffortAttempt(attempt: SegmentAttemptEntity) {
+        deleteForStravaEffort(checkNotNull(attempt.stravaEffortExternalId))
+        insert(attempt)
+    }
 }

@@ -15,6 +15,7 @@ import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
+import com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,7 @@ class RideDetailViewModel @Inject constructor(
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEffortDetail: FetchStravaSegmentEffortDetailUseCase,
+    private val saveStravaSegmentEffortAttempt: SaveStravaSegmentEffortAttemptUseCase,
 ) : ViewModel() {
 
     private val rideId: Long = checkNotNull(savedStateHandle["rideId"])
@@ -108,16 +110,21 @@ class RideDetailViewModel @Inject constructor(
             expandedSegmentEffortDetail.value = null
             return
         }
-        val cachedDetail = latestEfforts.find { it.effortExternalId == effortExternalId }?.detail
-        if (cachedDetail != null) {
+        val effort = latestEfforts.find { it.effortExternalId == effortExternalId }
+        val cachedDetail = effort?.detail
+        if (effort != null && cachedDetail != null) {
             expandedSegmentEffortDetail.value =
                 ExpandedSegmentEffortDetail(effortIndex, effortExternalId, StravaEffortDetailUiState.Loaded(cachedDetail.toItem()))
+            // Retrofits effort detail that was cached before pseudo-attempts existed, and is a
+            // cheap idempotent no-op otherwise — see saveStravaSegmentEffortAttempt's own doc.
+            viewModelScope.launch { saveStravaSegmentEffortAttempt(rideId, effort, cachedDetail) }
             return
         }
         expandedSegmentEffortDetail.value =
             ExpandedSegmentEffortDetail(effortIndex, effortExternalId, StravaEffortDetailUiState.Loading)
         viewModelScope.launch {
             val result = fetchStravaSegmentEffortDetail(effortExternalId)
+            result.onSuccess { detail -> effort?.let { saveStravaSegmentEffortAttempt(rideId, it, detail) } }
             // The user may have collapsed this panel or opened a different one while the fetch was in flight.
             if (expandedSegmentEffortDetail.value?.effortIndex != effortIndex) return@launch
             expandedSegmentEffortDetail.value = ExpandedSegmentEffortDetail(

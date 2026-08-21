@@ -330,6 +330,11 @@ class RideDetailViewModelTest {
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
             FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository, stravaEffortRepository),
+            com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase(
+                FakeRideDetailSegmentRepository(),
+                rideRepository,
+                segmentAttemptRepository,
+            ),
         )
     }
 }
@@ -348,11 +353,32 @@ private class FakeRideDetailRideRepository(
 private class FakeRideDetailSegmentAttemptRepository(
     private val matches: List<RideSegmentMatch>,
 ) : SegmentAttemptRepository {
+    val savedStravaEffortAttempts = mutableListOf<String>()
+
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
     override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> = MutableStateFlow(matches)
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0
+    override suspend fun saveStravaEffortAttempt(
+        segmentId: Long,
+        rideId: Long,
+        startTime: java.time.Instant,
+        duration: java.time.Duration,
+        avgSpeedKmh: Double,
+        elevationGainMeters: Double,
+        avgPowerWatts: Double?,
+        effortExternalId: String,
+    ) {
+        savedStravaEffortAttempts += effortExternalId
+    }
+}
+
+private class FakeRideDetailSegmentRepository(
+    private val segments: List<com.segmentanalyzer.domain.model.Segment> = emptyList(),
+) : com.segmentanalyzer.domain.repository.SegmentRepository {
+    override fun observeSegments(): Flow<List<com.segmentanalyzer.domain.model.Segment>> = MutableStateFlow(segments)
+    override suspend fun saveSegments(segments: List<com.segmentanalyzer.domain.model.Segment>): List<Long> = emptyList()
 }
 
 private class FakeStravaActivityRepository(

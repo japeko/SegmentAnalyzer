@@ -93,4 +93,8 @@ private class FakeGpxSegmentAttemptRepository : SegmentAttemptRepository {
     override suspend fun trackPointsForAttempt(attemptId: Long) = emptyList<com.segmentanalyzer.domain.model.TrackPoint>()
     override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0
     override suspend fun matchSegmentAgainstAllRides(segmentId: Long) = 0
+    override suspend fun saveStravaEffortAttempt(
+        segmentId: Long, rideId: Long, startTime: java.time.Instant, duration: java.time.Duration,
+        avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
+    ) = Unit
 }

@@ -26,7 +26,7 @@ import com.segmentanalyzer.data.local.entity.StravaSegmentEffortPointEntity
         StravaSegmentEffortEntity::class,
         StravaSegmentEffortPointEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(RideTypeConverters::class)

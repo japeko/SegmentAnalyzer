@@ -24,6 +24,8 @@ data class AttemptItem(
     val durationLabel: String,
     val deltaVsPrSeconds: Long,
     val isPersonalBest: Boolean,
+    /** True if this attempt's stats/track came from a Strava segment effort, not local GPS matching. */
+    val isFromStrava: Boolean,
 )
 
 data class ProgressPoint(val attemptId: Long, val normalizedY: Float, val isPersonalBest: Boolean)
