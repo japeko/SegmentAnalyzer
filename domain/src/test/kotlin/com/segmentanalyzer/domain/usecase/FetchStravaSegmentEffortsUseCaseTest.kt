@@ -4,6 +4,7 @@ import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
+import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +31,7 @@ private val ride = Ride(
 )
 
 private fun effort(name: String) = StravaSegmentEffort(
+    effortExternalId = "effort-$name",
     segmentExternalId = "seg-$name",
     segmentName = name,
     elapsedTime = Duration.ofMinutes(5),
@@ -76,6 +78,8 @@ private class FakeStravaActivityRepository(
     private val result: Result<List<StravaSegmentEffort>>,
 ) : StravaActivityRepository {
     override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = result
+    override suspend fun fetchEffortDetail(effortExternalId: String): Result<StravaSegmentEffortDetail> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
 private class FakeStravaSegmentEffortRepository : StravaSegmentEffortRepository {

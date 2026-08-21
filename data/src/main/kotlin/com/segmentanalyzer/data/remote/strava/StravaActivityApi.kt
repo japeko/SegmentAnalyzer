@@ -21,6 +21,7 @@ internal data class StravaSegmentEffortSegmentRefDto(
 
 @Serializable
 internal data class StravaSegmentEffortDto(
+    val id: Long,
     val name: String,
     @SerialName("elapsed_time") val elapsedTime: Int,
     val distance: Double,
@@ -32,6 +33,13 @@ internal data class StravaSegmentEffortDto(
 @Serializable
 internal data class StravaActivityDetailDto(
     @SerialName("segment_efforts") val segmentEfforts: List<StravaSegmentEffortDto> = emptyList(),
+)
+
+/** One requested stream (e.g. "watts", "heartrate") from a segment effort's `/streams` response. */
+@Serializable
+internal data class StravaStreamDto(
+    val type: String,
+    val data: List<Double> = emptyList(),
 )
 
 /**
@@ -59,6 +67,17 @@ internal class StravaActivityApi @Inject constructor(
     fun fetchActivityDetail(accessToken: String, activityId: Long): StravaActivityDetailDto =
         get("$ACTIVITY_URL/$activityId", accessToken, "activity detail")
 
+    /**
+     * Point-by-point streams for one specific segment effort (identified by its own id, not the
+     * segment's — see [StravaSegmentEffortDto.id]). `latlng` is deliberately not requested since
+     * nothing here renders a map yet; the rest is enough for pace/power/HR/cadence summaries.
+     */
+    fun fetchEffortStreams(accessToken: String, effortId: Long): List<StravaStreamDto> = get(
+        "$SEGMENT_EFFORT_URL/$effortId/streams?keys=$STREAM_KEYS",
+        accessToken,
+        "segment effort streams",
+    )
+
     private inline fun <reified T> get(url: String, accessToken: String, what: String): T {
         val request = Request.Builder()
             .url(url)
@@ -85,5 +104,7 @@ internal class StravaActivityApi @Inject constructor(
         /** The athlete-scoped activity list — NOT the same base path as the single-activity detail endpoint below. */
         const val ATHLETE_ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities"
         const val ACTIVITY_URL = "https://www.strava.com/api/v3/activities"
+        const val SEGMENT_EFFORT_URL = "https://www.strava.com/api/v3/segment_efforts"
+        const val STREAM_KEYS = "time,distance,altitude,velocity_smooth,heartrate,cadence,watts,grade_smooth"
     }
 }

@@ -40,7 +40,7 @@ import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.detail.components.MatchedSegmentRow
-import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortHistoryPanel
+import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortDetailPanel
 import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,7 +150,7 @@ fun RideDetailScreen(
             }
             stravaEffortsSection(
                 state = uiState.stravaSegmentEfforts,
-                expandedHistory = uiState.expandedSegmentEffortHistory,
+                expandedDetail = uiState.expandedSegmentEffortDetail,
                 onFetchClick = onFetchStravaSegmentsClick,
                 onEffortClick = onStravaSegmentEffortClick,
             )
@@ -160,7 +160,7 @@ fun RideDetailScreen(
 
 private fun LazyListScope.stravaEffortsSection(
     state: StravaEffortsUiState,
-    expandedHistory: ExpandedSegmentEffortHistory?,
+    expandedDetail: ExpandedSegmentEffortDetail?,
     onFetchClick: () -> Unit,
     onEffortClick: (Int, String) -> Unit,
 ) {
@@ -197,12 +197,12 @@ private fun LazyListScope.stravaEffortsSection(
                 Column {
                     StravaSegmentEffortRow(
                         item = effort,
-                        onClick = { onEffortClick(index, effort.segmentExternalId) },
+                        onClick = { onEffortClick(index, effort.effortExternalId) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
-                    if (expandedHistory?.effortIndex == index) {
-                        StravaSegmentEffortHistoryPanel(
-                            state = expandedHistory.state,
+                    if (expandedDetail?.effortIndex == index) {
+                        StravaSegmentEffortDetailPanel(
+                            state = expandedDetail.state,
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }

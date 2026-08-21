@@ -2,6 +2,7 @@ package com.segmentanalyzer.domain.repository
 
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
+import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 
 /** Fetches Strava's own segment effort data for a ride, by matching it to a Strava activity. */
 interface StravaActivityRepository {
@@ -10,4 +11,7 @@ interface StravaActivityRepository {
      * if no matching Strava activity is found. Requires the `activity:read_all` OAuth scope.
      */
     suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>>
+
+    /** Pace/power/HR/cadence summary for one specific effort, from its point-by-point streams. */
+    suspend fun fetchEffortDetail(effortExternalId: String): Result<StravaSegmentEffortDetail>
 }

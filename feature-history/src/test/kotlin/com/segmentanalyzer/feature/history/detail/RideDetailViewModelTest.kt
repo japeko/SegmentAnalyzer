@@ -6,17 +6,15 @@ import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.RideSegmentMatch
-import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
-import com.segmentanalyzer.domain.model.StravaSegmentEffortHistoryEntry
+import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
-import com.segmentanalyzer.domain.repository.StravaSegmentRepository
-import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortHistoryUseCase
+import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
@@ -130,6 +128,7 @@ class RideDetailViewModelTest {
     fun `fetching Strava segments shows loading then the fetched efforts`() = runTest(dispatcher) {
         val efforts = listOf(
             StravaSegmentEffort(
+                effortExternalId = "effort-1",
                 segmentExternalId = "seg-1",
                 segmentName = "Skyline Climb",
                 elapsedTime = Duration.ofMinutes(4),
@@ -163,6 +162,7 @@ class RideDetailViewModelTest {
     fun `previously cached Strava efforts show immediately without needing a fetch`() = runTest(dispatcher) {
         val cached = listOf(
             StravaSegmentEffort(
+                effortExternalId = "effort-2",
                 segmentExternalId = "seg-2",
                 segmentName = "Fireroad Descent",
                 elapsedTime = Duration.ofMinutes(2),
@@ -207,61 +207,60 @@ class RideDetailViewModelTest {
     }
 
     @Test
-    fun `clicking a segment effort expands it and shows its history`() = runTest(dispatcher) {
-        val history = listOf(
-            StravaSegmentEffortHistoryEntry(
-                startTime = Instant.parse("2026-08-10T06:00:00Z"),
-                elapsedTime = Duration.ofMinutes(4).plusSeconds(30),
-                distanceMeters = 1_200.0,
-                komRank = null,
-                prRank = 1,
-            ),
+    fun `clicking a segment effort expands it and shows its detail`() = runTest(dispatcher) {
+        val detail = StravaSegmentEffortDetail(
+            avgSpeedKmh = 24.5,
+            maxSpeedKmh = 38.0,
+            elevationGainMeters = 12.0,
+            avgWatts = 210.0,
+            avgHeartRateBpm = 152.0,
+            avgCadenceRpm = 78.0,
         )
         val viewModel = viewModel(
             ride = ride,
             hasTrack = true,
             matches = emptyList(),
-            historyResult = Result.success(history),
+            detailResult = Result.success(detail),
         )
 
         viewModel.uiState.test {
             skipItems(1)
-            assertEquals(null, awaitItem().expandedSegmentEffortHistory)
+            assertEquals(null, awaitItem().expandedSegmentEffortDetail)
 
-            viewModel.onStravaSegmentEffortClick(0, "seg-1")
+            viewModel.onStravaSegmentEffortClick(0, "effort-1")
 
-            val loading = awaitItem().expandedSegmentEffortHistory
-            assertEquals("seg-1", loading?.segmentExternalId)
-            assertEquals(StravaEffortHistoryUiState.Loading, loading?.state)
+            val loading = awaitItem().expandedSegmentEffortDetail
+            assertEquals("effort-1", loading?.effortExternalId)
+            assertEquals(StravaEffortDetailUiState.Loading, loading?.state)
 
-            val loaded = awaitItem().expandedSegmentEffortHistory
-            val loadedState = loaded?.state as StravaEffortHistoryUiState.Loaded
-            assertEquals(1, loadedState.entries.size)
-            assertEquals(1, loadedState.entries.first().prRank)
+            val loaded = awaitItem().expandedSegmentEffortDetail
+            val loadedState = loaded?.state as StravaEffortDetailUiState.Loaded
+            assertEquals("210 W", loadedState.detail.avgWattsLabel)
+            assertEquals("152 bpm", loadedState.detail.avgHeartRateLabel)
 
-            viewModel.onStravaSegmentEffortClick(0, "seg-1")
-            assertEquals(null, awaitItem().expandedSegmentEffortHistory)
+            viewModel.onStravaSegmentEffortClick(0, "effort-1")
+            assertEquals(null, awaitItem().expandedSegmentEffortDetail)
         }
     }
 
     @Test
-    fun `a failed segment history fetch shows the error message`() = runTest(dispatcher) {
+    fun `a failed segment effort detail fetch shows the error message`() = runTest(dispatcher) {
         val viewModel = viewModel(
             ride = ride,
             hasTrack = true,
             matches = emptyList(),
-            historyResult = Result.failure(IllegalStateException("Couldn't reach Strava")),
+            detailResult = Result.failure(IllegalStateException("Couldn't reach Strava")),
         )
 
         viewModel.uiState.test {
             skipItems(1)
-            assertEquals(null, awaitItem().expandedSegmentEffortHistory)
+            assertEquals(null, awaitItem().expandedSegmentEffortDetail)
 
-            viewModel.onStravaSegmentEffortClick(0, "seg-1")
+            viewModel.onStravaSegmentEffortClick(0, "effort-1")
 
             skipItems(1) // loading
-            val errored = awaitItem().expandedSegmentEffortHistory?.state
-            assertEquals(StravaEffortHistoryUiState.Error("Couldn't reach Strava"), errored)
+            val errored = awaitItem().expandedSegmentEffortDetail?.state
+            assertEquals(StravaEffortDetailUiState.Error("Couldn't reach Strava"), errored)
         }
     }
 
@@ -271,14 +270,13 @@ class RideDetailViewModelTest {
         matches: List<RideSegmentMatch>,
         stravaResult: Result<List<StravaSegmentEffort>> = Result.success(emptyList()),
         cachedEfforts: List<StravaSegmentEffort> = emptyList(),
-        historyResult: Result<List<StravaSegmentEffortHistoryEntry>> = Result.success(emptyList()),
+        detailResult: Result<StravaSegmentEffortDetail> = Result.failure(UnsupportedOperationException("not used")),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
         val rideRepository = FakeRideDetailRideRepository(ride, hasTrack)
         val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(matches)
-        val stravaActivityRepository = FakeStravaActivityRepository(stravaResult)
+        val stravaActivityRepository = FakeStravaActivityRepository(stravaResult, detailResult)
         val stravaEffortRepository = FakeStravaSegmentEffortRepository(mutableMapOf(1L to cachedEfforts))
-        val stravaSegmentRepository = FakeStravaSegmentRepository(historyResult)
         return RideDetailViewModel(
             savedStateHandle,
             ObserveRideUseCase(rideRepository),
@@ -286,7 +284,7 @@ class RideDetailViewModelTest {
             ObserveSegmentMatchesForRideUseCase(segmentAttemptRepository),
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
-            FetchStravaSegmentEffortHistoryUseCase(stravaSegmentRepository),
+            FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository),
         )
     }
 }
@@ -313,9 +311,11 @@ private class FakeRideDetailSegmentAttemptRepository(
 }
 
 private class FakeStravaActivityRepository(
-    private val result: Result<List<StravaSegmentEffort>>,
+    private val segmentEffortsResult: Result<List<StravaSegmentEffort>>,
+    private val detailResult: Result<StravaSegmentEffortDetail>,
 ) : StravaActivityRepository {
-    override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = result
+    override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = segmentEffortsResult
+    override suspend fun fetchEffortDetail(effortExternalId: String): Result<StravaSegmentEffortDetail> = detailResult
 }
 
 private class FakeStravaSegmentEffortRepository(
@@ -329,12 +329,4 @@ private class FakeStravaSegmentEffortRepository(
     override suspend fun replaceEffortsForRide(rideId: Long, efforts: List<StravaSegmentEffort>) {
         state.value = state.value + (rideId to efforts)
     }
-}
-
-private class FakeStravaSegmentRepository(
-    private val historyResult: Result<List<StravaSegmentEffortHistoryEntry>>,
-) : StravaSegmentRepository {
-    override suspend fun fetchStarredSegments(): Result<List<Segment>> = Result.success(emptyList())
-    override suspend fun fetchEffortHistory(segmentExternalId: String): Result<List<StravaSegmentEffortHistoryEntry>> =
-        historyResult
 }

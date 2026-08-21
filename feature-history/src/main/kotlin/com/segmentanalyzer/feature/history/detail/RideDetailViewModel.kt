@@ -8,8 +8,8 @@ import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
-import com.segmentanalyzer.domain.model.StravaSegmentEffortHistoryEntry
-import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortHistoryUseCase
+import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
+import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
@@ -31,7 +31,7 @@ class RideDetailViewModel @Inject constructor(
     observeSegmentMatchesForRide: ObserveSegmentMatchesForRideUseCase,
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
-    private val fetchStravaSegmentEffortHistory: FetchStravaSegmentEffortHistoryUseCase,
+    private val fetchStravaSegmentEffortDetail: FetchStravaSegmentEffortDetailUseCase,
 ) : ViewModel() {
 
     private val rideId: Long = checkNotNull(savedStateHandle["rideId"])
@@ -46,8 +46,8 @@ class RideDetailViewModel @Inject constructor(
      */
     private val stravaEffortsOverride = MutableStateFlow<StravaEffortsUiState?>(null)
 
-    /** Which segment's full Strava effort history is expanded, and its fetch state. Null = none expanded. */
-    private val expandedSegmentEffortHistory = MutableStateFlow<ExpandedSegmentEffortHistory?>(null)
+    /** Which effort's full pace/power/HR detail is expanded, and its fetch state. Null = none expanded. */
+    private val expandedSegmentEffortDetail = MutableStateFlow<ExpandedSegmentEffortDetail?>(null)
 
     private val coreState = combine(
         observeRide(rideId),
@@ -65,14 +65,14 @@ class RideDetailViewModel @Inject constructor(
         )
     }
 
-    val uiState = combine(coreState, expandedSegmentEffortHistory) { core, expandedHistory ->
+    val uiState = combine(coreState, expandedSegmentEffortDetail) { core, expandedDetail ->
         RideDetailUiState(
             isLoading = false,
             ride = core.ride,
             hasTrack = core.hasTrack,
             matchedSegments = core.matchedSegments,
             stravaSegmentEfforts = core.stravaSegmentEfforts,
-            expandedSegmentEffortHistory = expandedHistory,
+            expandedSegmentEffortDetail = expandedDetail,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -94,28 +94,28 @@ class RideDetailViewModel @Inject constructor(
     }
 
     /**
-     * Toggles the full effort-history panel for one segment-effort row (identified by
+     * Toggles the pace/power/HR detail panel for one segment-effort row (identified by
      * [effortIndex], since a ride can pass through the same segment more than once): expands and
      * fetches it, or collapses it if already open.
      */
-    fun onStravaSegmentEffortClick(effortIndex: Int, segmentExternalId: String) {
-        if (expandedSegmentEffortHistory.value?.effortIndex == effortIndex) {
-            expandedSegmentEffortHistory.value = null
+    fun onStravaSegmentEffortClick(effortIndex: Int, effortExternalId: String) {
+        if (expandedSegmentEffortDetail.value?.effortIndex == effortIndex) {
+            expandedSegmentEffortDetail.value = null
             return
         }
-        expandedSegmentEffortHistory.value =
-            ExpandedSegmentEffortHistory(effortIndex, segmentExternalId, StravaEffortHistoryUiState.Loading)
+        expandedSegmentEffortDetail.value =
+            ExpandedSegmentEffortDetail(effortIndex, effortExternalId, StravaEffortDetailUiState.Loading)
         viewModelScope.launch {
-            val result = fetchStravaSegmentEffortHistory(segmentExternalId)
+            val result = fetchStravaSegmentEffortDetail(effortExternalId)
             // The user may have collapsed this panel or opened a different one while the fetch was in flight.
-            if (expandedSegmentEffortHistory.value?.effortIndex != effortIndex) return@launch
-            expandedSegmentEffortHistory.value = ExpandedSegmentEffortHistory(
+            if (expandedSegmentEffortDetail.value?.effortIndex != effortIndex) return@launch
+            expandedSegmentEffortDetail.value = ExpandedSegmentEffortDetail(
                 effortIndex,
-                segmentExternalId,
+                effortExternalId,
                 result.fold(
-                    onSuccess = { entries -> StravaEffortHistoryUiState.Loaded(entries.map { it.toItem() }) },
+                    onSuccess = { detail -> StravaEffortDetailUiState.Loaded(detail.toItem()) },
                     onFailure = { throwable ->
-                        StravaEffortHistoryUiState.Error(throwable.message ?: "Couldn't fetch segment history.")
+                        StravaEffortDetailUiState.Error(throwable.message ?: "Couldn't fetch effort detail.")
                     },
                 ),
             )
@@ -158,6 +158,7 @@ private fun RideSegmentMatch.toItem(): MatchedSegmentItem = MatchedSegmentItem(
 )
 
 private fun StravaSegmentEffort.toItem(): StravaSegmentEffortItem = StravaSegmentEffortItem(
+    effortExternalId = effortExternalId,
     segmentExternalId = segmentExternalId,
     segmentName = segmentName,
     elapsedTimeLabel = elapsedTime.toRideClock(),
@@ -166,10 +167,11 @@ private fun StravaSegmentEffort.toItem(): StravaSegmentEffortItem = StravaSegmen
     prRank = prRank,
 )
 
-private fun StravaSegmentEffortHistoryEntry.toItem(): StravaSegmentEffortHistoryItem = StravaSegmentEffortHistoryItem(
-    dateLabel = startTime.toRideCardDate(),
-    elapsedTimeLabel = elapsedTime.toRideClock(),
-    distanceKm = distanceMeters / 1000.0,
-    komRank = komRank,
-    prRank = prRank,
+private fun StravaSegmentEffortDetail.toItem(): StravaSegmentEffortDetailItem = StravaSegmentEffortDetailItem(
+    avgSpeedLabel = "%.1f km/h".format(avgSpeedKmh),
+    maxSpeedLabel = "%.1f km/h".format(maxSpeedKmh),
+    elevationGainLabel = "%.0f m".format(elevationGainMeters),
+    avgWattsLabel = avgWatts?.let { "%.0f W".format(it) },
+    avgHeartRateLabel = avgHeartRateBpm?.let { "%.0f bpm".format(it) },
+    avgCadenceLabel = avgCadenceRpm?.let { "%.0f rpm".format(it) },
 )

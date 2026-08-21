@@ -4,6 +4,8 @@ import java.time.Duration
 
 /** One segment effort from a Strava activity — Strava's own timing/ranking for a segment. */
 data class StravaSegmentEffort(
+    /** Strava's id for this specific effort — used to fetch its point-by-point streams. */
+    val effortExternalId: String,
     /** Strava's id for the segment this effort was on — not this effort itself. */
     val segmentExternalId: String,
     val segmentName: String,
