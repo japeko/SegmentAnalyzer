@@ -65,7 +65,8 @@ fun SettingsScreen(
                 source = ActivitySource.GARMIN,
                 isConnected = uiState.garminConnectionState is GarminConnectionState.Connected,
                 statusText = when (val state = uiState.garminConnectionState) {
-                    is GarminConnectionState.Connected -> "Connected as ${state.username}"
+                    is GarminConnectionState.Connected ->
+                        state.username.takeIf { it.isNotBlank() }?.let { "Connected as $it" } ?: "Connected"
                     GarminConnectionState.Disconnected -> "Not connected"
                 },
                 onConnectClick = onConnectGarminClick,
