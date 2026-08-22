@@ -23,9 +23,11 @@ import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
 import com.segmentanalyzer.feature.importer.gpx.GpxFileImportRoute
 import com.segmentanalyzer.feature.segments.SegmentsRoute
 import com.segmentanalyzer.feature.segments.detail.SegmentDetailRoute
+import com.segmentanalyzer.feature.settings.AboutScreen
 import com.segmentanalyzer.feature.settings.SettingsRoute
 
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
+private const val ABOUT_ROUTE = "about"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
 private const val IMPORT_SOURCE_ROUTE = "import_source"
 private const val FIT_FILE_IMPORT_ROUTE = "fit_file_import"
@@ -75,7 +77,11 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onConnectStravaClick = { authorizationUrl ->
                     CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(authorizationUrl))
                 },
+                onAboutClick = { navController.navigate(ABOUT_ROUTE) },
             )
+        }
+        composable(ABOUT_ROUTE) {
+            AboutScreen(onBackClick = { navController.popBackStack() })
         }
         composable(GARMIN_LOGIN_ROUTE) {
             GarminLoginRoute(
