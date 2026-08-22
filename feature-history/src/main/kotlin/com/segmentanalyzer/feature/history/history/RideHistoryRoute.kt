@@ -19,6 +19,7 @@ fun RideHistoryRoute(
     RideHistoryScreen(
         uiState = uiState,
         onFilterSelected = viewModel::onFilterSelected,
+        onPeriodSelected = viewModel::onPeriodSelected,
         onRideClick = onRideClick,
         onSearchClick = onSearchClick,
         onImportClick = onImportClick,

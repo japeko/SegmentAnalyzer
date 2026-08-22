@@ -16,17 +16,20 @@ import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.theme.SegmentAnalyzerTheme
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
-import com.segmentanalyzer.domain.usecase.MonthlySummary
+import com.segmentanalyzer.domain.model.SummaryPeriod
+import com.segmentanalyzer.domain.usecase.RideSummary
 import com.segmentanalyzer.feature.history.history.components.ActivityTypeFilterRow
 import com.segmentanalyzer.feature.history.history.components.ImportFab
 import com.segmentanalyzer.feature.history.history.components.QuickStatsRow
 import com.segmentanalyzer.feature.history.history.components.RideCard
 import com.segmentanalyzer.feature.history.history.components.RideHistoryTopBar
+import com.segmentanalyzer.feature.history.history.components.SummaryPeriodRow
 
 @Composable
 fun RideHistoryScreen(
     uiState: RideHistoryUiState,
     onFilterSelected: (ActivityType?) -> Unit,
+    onPeriodSelected: (SummaryPeriod) -> Unit,
     onRideClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
@@ -43,9 +46,17 @@ fun RideHistoryScreen(
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
-                QuickStatsRow(
-                    summary = uiState.monthSummary,
+                SummaryPeriodRow(
+                    selected = uiState.summaryPeriod,
+                    onPeriodSelected = onPeriodSelected,
                     modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            item {
+                QuickStatsRow(
+                    summary = uiState.summary,
+                    period = uiState.summaryPeriod,
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
             item {
@@ -106,12 +117,13 @@ private val previewRides = listOf(
 
 private val previewState = RideHistoryUiState(
     isLoading = false,
-    monthSummary = MonthlySummary(
+    summary = RideSummary(
         totalDistanceKm = 140.4,
         rideCount = 5,
         elevationGainMeters = 1644.0,
         newPersonalBestCount = 2,
     ),
+    summaryPeriod = SummaryPeriod.THIS_MONTH,
     selectedFilter = null,
     rides = previewRides,
 )
@@ -123,6 +135,7 @@ private fun RideHistoryScreenLightPreview() {
         RideHistoryScreen(
             uiState = previewState,
             onFilterSelected = {},
+            onPeriodSelected = {},
             onRideClick = {},
             onSearchClick = {},
             onImportClick = {},
@@ -137,6 +150,7 @@ private fun RideHistoryScreenDarkPreview() {
         RideHistoryScreen(
             uiState = previewState,
             onFilterSelected = {},
+            onPeriodSelected = {},
             onRideClick = {},
             onSearchClick = {},
             onImportClick = {},

@@ -3,9 +3,10 @@ package com.segmentanalyzer.feature.history.history
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.repository.RideRepository
-import com.segmentanalyzer.domain.usecase.ObserveMonthlySummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -22,12 +23,18 @@ import org.junit.Test
 import java.time.Duration
 import java.time.Instant
 
-private fun ride(id: Long, name: String, type: ActivityType, isPersonalBest: Boolean = false) = Ride(
+private fun ride(
+    id: Long,
+    name: String,
+    type: ActivityType,
+    isPersonalBest: Boolean = false,
+    startTime: Instant = Instant.now(),
+) = Ride(
     id = id,
     name = name,
     activityType = type,
     source = ActivitySource.GARMIN,
-    startTime = Instant.now(),
+    startTime = startTime,
     duration = Duration.ofMinutes(30),
     distanceMeters = 10_000.0,
     elevationGainMeters = 100.0,
@@ -60,7 +67,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveMonthlySummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
         )
 
         // `onFilterSelected` changes both the direct selectedFilter flow and (via flatMapLatest)
@@ -76,6 +83,34 @@ class RideHistoryViewModelTest {
         val filtered = viewModel.uiState.value
         assertEquals(1, filtered.rides.size)
         assertEquals("Sunday Club Ride", filtered.rides.first().name)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `changing the summary period recomputes the stats but not the ride list`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val lastYear = Instant.now().atZone(java.time.ZoneId.systemDefault()).minusYears(1).toInstant()
+        val rides = listOf(
+            ride(1, "Skyline Ridge Loop", ActivityType.MTB, startTime = Instant.now()),
+            ride(2, "Old Century Ride", ActivityType.ROAD, startTime = lastYear),
+        )
+        val repository = FakeRideRepository(rides)
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(SummaryPeriod.THIS_MONTH, viewModel.uiState.value.summaryPeriod)
+        assertEquals(1, viewModel.uiState.value.summary?.rideCount)
+        assertEquals(2, viewModel.uiState.value.rides.size)
+
+        viewModel.onPeriodSelected(SummaryPeriod.ALL_TIME)
+        advanceUntilIdle()
+
+        assertEquals(SummaryPeriod.ALL_TIME, viewModel.uiState.value.summaryPeriod)
+        assertEquals(2, viewModel.uiState.value.summary?.rideCount)
+        assertEquals(2, viewModel.uiState.value.rides.size)
         collectJob.cancel()
     }
 }
