@@ -8,6 +8,7 @@ import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.repository.GarminImportRepository
 import com.segmentanalyzer.domain.repository.RideRepository
+import com.segmentanalyzer.domain.usecase.FetchGarminRidesUseCase
 import com.segmentanalyzer.domain.usecase.ImportGarminRidesUseCase
 import com.segmentanalyzer.domain.usecase.ObserveGarminConnectionStateUseCase
 import kotlinx.coroutines.Dispatchers
@@ -56,22 +57,70 @@ class GarminImportViewModelTest {
     }
 
     @Test
-    fun `successful import reports fetched and imported counts`() = runTest(dispatcher) {
+    fun `browsing rides shows all of them pre-selected`() = runTest(dispatcher) {
         val viewModel = viewModel(connected = true, importRepository = FakeGarminImportRepository(Result.success(listOf(ride("1"), ride("2")))))
 
         viewModel.uiState.test {
             skipItems(1)
             assertEquals(GarminImportUiState.Idle, awaitItem())
 
-            viewModel.onImportClick()
+            viewModel.onBrowseRidesClick()
 
-            assertEquals(GarminImportUiState.Importing, awaitItem())
-            assertEquals(GarminImportUiState.Result(fetchedCount = 2, importedCount = 1), awaitItem())
+            assertEquals(GarminImportUiState.FetchingRides, awaitItem())
+            val selecting = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(2, selecting.candidates.size)
+            assertEquals(setOf("1", "2"), selecting.selectedExternalIds)
         }
     }
 
     @Test
-    fun `failed import shows the error message`() = runTest(dispatcher) {
+    fun `deselecting a ride excludes it from the import`() = runTest(dispatcher) {
+        val rideRepository = FakeRideRepository(newRideCount = 1)
+        val viewModel = viewModel(
+            connected = true,
+            importRepository = FakeGarminImportRepository(Result.success(listOf(ride("1"), ride("2")))),
+            rideRepository = rideRepository,
+        )
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // Idle
+            viewModel.onBrowseRidesClick()
+            awaitItem() // FetchingRides
+            awaitItem() // SelectingRides, both selected
+
+            viewModel.onRideToggled("2")
+            val afterToggle = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(setOf("1"), afterToggle.selectedExternalIds)
+
+            viewModel.onImportSelectedClick()
+            assertEquals(GarminImportUiState.Importing, awaitItem())
+            assertEquals(GarminImportUiState.Result(selectedCount = 1, importedCount = 1), awaitItem())
+        }
+        assertEquals(listOf("1"), rideRepository.lastSavedExternalIds)
+    }
+
+    @Test
+    fun `select all toggles between everything and nothing`() = runTest(dispatcher) {
+        val viewModel = viewModel(connected = true, importRepository = FakeGarminImportRepository(Result.success(listOf(ride("1"), ride("2")))))
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // Idle
+            viewModel.onBrowseRidesClick()
+            awaitItem() // FetchingRides
+            awaitItem() // SelectingRides, both selected
+
+            viewModel.onSelectAllToggled()
+            assertEquals(emptySet<String>(), (awaitItem() as GarminImportUiState.SelectingRides).selectedExternalIds)
+
+            viewModel.onSelectAllToggled()
+            assertEquals(setOf("1", "2"), (awaitItem() as GarminImportUiState.SelectingRides).selectedExternalIds)
+        }
+    }
+
+    @Test
+    fun `a fetch failure shows the error message`() = runTest(dispatcher) {
         val viewModel = viewModel(
             connected = true,
             importRepository = FakeGarminImportRepository(Result.failure(IllegalStateException("session expired"))),
@@ -81,9 +130,9 @@ class GarminImportViewModelTest {
             skipItems(1)
             assertEquals(GarminImportUiState.Idle, awaitItem())
 
-            viewModel.onImportClick()
+            viewModel.onBrowseRidesClick()
 
-            assertEquals(GarminImportUiState.Importing, awaitItem())
+            assertEquals(GarminImportUiState.FetchingRides, awaitItem())
             assertEquals(GarminImportUiState.Error("session expired"), awaitItem())
         }
     }
@@ -91,6 +140,7 @@ class GarminImportViewModelTest {
     private fun viewModel(
         connected: Boolean,
         importRepository: FakeGarminImportRepository = FakeGarminImportRepository(Result.success(emptyList())),
+        rideRepository: FakeRideRepository = FakeRideRepository(newRideCount = 1),
     ): GarminImportViewModel {
         val accountState = if (connected) {
             GarminConnectionState.Connected("rider", Instant.EPOCH)
@@ -99,7 +149,8 @@ class GarminImportViewModelTest {
         }
         return GarminImportViewModel(
             ObserveGarminConnectionStateUseCase(FakeGarminAccountRepository(accountState)),
-            ImportGarminRidesUseCase(importRepository, FakeRideRepository(newRideCount = 1)),
+            FetchGarminRidesUseCase(importRepository),
+            ImportGarminRidesUseCase(rideRepository),
         )
     }
 }
@@ -138,10 +189,18 @@ private class FakeGarminImportRepository(private val result: Result<List<Ride>>)
 }
 
 private class FakeRideRepository(private val newRideCount: Int) : RideRepository {
+    var lastSavedExternalIds: List<String> = emptyList()
+        private set
+
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
     override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
-    override suspend fun saveRides(rides: List<Ride>): Int = newRideCount
+
+    override suspend fun saveRides(rides: List<Ride>): Int {
+        lastSavedExternalIds = rides.mapNotNull { it.externalId }
+        return newRideCount
+    }
+
     override suspend fun saveRide(ride: Ride): Long? = null
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())

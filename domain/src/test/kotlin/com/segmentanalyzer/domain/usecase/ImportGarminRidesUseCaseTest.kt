@@ -3,7 +3,6 @@ package com.segmentanalyzer.domain.usecase
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
-import com.segmentanalyzer.domain.repository.GarminImportRepository
 import com.segmentanalyzer.domain.repository.RideRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,37 +31,27 @@ private fun ride(externalId: String) = Ride(
 class ImportGarminRidesUseCaseTest {
 
     @Test
-    fun `imports fetched rides and reports how many were new`() = runTest {
-        val fetched = listOf(ride("1"), ride("2"), ride("3"))
-        val useCase = ImportGarminRidesUseCase(
-            FakeGarminImportRepository(Result.success(fetched)),
-            FakeImportRideRepository(newCount = 2),
-        )
+    fun `saves the given rides and reports how many were new`() = runTest {
+        val selected = listOf(ride("1"), ride("2"), ride("3"))
+        val useCase = ImportGarminRidesUseCase(FakeImportRideRepository(newCount = 2))
 
-        val result = useCase()
+        val result = useCase(selected)
 
         assertTrue(result.isSuccess)
-        assertEquals(ImportSummary(fetchedCount = 3, importedCount = 2), result.getOrNull())
+        assertEquals(ImportSummary(selectedCount = 3, importedCount = 2), result.getOrNull())
     }
 
     @Test
-    fun `surfaces a fetch failure without touching the ride repository`() = runTest {
+    fun `an empty selection saves nothing and reports zero counts`() = runTest {
         val rideRepository = FakeImportRideRepository(newCount = 0)
-        val useCase = ImportGarminRidesUseCase(
-            FakeGarminImportRepository(Result.failure(IllegalStateException("session expired"))),
-            rideRepository,
-        )
+        val useCase = ImportGarminRidesUseCase(rideRepository)
 
-        val result = useCase()
+        val result = useCase(emptyList())
 
-        assertTrue(result.isFailure)
-        assertEquals("session expired", result.exceptionOrNull()?.message)
-        assertEquals(0, rideRepository.saveCallCount)
+        assertTrue(result.isSuccess)
+        assertEquals(ImportSummary(selectedCount = 0, importedCount = 0), result.getOrNull())
+        assertEquals(1, rideRepository.saveCallCount)
     }
-}
-
-private class FakeGarminImportRepository(private val result: Result<List<Ride>>) : GarminImportRepository {
-    override suspend fun fetchRecentRides(limit: Int): Result<List<Ride>> = result
 }
 
 private class FakeImportRideRepository(private val newCount: Int) : RideRepository {

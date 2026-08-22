@@ -1,19 +1,16 @@
 package com.segmentanalyzer.domain.usecase
 
-import com.segmentanalyzer.domain.repository.GarminImportRepository
+import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.repository.RideRepository
 import javax.inject.Inject
 
-/** Number of rides fetched from Garmin Connect vs. how many were actually new. */
-data class ImportSummary(val fetchedCount: Int, val importedCount: Int)
+/** How many of the rider's chosen rides were actually new. */
+data class ImportSummary(val selectedCount: Int, val importedCount: Int)
 
-/** Fetches recent rides from Garmin Connect and saves the new ones locally. */
+/** Saves the rider's chosen Garmin Connect rides locally. */
 class ImportGarminRidesUseCase @Inject constructor(
-    private val garminImportRepository: GarminImportRepository,
     private val rideRepository: RideRepository,
 ) {
-    suspend operator fun invoke(): Result<ImportSummary> =
-        garminImportRepository.fetchRecentRides().mapCatching { rides ->
-            ImportSummary(fetchedCount = rides.size, importedCount = rideRepository.saveRides(rides))
-        }
+    suspend operator fun invoke(rides: List<Ride>): Result<ImportSummary> =
+        runCatching { ImportSummary(selectedCount = rides.size, importedCount = rideRepository.saveRides(rides)) }
 }
