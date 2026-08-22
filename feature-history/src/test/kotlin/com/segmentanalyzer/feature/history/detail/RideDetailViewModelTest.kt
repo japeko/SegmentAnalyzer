@@ -481,6 +481,11 @@ private class FakeRideDetailSegmentRepository(
 ) : com.segmentanalyzer.domain.repository.SegmentRepository {
     override fun observeSegments(): Flow<List<com.segmentanalyzer.domain.model.Segment>> = MutableStateFlow(segments)
     override suspend fun saveSegments(segments: List<com.segmentanalyzer.domain.model.Segment>): List<Long> = emptyList()
+    override fun observeFilteredSegments(
+        tag: String?,
+        afterEpochMillis: Long?,
+        beforeEpochMillis: Long?,
+    ): Flow<List<com.segmentanalyzer.domain.model.Segment>> = throw UnsupportedOperationException("not used in this test")
 }
 
 private class FakeRideDetailStravaSegmentRepository :

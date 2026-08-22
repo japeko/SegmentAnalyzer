@@ -205,6 +205,9 @@ private class FakeSaveAttemptSegmentRepository(initial: List<Segment>) : Segment
         state.value = state.value + saved
         return saved.map { it.id }
     }
+
+    override fun observeFilteredSegments(tag: String?, afterEpochMillis: Long?, beforeEpochMillis: Long?): Flow<List<Segment>> =
+        throw UnsupportedOperationException("not used in this test")
 }
 
 private class FakeSaveAttemptStravaSegmentRepository(

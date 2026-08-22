@@ -20,6 +20,12 @@ fun SegmentsRoute(
         onSyncClick = viewModel::onSyncClick,
         onGoToSettingsClick = onGoToSettingsClick,
         onSegmentClick = onSegmentClick,
+        onFilterClick = viewModel::onFilterClick,
+        onDismissFilterSheet = viewModel::onDismissFilterSheet,
+        onTagSelected = viewModel::onTagSelected,
+        onDateFromSelected = viewModel::onDateFromSelected,
+        onDateToSelected = viewModel::onDateToSelected,
+        onClearFiltersClick = viewModel::onClearFiltersClick,
         modifier = modifier,
     )
 }

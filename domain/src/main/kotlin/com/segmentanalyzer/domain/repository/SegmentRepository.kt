@@ -10,4 +10,11 @@ interface SegmentRepository {
 
     /** Saves synced segments, skipping ones already present. Returns the ids of newly inserted segments. */
     suspend fun saveSegments(segments: List<Segment>): List<Long>
+
+    /**
+     * Segments with at least one attempt whose ride matches [tag] and whose attempt's own start
+     * time falls within [afterEpochMillis]..[beforeEpochMillis) — any null bound is unfiltered on
+     * that axis. A segment with no matching attempt (including one with none at all) is excluded.
+     */
+    fun observeFilteredSegments(tag: String?, afterEpochMillis: Long?, beforeEpochMillis: Long?): Flow<List<Segment>>
 }
