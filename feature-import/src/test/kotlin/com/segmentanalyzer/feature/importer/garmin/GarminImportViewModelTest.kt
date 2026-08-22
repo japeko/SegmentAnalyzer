@@ -4,12 +4,17 @@ import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.GarminConnectionState
+import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.repository.GarminImportRepository
 import com.segmentanalyzer.domain.repository.RideRepository
+import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.usecase.FetchGarminRidesUseCase
 import com.segmentanalyzer.domain.usecase.ImportGarminRidesUseCase
+import com.segmentanalyzer.domain.usecase.MatchNewRideToSegmentsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveGarminConnectionStateUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -204,7 +209,11 @@ class GarminImportViewModelTest {
         return GarminImportViewModel(
             ObserveGarminConnectionStateUseCase(FakeGarminAccountRepository(accountState)),
             FetchGarminRidesUseCase(importRepository),
-            ImportGarminRidesUseCase(rideRepository),
+            ImportGarminRidesUseCase(
+                importRepository,
+                rideRepository,
+                MatchNewRideToSegmentsUseCase(FakeSegmentAttemptRepository()),
+            ),
         )
     }
 }
@@ -249,22 +258,50 @@ private class FakeGarminImportRepository(private val result: Result<List<Ride>>)
         lastEndDate = endDate
         return result
     }
+
+    override suspend fun fetchTrack(externalId: String): List<TrackPoint> = emptyList()
 }
 
+/** Saves up to [newRideCount] rides (by call order) with an incrementing id; any beyond that are treated as duplicates (null). */
 private class FakeRideRepository(private val newRideCount: Int) : RideRepository {
     var lastSavedExternalIds: List<String> = emptyList()
         private set
+    private var nextId = 1L
+    private var savedCount = 0
 
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
     override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
+    override suspend fun saveRides(rides: List<Ride>): Int = 0
 
-    override suspend fun saveRides(rides: List<Ride>): Int {
-        lastSavedExternalIds = rides.mapNotNull { it.externalId }
-        return newRideCount
+    override suspend fun saveRide(ride: Ride): Long? {
+        lastSavedExternalIds = lastSavedExternalIds + listOfNotNull(ride.externalId)
+        if (savedCount >= newRideCount) return null
+        savedCount++
+        return nextId++
     }
 
-    override suspend fun saveRide(ride: Ride): Long? = null
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
+}
+
+private class FakeSegmentAttemptRepository : SegmentAttemptRepository {
+    override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
+    override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> = MutableStateFlow(emptyList())
+    override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
+    override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long): Int = 0
+
+    override suspend fun saveStravaEffortAttempt(
+        segmentId: Long,
+        rideId: Long,
+        startTime: java.time.Instant,
+        duration: java.time.Duration,
+        avgSpeedKmh: Double,
+        elevationGainMeters: Double,
+        avgPowerWatts: Double?,
+        effortExternalId: String,
+    ) = Unit
+
+    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long): Boolean = false
 }

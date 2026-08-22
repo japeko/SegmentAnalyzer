@@ -3,6 +3,7 @@ package com.segmentanalyzer.domain.usecase
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.GarminImportRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -77,4 +78,6 @@ private class FakeGarminImportRepository(private val result: Result<List<Ride>>)
         lastEndDate = endDate
         return result
     }
+
+    override suspend fun fetchTrack(externalId: String): List<TrackPoint> = emptyList()
 }

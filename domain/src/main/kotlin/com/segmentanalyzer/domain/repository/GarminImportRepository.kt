@@ -1,6 +1,7 @@
 package com.segmentanalyzer.domain.repository
 
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.TrackPoint
 import java.time.LocalDate
 
 /** Fetches ride activities from the connected Garmin Connect account. */
@@ -14,6 +15,13 @@ interface GarminImportRepository {
         startDate: LocalDate? = null,
         endDate: LocalDate? = null,
     ): Result<List<Ride>>
+
+    /**
+     * The full GPS track for the activity identified by [externalId] — best-effort: an empty
+     * list (rather than a thrown/failed [Result]) if it can't be fetched, so one bad activity
+     * doesn't block importing the rest of a selection.
+     */
+    suspend fun fetchTrack(externalId: String): List<TrackPoint>
 }
 
 /** Thrown when there's no usable Garmin Connect session to import with. */
