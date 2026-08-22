@@ -87,7 +87,7 @@ class RideHistoryViewModelTest {
     }
 
     @Test
-    fun `changing the summary period recomputes the stats but not the ride list`() = kotlinx.coroutines.test.runTest(dispatcher) {
+    fun `changing the summary period also filters the ride list`() = kotlinx.coroutines.test.runTest(dispatcher) {
         val lastYear = Instant.now().atZone(java.time.ZoneId.systemDefault()).minusYears(1).toInstant()
         val rides = listOf(
             ride(1, "Skyline Ridge Loop", ActivityType.MTB, startTime = Instant.now()),
@@ -103,7 +103,8 @@ class RideHistoryViewModelTest {
         advanceUntilIdle()
         assertEquals(SummaryPeriod.THIS_MONTH, viewModel.uiState.value.summaryPeriod)
         assertEquals(1, viewModel.uiState.value.summary?.rideCount)
-        assertEquals(2, viewModel.uiState.value.rides.size)
+        assertEquals(1, viewModel.uiState.value.rides.size)
+        assertEquals("Skyline Ridge Loop", viewModel.uiState.value.rides.first().name)
 
         viewModel.onPeriodSelected(SummaryPeriod.ALL_TIME)
         advanceUntilIdle()
@@ -111,6 +112,33 @@ class RideHistoryViewModelTest {
         assertEquals(SummaryPeriod.ALL_TIME, viewModel.uiState.value.summaryPeriod)
         assertEquals(2, viewModel.uiState.value.summary?.rideCount)
         assertEquals(2, viewModel.uiState.value.rides.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `activity type filter and summary period combine`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val lastYear = Instant.now().atZone(java.time.ZoneId.systemDefault()).minusYears(1).toInstant()
+        val rides = listOf(
+            ride(1, "Skyline Ridge Loop", ActivityType.MTB, startTime = Instant.now()),
+            ride(2, "Sunday Club Ride", ActivityType.ROAD, startTime = Instant.now()),
+            ride(3, "Old MTB Ride", ActivityType.MTB, startTime = lastYear),
+        )
+        val repository = FakeRideRepository(rides)
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onFilterSelected(ActivityType.MTB)
+        viewModel.onPeriodSelected(SummaryPeriod.ALL_TIME)
+        advanceUntilIdle()
+
+        val filtered = viewModel.uiState.value
+        assertEquals(2, filtered.rides.size)
+        assertEquals(setOf("Skyline Ridge Loop", "Old MTB Ride"), filtered.rides.map { it.name }.toSet())
         collectJob.cancel()
     }
 }

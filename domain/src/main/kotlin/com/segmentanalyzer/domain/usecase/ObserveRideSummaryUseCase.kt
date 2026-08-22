@@ -1,13 +1,10 @@
 package com.segmentanalyzer.domain.usecase
 
-import com.segmentanalyzer.common.format.isInCurrentMonth
-import com.segmentanalyzer.common.format.isInCurrentWeek
-import com.segmentanalyzer.common.format.isInCurrentYear
 import com.segmentanalyzer.domain.model.SummaryPeriod
+import com.segmentanalyzer.domain.model.isIn
 import com.segmentanalyzer.domain.repository.RideRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.Instant
 import javax.inject.Inject
 
 data class RideSummary(
@@ -36,11 +33,4 @@ class ObserveRideSummaryUseCase @Inject constructor(
                 newPersonalBestCount = inPeriod.count { it.isPersonalBest },
             )
         }
-
-    private fun Instant.isIn(period: SummaryPeriod): Boolean = when (period) {
-        SummaryPeriod.THIS_WEEK -> isInCurrentWeek()
-        SummaryPeriod.THIS_MONTH -> isInCurrentMonth()
-        SummaryPeriod.THIS_YEAR -> isInCurrentYear()
-        SummaryPeriod.ALL_TIME -> true
-    }
 }

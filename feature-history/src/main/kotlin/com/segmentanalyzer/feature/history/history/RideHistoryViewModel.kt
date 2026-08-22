@@ -30,7 +30,8 @@ class RideHistoryViewModel @Inject constructor(
     private val selectedPeriod = MutableStateFlow(SummaryPeriod.THIS_MONTH)
 
     val uiState: StateFlow<RideHistoryUiState> = combine(
-        selectedFilter.flatMapLatest { observeRideHistory(it) },
+        combine(selectedFilter, selectedPeriod) { filter, period -> filter to period }
+            .flatMapLatest { (filter, period) -> observeRideHistory(filter, period) },
         selectedPeriod.flatMapLatest { observeRideSummary(it) },
         selectedFilter,
         selectedPeriod,
