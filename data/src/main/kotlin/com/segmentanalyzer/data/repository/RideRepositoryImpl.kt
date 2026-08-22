@@ -7,6 +7,7 @@ import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.entity.RidePointEntity
 import com.segmentanalyzer.data.mapper.toDomain
 import com.segmentanalyzer.data.mapper.toEntity
+import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.RideRepository
@@ -43,8 +44,8 @@ class RideRepositoryImpl @Inject constructor(
         id
     }
 
-    override suspend fun updateRide(rideId: Long, name: String, tag: String?) =
-        rideDao.updateNameAndTag(rideId, name, tag?.trim()?.takeIf { it.isNotEmpty() })
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) =
+        rideDao.updateDetails(rideId, name, tag?.trim()?.takeIf { it.isNotEmpty() }, activityType)
 
     override fun observeAllTags(): Flow<List<String>> = rideDao.observeDistinctTags()
 }

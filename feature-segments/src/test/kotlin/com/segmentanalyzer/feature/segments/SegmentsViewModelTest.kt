@@ -1,6 +1,7 @@
 package com.segmentanalyzer.feature.segments
 
 import app.cash.turbine.test
+import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.StravaConnectionState
@@ -272,7 +273,7 @@ private class FakeSegmentsVmRideRepository(private val tags: List<String>) : Rid
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
-    override suspend fun updateRide(rideId: Long, name: String, tag: String?) = Unit
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 

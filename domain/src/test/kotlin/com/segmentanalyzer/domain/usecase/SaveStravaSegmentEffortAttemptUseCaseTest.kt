@@ -225,7 +225,7 @@ private class FakeSaveAttemptRideRepository(private val ride: Ride?) : RideRepos
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
-    override suspend fun updateRide(rideId: Long, name: String, tag: String?) = Unit
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }
 

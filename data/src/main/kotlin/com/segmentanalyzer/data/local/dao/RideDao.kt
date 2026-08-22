@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.segmentanalyzer.data.local.entity.RideEntity
+import com.segmentanalyzer.domain.model.ActivityType
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -34,8 +35,8 @@ interface RideDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfNew(rides: List<RideEntity>): List<Long>
 
-    @Query("UPDATE rides SET name = :name, tag = :tag WHERE id = :rideId")
-    suspend fun updateNameAndTag(rideId: Long, name: String, tag: String?)
+    @Query("UPDATE rides SET name = :name, tag = :tag, activityType = :activityType WHERE id = :rideId")
+    suspend fun updateDetails(rideId: Long, name: String, tag: String?, activityType: ActivityType)
 
     @Query("SELECT DISTINCT tag FROM rides WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC")
     fun observeDistinctTags(): Flow<List<String>>

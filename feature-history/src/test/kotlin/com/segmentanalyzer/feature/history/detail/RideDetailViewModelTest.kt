@@ -350,6 +350,29 @@ class RideDetailViewModelTest {
         assertEquals(ride.id, saved.rideId)
         assertEquals("Renamed Ride", saved.name)
         assertEquals("Training", saved.tag)
+        assertEquals(ride.activityType, saved.activityType)
+    }
+
+    @Test
+    fun `saving the edit dialog after changing activity type persists the new type`() = runTest(dispatcher) {
+        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
+        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // null editDialog
+
+            viewModel.onEditClick()
+            assertEquals(ActivityType.GRAVEL, awaitItem().editDialog?.activityType)
+
+            viewModel.onEditActivityTypeChange(ActivityType.EGRAVEL)
+            assertEquals(ActivityType.EGRAVEL, awaitItem().editDialog?.activityType)
+
+            viewModel.onSaveEditClick()
+            assertEquals(null, awaitItem().editDialog)
+        }
+
+        assertEquals(ActivityType.EGRAVEL, rideRepository.updateCalls.single().activityType)
     }
 
     @Test
@@ -433,7 +456,7 @@ private class FakeRideDetailRideRepository(
     private val hasTrack: Boolean,
     private val tags: List<String> = emptyList(),
 ) : RideRepository {
-    data class UpdateCall(val rideId: Long, val name: String, val tag: String?)
+    data class UpdateCall(val rideId: Long, val name: String, val tag: String?, val activityType: ActivityType)
 
     val updateCalls = mutableListOf<UpdateCall>()
 
@@ -443,8 +466,8 @@ private class FakeRideDetailRideRepository(
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
 
-    override suspend fun updateRide(rideId: Long, name: String, tag: String?) {
-        updateCalls += UpdateCall(rideId, name, tag)
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) {
+        updateCalls += UpdateCall(rideId, name, tag, activityType)
     }
 
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)

@@ -109,7 +109,10 @@ fun RideCard(item: RideListItem, onClick: (Long) -> Unit, modifier: Modifier = M
 
 private fun ActivityType.label(): String = when (this) {
     ActivityType.MTB -> "MTB"
+    ActivityType.EMTB -> "E-MTB"
     ActivityType.GRAVEL -> "Gravel"
+    ActivityType.EGRAVEL -> "E-Gravel"
     ActivityType.ROAD -> "Road"
+    ActivityType.EROAD -> "E-Road"
     ActivityType.OTHER -> "Other"
 }

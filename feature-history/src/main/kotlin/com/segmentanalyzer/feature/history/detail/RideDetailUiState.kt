@@ -16,10 +16,11 @@ data class RideDetailUiState(
     val editDialog: EditRideDialogState? = null,
 )
 
-/** Live state of the rename/tag dialog — [tagSuggestions] narrows as [tag] is typed. */
+/** Live state of the rename/tag/type dialog — [tagSuggestions] narrows as [tag] is typed. */
 data class EditRideDialogState(
     val name: String,
     val tag: String,
+    val activityType: ActivityType,
     val tagSuggestions: List<String> = emptyList(),
 )
 

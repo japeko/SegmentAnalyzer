@@ -26,6 +26,7 @@ fun RideDetailRoute(
         onEditNameChange = viewModel::onEditNameChange,
         onEditTagChange = viewModel::onEditTagChange,
         onEditTagSuggestionClick = viewModel::onEditTagSuggestionClick,
+        onEditActivityTypeChange = viewModel::onEditActivityTypeChange,
         onSaveEditClick = viewModel::onSaveEditClick,
         modifier = modifier,
     )

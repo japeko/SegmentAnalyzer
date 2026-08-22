@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +67,7 @@ fun RideDetailScreen(
     onEditNameChange: (String) -> Unit,
     onEditTagChange: (String) -> Unit,
     onEditTagSuggestionClick: (String) -> Unit,
+    onEditActivityTypeChange: (ActivityType) -> Unit,
     onSaveEditClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -197,6 +200,7 @@ fun RideDetailScreen(
             onNameChange = onEditNameChange,
             onTagChange = onEditTagChange,
             onTagSuggestionClick = onEditTagSuggestionClick,
+            onActivityTypeChange = onEditActivityTypeChange,
             onSaveClick = onSaveEditClick,
         )
     }
@@ -209,6 +213,7 @@ private fun EditRideDialog(
     onNameChange: (String) -> Unit,
     onTagChange: (String) -> Unit,
     onTagSuggestionClick: (String) -> Unit,
+    onActivityTypeChange: (ActivityType) -> Unit,
     onSaveClick: () -> Unit,
 ) {
     AlertDialog(
@@ -223,6 +228,18 @@ private fun EditRideDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) {
+                    items(ActivityType.entries) { type ->
+                        FilterChip(
+                            selected = dialog.activityType == type,
+                            onClick = { onActivityTypeChange(type) },
+                            label = { Text(type.label()) },
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = dialog.tag,
                     onValueChange = onTagChange,
@@ -335,7 +352,10 @@ private fun EmptyMessage(text: String, modifier: Modifier = Modifier) {
 
 private fun ActivityType.label(): String = when (this) {
     ActivityType.MTB -> "MTB"
+    ActivityType.EMTB -> "E-MTB"
     ActivityType.GRAVEL -> "Gravel"
+    ActivityType.EGRAVEL -> "E-Gravel"
     ActivityType.ROAD -> "Road"
+    ActivityType.EROAD -> "E-Road"
     ActivityType.OTHER -> "Other"
 }

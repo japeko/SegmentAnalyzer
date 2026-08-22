@@ -86,7 +86,7 @@ private class FakeFitRideRepository : RideRepository {
         return nextId++
     }
 
-    override suspend fun updateRide(rideId: Long, name: String, tag: String?) = Unit
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }
 

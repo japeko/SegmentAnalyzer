@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
+import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
@@ -90,6 +91,7 @@ class RideDetailViewModel @Inject constructor(
                 EditRideDialogState(
                     name = request.name,
                     tag = request.tag,
+                    activityType = request.activityType,
                     tagSuggestions = tags.filter {
                         request.tag.isNotBlank() && it.contains(request.tag, ignoreCase = true) && !it.equals(request.tag, ignoreCase = true)
                     },
@@ -158,7 +160,7 @@ class RideDetailViewModel @Inject constructor(
 
     fun onEditClick() {
         val ride = latestRide ?: return
-        editRequest.value = EditRideRequest(name = ride.name, tag = ride.tag.orEmpty())
+        editRequest.value = EditRideRequest(name = ride.name, tag = ride.tag.orEmpty(), activityType = ride.activityType)
     }
 
     fun onDismissEdit() {
@@ -177,18 +179,22 @@ class RideDetailViewModel @Inject constructor(
         editRequest.value = editRequest.value?.copy(tag = tag)
     }
 
+    fun onEditActivityTypeChange(activityType: ActivityType) {
+        editRequest.value = editRequest.value?.copy(activityType = activityType)
+    }
+
     fun onSaveEditClick() {
         val request = editRequest.value ?: return
         val trimmedName = request.name.trim()
         if (trimmedName.isEmpty()) return
         viewModelScope.launch {
-            updateRide(rideId, trimmedName, request.tag)
+            updateRide(rideId, trimmedName, request.tag, request.activityType)
             editRequest.value = null
         }
     }
 }
 
-private data class EditRideRequest(val name: String, val tag: String)
+private data class EditRideRequest(val name: String, val tag: String, val activityType: ActivityType)
 
 private data class CoreRideDetail(
     val ride: RideDetailInfo?,

@@ -1,5 +1,6 @@
 package com.segmentanalyzer.domain.repository
 
+import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import kotlinx.coroutines.flow.Flow
 
@@ -27,8 +28,8 @@ interface RideRepository {
      */
     suspend fun saveRide(ride: Ride): Long?
 
-    /** Renames [rideId] and sets its tag (null clears it). */
-    suspend fun updateRide(rideId: Long, name: String, tag: String?)
+    /** Renames [rideId], sets its tag (null clears it) and its activity type. */
+    suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType)
 
     /** Every distinct, non-blank tag currently in use, for autocomplete when editing a ride. */
     fun observeAllTags(): Flow<List<String>>
