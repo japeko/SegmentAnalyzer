@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.domain.model.ActivityType
 
-private val filters: List<ActivityType?> = listOf(null, ActivityType.MTB, ActivityType.GRAVEL, ActivityType.ROAD)
+private val filters: List<ActivityType?> = listOf(null) + ActivityType.entries
 
 private fun ActivityType?.label(): String = when (this) {
     null -> "All"
