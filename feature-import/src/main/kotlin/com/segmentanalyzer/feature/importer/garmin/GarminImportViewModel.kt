@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,15 +29,21 @@ class GarminImportViewModel @Inject constructor(
     /** Null means "derive from connection state"; non-null overrides it once browsing/import starts. */
     private val screenState = MutableStateFlow<GarminImportUiState?>(null)
 
+    /** The rider's chosen search range for the next browse — survives across a browse/import cycle. */
+    private val dateFrom = MutableStateFlow<LocalDate?>(null)
+    private val dateTo = MutableStateFlow<LocalDate?>(null)
+
     /** The full candidate list from the last fetch, so the import step can resolve selected ids back to [Ride]s without re-fetching. */
     private var latestCandidates: List<Ride> = emptyList()
 
     val uiState: StateFlow<GarminImportUiState> = combine(
         observeGarminConnectionState(),
         screenState,
-    ) { connectionState, override ->
+        dateFrom,
+        dateTo,
+    ) { connectionState, override, from, to ->
         override ?: if (connectionState is GarminConnectionState.Connected) {
-            GarminImportUiState.Idle
+            GarminImportUiState.Idle(dateFrom = from, dateTo = to)
         } else {
             GarminImportUiState.NotConnected
         }
@@ -46,15 +53,27 @@ class GarminImportViewModel @Inject constructor(
         initialValue = GarminImportUiState.NotConnected,
     )
 
+    fun onDateFromSelected(date: LocalDate?) {
+        dateFrom.value = date
+    }
+
+    fun onDateToSelected(date: LocalDate?) {
+        dateTo.value = date
+    }
+
     fun onBrowseRidesClick() {
+        val from = dateFrom.value
+        val to = dateTo.value
         screenState.value = GarminImportUiState.FetchingRides
         viewModelScope.launch {
-            screenState.value = fetchGarminRides().fold(
+            screenState.value = fetchGarminRides(from, to).fold(
                 onSuccess = { rides ->
                     latestCandidates = rides
                     GarminImportUiState.SelectingRides(
                         candidates = rides.map { it.toCandidateItem() },
                         selectedExternalIds = rides.mapNotNull { it.externalId }.toSet(),
+                        dateFrom = from,
+                        dateTo = to,
                     )
                 },
                 onFailure = { throwable -> GarminImportUiState.Error(throwable.message ?: "Couldn't fetch rides.") },
@@ -88,6 +107,11 @@ class GarminImportViewModel @Inject constructor(
                 onFailure = { throwable -> GarminImportUiState.Error(throwable.message ?: "Import failed.") },
             )
         }
+    }
+
+    /** Drops any override so [uiState] falls back to [GarminImportUiState.Idle], letting the rider adjust the date range before browsing again. */
+    fun onBackToIdleClick() {
+        screenState.value = null
     }
 }
 

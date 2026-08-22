@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.time.LocalDate
 import javax.inject.Inject
 
 @Serializable
@@ -35,9 +36,20 @@ internal class GarminActivityApi @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun fetchActivities(accessToken: String, limit: Int): List<GarminActivityDto> {
+    fun fetchActivities(
+        accessToken: String,
+        limit: Int,
+        startDate: LocalDate? = null,
+        endDate: LocalDate? = null,
+    ): List<GarminActivityDto> {
+        val url = buildString {
+            append(BASE_URL).append("?start=0&limit=$limit")
+            // LocalDate.toString() is ISO_LOCAL_DATE (yyyy-MM-dd), the format this endpoint expects.
+            startDate?.let { append("&startDate=$it") }
+            endDate?.let { append("&endDate=$it") }
+        }
         val request = Request.Builder()
-            .url("$BASE_URL?start=0&limit=$limit")
+            .url(url)
             .header("Authorization", "Bearer $accessToken")
             .get()
             .build()

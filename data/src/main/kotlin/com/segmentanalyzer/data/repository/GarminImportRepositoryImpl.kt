@@ -12,6 +12,7 @@ import com.segmentanalyzer.domain.repository.GarminSessionExpiredException
 import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -23,13 +24,13 @@ internal class GarminImportRepositoryImpl @Inject constructor(
     private val dispatcherProvider: DispatcherProvider,
 ) : GarminImportRepository {
 
-    override suspend fun fetchRecentRides(limit: Int): Result<List<Ride>> =
+    override suspend fun fetchRecentRides(limit: Int, startDate: LocalDate?, endDate: LocalDate?): Result<List<Ride>> =
         withContext(dispatcherProvider.io) {
             runCatching {
                 val session = sessionStore.session() ?: throw GarminSessionExpiredException()
                 if (session.expiresAt.isBefore(Instant.now())) throw GarminSessionExpiredException()
 
-                activityApi.fetchActivities(session.accessToken, limit).mapNotNull { it.toRideOrNull() }
+                activityApi.fetchActivities(session.accessToken, limit, startDate, endDate).mapNotNull { it.toRideOrNull() }
             }
         }
 }

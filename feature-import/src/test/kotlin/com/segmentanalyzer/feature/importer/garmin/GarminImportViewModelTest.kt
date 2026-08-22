@@ -23,10 +23,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GarminImportViewModelTest {
@@ -62,7 +64,7 @@ class GarminImportViewModelTest {
 
         viewModel.uiState.test {
             skipItems(1)
-            assertEquals(GarminImportUiState.Idle, awaitItem())
+            assertEquals(GarminImportUiState.Idle(dateFrom = null, dateTo = null), awaitItem())
 
             viewModel.onBrowseRidesClick()
 
@@ -70,6 +72,58 @@ class GarminImportViewModelTest {
             val selecting = awaitItem() as GarminImportUiState.SelectingRides
             assertEquals(2, selecting.candidates.size)
             assertEquals(setOf("1", "2"), selecting.selectedExternalIds)
+        }
+    }
+
+    @Test
+    fun `picking a date range passes it through to the fetch and onto the picker screen`() = runTest(dispatcher) {
+        val importRepository = FakeGarminImportRepository(Result.success(listOf(ride("1"))))
+        val viewModel = viewModel(connected = true, importRepository = importRepository)
+        val from = LocalDate.of(2026, 6, 1)
+        val to = LocalDate.of(2026, 6, 30)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // Idle, no dates yet
+
+            viewModel.onDateFromSelected(from)
+            assertEquals(GarminImportUiState.Idle(dateFrom = from, dateTo = null), awaitItem())
+
+            viewModel.onDateToSelected(to)
+            assertEquals(GarminImportUiState.Idle(dateFrom = from, dateTo = to), awaitItem())
+
+            viewModel.onBrowseRidesClick()
+            awaitItem() // FetchingRides
+            val selecting = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(from, selecting.dateFrom)
+            assertEquals(to, selecting.dateTo)
+        }
+        assertEquals(from, importRepository.lastStartDate)
+        assertEquals(to, importRepository.lastEndDate)
+    }
+
+    @Test
+    fun `browsing more rides after a result returns to idle with the same date range`() = runTest(dispatcher) {
+        val viewModel = viewModel(connected = true, importRepository = FakeGarminImportRepository(Result.success(listOf(ride("1")))))
+        val from = LocalDate.of(2026, 6, 1)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // Idle, no dates yet
+            viewModel.onDateFromSelected(from)
+            awaitItem() // Idle, from set
+
+            viewModel.onBrowseRidesClick()
+            awaitItem() // FetchingRides
+            awaitItem() // SelectingRides
+            viewModel.onImportSelectedClick()
+            awaitItem() // Importing
+            awaitItem() // Result
+
+            viewModel.onBackToIdleClick()
+            val idle = awaitItem() as GarminImportUiState.Idle
+            assertEquals(from, idle.dateFrom)
+            assertNull(idle.dateTo)
         }
     }
 
@@ -128,7 +182,7 @@ class GarminImportViewModelTest {
 
         viewModel.uiState.test {
             skipItems(1)
-            assertEquals(GarminImportUiState.Idle, awaitItem())
+            assertEquals(GarminImportUiState.Idle(dateFrom = null, dateTo = null), awaitItem())
 
             viewModel.onBrowseRidesClick()
 
@@ -185,7 +239,16 @@ private class FakeGarminAccountRepository(initialState: GarminConnectionState) :
 }
 
 private class FakeGarminImportRepository(private val result: Result<List<Ride>>) : GarminImportRepository {
-    override suspend fun fetchRecentRides(limit: Int): Result<List<Ride>> = result
+    var lastStartDate: LocalDate? = null
+        private set
+    var lastEndDate: LocalDate? = null
+        private set
+
+    override suspend fun fetchRecentRides(limit: Int, startDate: LocalDate?, endDate: LocalDate?): Result<List<Ride>> {
+        lastStartDate = startDate
+        lastEndDate = endDate
+        return result
+    }
 }
 
 private class FakeRideRepository(private val newRideCount: Int) : RideRepository {

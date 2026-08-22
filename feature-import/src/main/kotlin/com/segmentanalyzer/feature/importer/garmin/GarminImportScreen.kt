@@ -16,6 +16,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,21 +27,36 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.domain.model.ActivityType
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+
+private val DATE_LABEL_FORMATTER = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GarminImportScreen(
     uiState: GarminImportUiState,
+    onDateFromSelected: (LocalDate?) -> Unit,
+    onDateToSelected: (LocalDate?) -> Unit,
     onBrowseRidesClick: () -> Unit,
     onRideToggled: (String) -> Unit,
     onSelectAllToggled: () -> Unit,
     onImportSelectedClick: () -> Unit,
+    onBackToIdleClick: () -> Unit,
     onGoToSettingsClick: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -88,13 +105,49 @@ fun GarminImportScreen(
                     }
                 }
 
-                GarminImportUiState.Idle -> {
+                is GarminImportUiState.Idle -> {
                     Text(
-                        text = "Browse your recent Garmin Connect rides and choose which ones to import.",
+                        text = "Browse your Garmin Connect rides and choose which ones to import.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Button(onClick = onBrowseRidesClick, modifier = Modifier.padding(top = 16.dp).fillMaxWidth()) {
+                    Text(
+                        text = "Optionally narrow the search to a date range.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    ) {
+                        DateField(
+                            label = "From",
+                            date = uiState.dateFrom,
+                            onDateSelected = onDateFromSelected,
+                            modifier = Modifier.weight(1f),
+                        )
+                        DateField(
+                            label = "To",
+                            date = uiState.dateTo,
+                            onDateSelected = onDateToSelected,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    val rangeIsInverted = uiState.dateFrom != null && uiState.dateTo != null && uiState.dateTo.isBefore(uiState.dateFrom)
+                    if (rangeIsInverted) {
+                        Text(
+                            text = "\"To\" can't be before \"From\".",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                    Button(
+                        onClick = onBrowseRidesClick,
+                        enabled = !rangeIsInverted,
+                        modifier = Modifier.padding(top = 16.dp).fillMaxWidth(),
+                    ) {
                         Text("Browse rides")
                     }
                 }
@@ -102,7 +155,7 @@ fun GarminImportScreen(
                 GarminImportUiState.FetchingRides -> {
                     CircularProgressIndicator()
                     Text(
-                        text = "Fetching your recent rides…",
+                        text = "Fetching your rides…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 16.dp),
@@ -133,7 +186,7 @@ fun GarminImportScreen(
                             modifier = Modifier.padding(top = 4.dp),
                         )
                     }
-                    OutlinedButton(onClick = onBrowseRidesClick, modifier = Modifier.padding(top = 16.dp)) {
+                    OutlinedButton(onClick = onBackToIdleClick, modifier = Modifier.padding(top = 16.dp)) {
                         Text("Browse more rides")
                     }
                 }
@@ -155,6 +208,37 @@ fun GarminImportScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(label: String, date: LocalDate?, onDateSelected: (LocalDate?) -> Unit, modifier: Modifier = Modifier) {
+    var showPicker by remember { mutableStateOf(false) }
+
+    OutlinedButton(onClick = { showPicker = true }, modifier = modifier) {
+        Text(text = "$label: ${date?.let { DATE_LABEL_FORMATTER.format(it) } ?: "Any"}", maxLines = 1)
+    }
+
+    if (showPicker) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = date?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = state.selectedDateMillis
+                    onDateSelected(millis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.of("UTC")).toLocalDate() })
+                    showPicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = state)
+        }
+    }
+}
+
 @Composable
 private fun RidePicker(
     state: GarminImportUiState.SelectingRides,
@@ -166,7 +250,7 @@ private fun RidePicker(
     if (state.candidates.isEmpty()) {
         Box(modifier = modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Text(
-                text = "No recent rides found on Garmin Connect.",
+                text = "No Garmin Connect rides found for that range.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -176,6 +260,16 @@ private fun RidePicker(
 
     val allSelected = state.selectedExternalIds.size == state.candidates.size
     Column(modifier = modifier.fillMaxSize()) {
+        if (state.dateFrom != null || state.dateTo != null) {
+            Text(
+                text = "${state.dateFrom?.let { DATE_LABEL_FORMATTER.format(it) } ?: "Any"} " +
+                    "– ${state.dateTo?.let { DATE_LABEL_FORMATTER.format(it) } ?: "Any"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
