@@ -23,9 +23,11 @@ import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
 import com.segmentanalyzer.feature.importer.gpx.GpxFileImportRoute
 import com.segmentanalyzer.feature.segments.SegmentsRoute
 import com.segmentanalyzer.feature.segments.detail.SegmentDetailRoute
+import com.segmentanalyzer.feature.settings.AboutScreen
 import com.segmentanalyzer.feature.settings.SettingsRoute
 
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
+private const val ABOUT_ROUTE = "about"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
 private const val IMPORT_SOURCE_ROUTE = "import_source"
 private const val FIT_FILE_IMPORT_ROUTE = "fit_file_import"
@@ -75,7 +77,11 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onConnectStravaClick = { authorizationUrl ->
                     CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(authorizationUrl))
                 },
+                onAboutClick = { navController.navigate(ABOUT_ROUTE) },
             )
+        }
+        composable(ABOUT_ROUTE) {
+            AboutScreen(onBackClick = { navController.popBackStack() })
         }
         composable(GARMIN_LOGIN_ROUTE) {
             GarminLoginRoute(
@@ -148,9 +154,19 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
             ),
         ) {
             val backToSettings = {
+                // Must match the bottom-nav tab switch's own navigate options exactly (see
+                // SegmentAnalyzerApp) — this is also a jump to a top-level destination, just
+                // triggered by the Strava OAuth deep link instead of a tab tap. Without
+                // saveState/restoreState here, this leaves the NavController's saved-state
+                // registry inconsistent with what the bottom nav itself expects: confirmed live,
+                // this made the Rides tab silently stop responding to taps after connecting both
+                // Garmin and Strava in the same session, until the app was force-restarted.
                 navController.navigate(TopLevelDestination.Settings.route) {
-                    popUpTo(navController.graph.findStartDestination().id)
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
                     launchSingleTop = true
+                    restoreState = true
                 }
             }
             StravaCallbackRoute(onConnected = backToSettings, onBackToSettingsClick = backToSettings)

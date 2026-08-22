@@ -76,6 +76,9 @@ private class FakeSegmentRepository(private val newCount: Int) : SegmentReposito
         saveCallCount++
         return (1..newCount).map { it.toLong() }
     }
+
+    override fun observeFilteredSegments(tag: String?, afterEpochMillis: Long?, beforeEpochMillis: Long?): Flow<List<Segment>> =
+        throw UnsupportedOperationException("not used in this test")
 }
 
 private class FakeSyncSegmentAttemptRepository : SegmentAttemptRepository {

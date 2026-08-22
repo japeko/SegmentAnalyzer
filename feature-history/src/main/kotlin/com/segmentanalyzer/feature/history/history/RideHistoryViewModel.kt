@@ -6,8 +6,9 @@ import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
-import com.segmentanalyzer.domain.usecase.ObserveMonthlySummaryUseCase
+import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,19 +23,23 @@ import javax.inject.Inject
 @HiltViewModel
 class RideHistoryViewModel @Inject constructor(
     observeRideHistory: ObserveRideHistoryUseCase,
-    observeMonthlySummary: ObserveMonthlySummaryUseCase,
+    observeRideSummary: ObserveRideSummaryUseCase,
 ) : ViewModel() {
 
     private val selectedFilter = MutableStateFlow<ActivityType?>(null)
+    private val selectedPeriod = MutableStateFlow(SummaryPeriod.THIS_MONTH)
 
     val uiState: StateFlow<RideHistoryUiState> = combine(
-        selectedFilter.flatMapLatest { observeRideHistory(it) },
-        observeMonthlySummary(),
+        combine(selectedFilter, selectedPeriod) { filter, period -> filter to period }
+            .flatMapLatest { (filter, period) -> observeRideHistory(filter, period) },
+        selectedPeriod.flatMapLatest { observeRideSummary(it) },
         selectedFilter,
-    ) { rides, summary, filter ->
+        selectedPeriod,
+    ) { rides, summary, filter, period ->
         RideHistoryUiState(
             isLoading = false,
-            monthSummary = summary,
+            summary = summary,
+            summaryPeriod = period,
             selectedFilter = filter,
             rides = rides.map { it.toListItem() },
         )
@@ -46,6 +51,10 @@ class RideHistoryViewModel @Inject constructor(
 
     fun onFilterSelected(type: ActivityType?) {
         selectedFilter.value = type
+    }
+
+    fun onPeriodSelected(period: SummaryPeriod) {
+        selectedPeriod.value = period
     }
 }
 

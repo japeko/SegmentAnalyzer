@@ -7,11 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.ui.StatCard
-import com.segmentanalyzer.domain.usecase.MonthlySummary
+import com.segmentanalyzer.domain.model.SummaryPeriod
+import com.segmentanalyzer.domain.usecase.RideSummary
 import kotlin.math.roundToInt
 
 @Composable
-fun QuickStatsRow(summary: MonthlySummary?, modifier: Modifier = Modifier) {
+fun QuickStatsRow(summary: RideSummary?, period: SummaryPeriod, modifier: Modifier = Modifier) {
     if (summary == null) return
 
     LazyRow(
@@ -21,7 +22,7 @@ fun QuickStatsRow(summary: MonthlySummary?, modifier: Modifier = Modifier) {
     ) {
         item {
             StatCard(
-                label = "This Month",
+                label = period.statLabel(),
                 value = "%.1f km".format(summary.totalDistanceKm),
                 caption = "${summary.rideCount} rides · ${summary.elevationGainMeters.roundToInt()} m gain",
             )
@@ -30,9 +31,23 @@ fun QuickStatsRow(summary: MonthlySummary?, modifier: Modifier = Modifier) {
             StatCard(
                 label = "New PBs",
                 value = summary.newPersonalBestCount.toString(),
-                caption = "personal bests this month",
+                caption = "personal bests ${period.captionSuffix()}",
                 accented = true,
             )
         }
     }
+}
+
+private fun SummaryPeriod.statLabel(): String = when (this) {
+    SummaryPeriod.THIS_WEEK -> "This Week"
+    SummaryPeriod.THIS_MONTH -> "This Month"
+    SummaryPeriod.THIS_YEAR -> "This Year"
+    SummaryPeriod.ALL_TIME -> "All Time"
+}
+
+private fun SummaryPeriod.captionSuffix(): String = when (this) {
+    SummaryPeriod.THIS_WEEK -> "this week"
+    SummaryPeriod.THIS_MONTH -> "this month"
+    SummaryPeriod.THIS_YEAR -> "this year"
+    SummaryPeriod.ALL_TIME -> "all time"
 }

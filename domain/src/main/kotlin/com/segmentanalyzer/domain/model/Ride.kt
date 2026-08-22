@@ -26,6 +26,8 @@ data class Ride(
     val externalId: String? = null,
     /** Full-resolution GPS track, chronological. Empty for Garmin/Strava-sourced rides. */
     val track: List<TrackPoint> = emptyList(),
+    /** User-assigned free-text label, e.g. "Race" or "Training" — null if never set. */
+    val tag: String? = null,
 ) {
     val averageSpeedKmh: Double
         get() {

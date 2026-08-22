@@ -79,4 +79,6 @@ private class FakeImportRideRepository(private val newCount: Int) : RideReposito
     }
 
     override suspend fun saveRide(ride: Ride): Long? = null
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
+    override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }

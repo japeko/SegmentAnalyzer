@@ -1,6 +1,7 @@
 package com.segmentanalyzer.feature.segments
 
 import com.segmentanalyzer.domain.model.Segment
+import java.time.LocalDate
 
 sealed interface StravaSyncStatus {
     data object NotConnected : StravaSyncStatus
@@ -13,4 +14,12 @@ sealed interface StravaSyncStatus {
 data class SegmentsUiState(
     val segments: List<Segment> = emptyList(),
     val syncStatus: StravaSyncStatus = StravaSyncStatus.NotConnected,
-)
+    /** Every distinct ride tag in use, for the filter sheet's tag choices. */
+    val availableTags: List<String> = emptyList(),
+    val selectedTag: String? = null,
+    val dateFrom: LocalDate? = null,
+    val dateTo: LocalDate? = null,
+    val isFilterSheetVisible: Boolean = false,
+) {
+    val isFilterActive: Boolean get() = selectedTag != null || dateFrom != null || dateTo != null
+}

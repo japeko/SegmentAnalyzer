@@ -294,6 +294,8 @@ class RideCompareViewModelTest {
 private class FakeCompareSegmentRepository : SegmentRepository {
     override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(listOf(segment))
     override suspend fun saveSegments(segments: List<Segment>): List<Long> = emptyList()
+    override fun observeFilteredSegments(tag: String?, afterEpochMillis: Long?, beforeEpochMillis: Long?): Flow<List<Segment>> =
+        throw UnsupportedOperationException("not used in this test")
 }
 
 private class FakeCompareSegmentAttemptRepository(

@@ -33,4 +33,6 @@ data class RideEntity(
     /** Path/URI of the originally imported FIT/GPX file, if any. */
     val sourceFilePath: String?,
     val createdAtEpochMillis: Long,
+    /** User-assigned free-text label, e.g. "Race" or "Training" — null if never set. */
+    val tag: String? = null,
 )

@@ -2,11 +2,13 @@ package com.segmentanalyzer.feature.history.history
 
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
-import com.segmentanalyzer.domain.usecase.MonthlySummary
+import com.segmentanalyzer.domain.model.SummaryPeriod
+import com.segmentanalyzer.domain.usecase.RideSummary
 
 data class RideHistoryUiState(
     val isLoading: Boolean = true,
-    val monthSummary: MonthlySummary? = null,
+    val summary: RideSummary? = null,
+    val summaryPeriod: SummaryPeriod = SummaryPeriod.THIS_MONTH,
     val selectedFilter: ActivityType? = null,
     val rides: List<RideListItem> = emptyList(),
 )

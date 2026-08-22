@@ -10,25 +10,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.segmentanalyzer.domain.model.ActivityType
+import com.segmentanalyzer.domain.model.SummaryPeriod
 
-private val filters: List<ActivityType?> = listOf(null) + ActivityType.entries
-
-private fun ActivityType?.label(): String = when (this) {
-    null -> "All"
-    ActivityType.MTB -> "MTB"
-    ActivityType.EMTB -> "E-MTB"
-    ActivityType.GRAVEL -> "Gravel"
-    ActivityType.EGRAVEL -> "E-Gravel"
-    ActivityType.ROAD -> "Road"
-    ActivityType.EROAD -> "E-Road"
-    ActivityType.OTHER -> "Other"
+private fun SummaryPeriod.label(): String = when (this) {
+    SummaryPeriod.THIS_WEEK -> "Week"
+    SummaryPeriod.THIS_MONTH -> "Month"
+    SummaryPeriod.THIS_YEAR -> "Year"
+    SummaryPeriod.ALL_TIME -> "All Time"
 }
 
 @Composable
-fun ActivityTypeFilterRow(
-    selected: ActivityType?,
-    onFilterSelected: (ActivityType?) -> Unit,
+fun SummaryPeriodRow(
+    selected: SummaryPeriod,
+    onPeriodSelected: (SummaryPeriod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyRow(
@@ -36,11 +30,11 @@ fun ActivityTypeFilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
-        items(filters) { filter ->
+        items(SummaryPeriod.entries) { period ->
             FilterChip(
-                selected = filter == selected,
-                onClick = { onFilterSelected(filter) },
-                label = { Text(filter.label()) },
+                selected = period == selected,
+                onClick = { onPeriodSelected(period) },
+                label = { Text(period.label()) },
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }

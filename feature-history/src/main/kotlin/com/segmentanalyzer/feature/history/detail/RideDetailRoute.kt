@@ -21,6 +21,13 @@ fun RideDetailRoute(
         onSegmentClick = onSegmentClick,
         onFetchStravaSegmentsClick = viewModel::onFetchStravaSegmentsClick,
         onStravaSegmentEffortClick = viewModel::onStravaSegmentEffortClick,
+        onEditClick = viewModel::onEditClick,
+        onDismissEdit = viewModel::onDismissEdit,
+        onEditNameChange = viewModel::onEditNameChange,
+        onEditTagChange = viewModel::onEditTagChange,
+        onEditTagSuggestionClick = viewModel::onEditTagSuggestionClick,
+        onEditActivityTypeChange = viewModel::onEditActivityTypeChange,
+        onSaveEditClick = viewModel::onSaveEditClick,
         modifier = modifier,
     )
 }

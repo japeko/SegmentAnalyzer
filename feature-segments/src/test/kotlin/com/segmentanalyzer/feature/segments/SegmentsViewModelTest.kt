@@ -1,15 +1,19 @@
 package com.segmentanalyzer.feature.segments
 
 import app.cash.turbine.test
+import com.segmentanalyzer.domain.model.ActivityType
+import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.repository.StravaAccountRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import com.segmentanalyzer.domain.usecase.MatchNewSegmentsToRidesUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.SyncStravaSegmentsUseCase
@@ -25,9 +29,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SegmentsViewModelTest {
@@ -60,7 +67,8 @@ class SegmentsViewModelTest {
     fun `successful sync reports fetched and synced counts`() = runTest(dispatcher) {
         val viewModel = viewModel(
             connected = true,
-            segmentRepository = FakeStravaSegmentRepository(Result.success(listOf(segment("1"), segment("2")))),
+            segmentRepository = FakeSegmentRepository(),
+            stravaSegmentRepository = FakeStravaSegmentRepository(Result.success(listOf(segment("1"), segment("2")))),
         )
 
         viewModel.uiState.test {
@@ -78,7 +86,8 @@ class SegmentsViewModelTest {
     fun `failed sync shows the error message`() = runTest(dispatcher) {
         val viewModel = viewModel(
             connected = true,
-            segmentRepository = FakeStravaSegmentRepository(Result.failure(IllegalStateException("session expired"))),
+            segmentRepository = FakeSegmentRepository(),
+            stravaSegmentRepository = FakeStravaSegmentRepository(Result.failure(IllegalStateException("session expired"))),
         )
 
         viewModel.uiState.test {
@@ -92,9 +101,107 @@ class SegmentsViewModelTest {
         }
     }
 
+    @Test
+    fun `shows unfiltered segments and available tags by default`() = runTest(dispatcher) {
+        val unfiltered = listOf(segment("1"), segment("2"))
+        val viewModel = viewModel(
+            connected = false,
+            segmentRepository = FakeSegmentRepository(unfilteredSegments = unfiltered),
+            rideTags = listOf("Race", "Training"),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
+        collectJob.cancel()
+
+        assertEquals(unfiltered, state.segments)
+        assertEquals(listOf("Race", "Training"), state.availableTags)
+        assertEquals(false, state.isFilterActive)
+    }
+
+    @Test
+    fun `selecting a tag switches to the filtered segment list`() = runTest(dispatcher) {
+        val filtered = listOf(segment("1"))
+        val segmentRepository = FakeSegmentRepository(
+            unfilteredSegments = listOf(segment("1"), segment("2")),
+            filteredSegments = filtered,
+        )
+        val viewModel = viewModel(connected = false, segmentRepository = segmentRepository, rideTags = listOf("Race"))
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onTagSelected("Race")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        collectJob.cancel()
+        assertEquals(filtered, state.segments)
+        assertEquals("Race", state.selectedTag)
+        assertTrue(state.isFilterActive)
+        assertEquals("Race", segmentRepository.lastFilterCall?.first)
+    }
+
+    @Test
+    fun `clearing filters reverts to the unfiltered segment list`() = runTest(dispatcher) {
+        val unfiltered = listOf(segment("1"), segment("2"))
+        val segmentRepository = FakeSegmentRepository(unfilteredSegments = unfiltered, filteredSegments = listOf(segment("1")))
+        val viewModel = viewModel(connected = false, segmentRepository = segmentRepository)
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onTagSelected("Race")
+        advanceUntilIdle()
+        viewModel.onClearFiltersClick()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        collectJob.cancel()
+        assertEquals(unfiltered, state.segments)
+        assertNull(state.selectedTag)
+        assertEquals(false, state.isFilterActive)
+    }
+
+    @Test
+    fun `date range is converted to an exclusive end-of-day upper bound`() = runTest(dispatcher) {
+        val segmentRepository = FakeSegmentRepository(filteredSegments = listOf(segment("1")))
+        val viewModel = viewModel(connected = false, segmentRepository = segmentRepository)
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onDateFromSelected(LocalDate.of(2026, 8, 1))
+        viewModel.onDateToSelected(LocalDate.of(2026, 8, 22))
+        advanceUntilIdle()
+        collectJob.cancel()
+
+        val (_, after, before) = segmentRepository.lastFilterCall!!
+        assertTrue(after!! < before!!)
+        // "to" is inclusive of the whole day, so the upper bound is the start of the next day.
+        assertEquals(LocalDate.of(2026, 8, 23), Instant.ofEpochMilli(before).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+    }
+
+    @Test
+    fun `filter sheet visibility toggles`() = runTest(dispatcher) {
+        val viewModel = viewModel(connected = false)
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.isFilterSheetVisible)
+
+        viewModel.onFilterClick()
+        advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.isFilterSheetVisible)
+
+        viewModel.onDismissFilterSheet()
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.isFilterSheetVisible)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         connected: Boolean,
-        segmentRepository: FakeStravaSegmentRepository = FakeStravaSegmentRepository(Result.success(emptyList())),
+        segmentRepository: FakeSegmentRepository = FakeSegmentRepository(),
+        stravaSegmentRepository: FakeStravaSegmentRepository = FakeStravaSegmentRepository(Result.success(emptyList())),
+        rideTags: List<String> = emptyList(),
     ): SegmentsViewModel {
         val accountState = if (connected) {
             StravaConnectionState.Connected("Jari K", Instant.EPOCH)
@@ -102,10 +209,11 @@ class SegmentsViewModelTest {
             StravaConnectionState.Disconnected
         }
         return SegmentsViewModel(
-            ObserveSegmentsUseCase(FakeSegmentRepository()),
+            ObserveSegmentsUseCase(segmentRepository),
             ObserveStravaConnectionStateUseCase(FakeStravaAccountRepository(accountState)),
+            ObserveRideTagsUseCase(FakeSegmentsVmRideRepository(rideTags)),
             SyncStravaSegmentsUseCase(
-                segmentRepository,
+                stravaSegmentRepository,
                 FakeSegmentRepository(newCount = 1),
                 MatchNewSegmentsToRidesUseCase(FakeSegmentsVmSegmentAttemptRepository()),
             ),
@@ -142,9 +250,31 @@ private class FakeStravaSegmentRepository(private val result: Result<List<Segmen
         Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
-private class FakeSegmentRepository(private val newCount: Int = 0) : SegmentRepository {
-    override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(emptyList())
+private class FakeSegmentRepository(
+    private val newCount: Int = 0,
+    private val unfilteredSegments: List<Segment> = emptyList(),
+    private val filteredSegments: List<Segment> = emptyList(),
+) : SegmentRepository {
+    var lastFilterCall: Triple<String?, Long?, Long?>? = null
+        private set
+
+    override fun observeSegments(): Flow<List<Segment>> = MutableStateFlow(unfilteredSegments)
     override suspend fun saveSegments(segments: List<Segment>): List<Long> = (1..newCount).map { it.toLong() }
+
+    override fun observeFilteredSegments(tag: String?, afterEpochMillis: Long?, beforeEpochMillis: Long?): Flow<List<Segment>> {
+        lastFilterCall = Triple(tag, afterEpochMillis, beforeEpochMillis)
+        return MutableStateFlow(filteredSegments)
+    }
+}
+
+private class FakeSegmentsVmRideRepository(private val tags: List<String>) : RideRepository {
+    override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
+    override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
+    override suspend fun saveRides(rides: List<Ride>): Int = 0
+    override suspend fun saveRide(ride: Ride): Long? = null
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
+    override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 
 private class FakeSegmentsVmSegmentAttemptRepository : SegmentAttemptRepository {

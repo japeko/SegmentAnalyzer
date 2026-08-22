@@ -79,11 +79,25 @@ internal class StravaActivityApi @Inject constructor(
      * route, plus altitude/velocity_smooth/heartrate/cadence/watts/grade_smooth for the
      * pace/power/HR summary.
      */
-    fun fetchEffortStreams(accessToken: String, effortId: Long): List<StravaStreamDto> = get(
-        "$SEGMENT_EFFORT_URL/$effortId/streams?keys=$STREAM_KEYS",
-        accessToken,
-        "segment effort streams",
-    )
+    /**
+     * Confirmed live: this can 403 for one specific effort while every other effort's streams
+     * (including other e-bike segments) fetch fine, and while that same effort's own summary
+     * (time, rank) already came through moments earlier via [fetchActivityDetail] — consistent
+     * with Strava restricting detail/leaderboard data for a segment it flags as hazardous, which
+     * is platform-side and not something a retry or a different request shape fixes.
+     */
+    fun fetchEffortStreams(accessToken: String, effortId: Long): List<StravaStreamDto> = try {
+        get(
+            "$SEGMENT_EFFORT_URL/$effortId/streams?keys=$STREAM_KEYS",
+            accessToken,
+            "segment effort streams",
+        )
+    } catch (e: StravaApiException) {
+        if (e.message?.startsWith("HTTP 403") == true) {
+            throw StravaApiException("Strava is restricting detailed data for this segment (HTTP 403) — likely one it flags as hazardous", e)
+        }
+        throw e
+    }
 
     private inline fun <reified T> get(url: String, accessToken: String, what: String): T {
         val request = Request.Builder()

@@ -309,6 +309,114 @@ class RideDetailViewModelTest {
         }
     }
 
+    @Test
+    fun `edit click opens the dialog pre-filled with the ride's current name and tag`() = runTest(dispatcher) {
+        val viewModel = viewModel(ride = ride.copy(tag = "Race"), hasTrack = true, matches = emptyList())
+
+        viewModel.uiState.test {
+            skipItems(1)
+            assertEquals(null, awaitItem().editDialog)
+
+            viewModel.onEditClick()
+
+            val dialog = awaitItem().editDialog
+            assertEquals("Tampere Pyöräily", dialog?.name)
+            assertEquals("Race", dialog?.tag)
+        }
+    }
+
+    @Test
+    fun `saving the edit dialog persists the trimmed name and tag, then closes it`() = runTest(dispatcher) {
+        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
+        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // null editDialog
+
+            viewModel.onEditClick()
+            awaitItem() // dialog opened
+
+            viewModel.onEditNameChange("  Renamed Ride  ")
+            awaitItem()
+            viewModel.onEditTagChange("Training")
+            awaitItem()
+            viewModel.onSaveEditClick()
+
+            assertEquals(null, awaitItem().editDialog)
+        }
+
+        val saved = rideRepository.updateCalls.single()
+        assertEquals(ride.id, saved.rideId)
+        assertEquals("Renamed Ride", saved.name)
+        assertEquals("Training", saved.tag)
+        assertEquals(ride.activityType, saved.activityType)
+    }
+
+    @Test
+    fun `saving the edit dialog after changing activity type persists the new type`() = runTest(dispatcher) {
+        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
+        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // null editDialog
+
+            viewModel.onEditClick()
+            assertEquals(ActivityType.GRAVEL, awaitItem().editDialog?.activityType)
+
+            viewModel.onEditActivityTypeChange(ActivityType.EGRAVEL)
+            assertEquals(ActivityType.EGRAVEL, awaitItem().editDialog?.activityType)
+
+            viewModel.onSaveEditClick()
+            assertEquals(null, awaitItem().editDialog)
+        }
+
+        assertEquals(ActivityType.EGRAVEL, rideRepository.updateCalls.single().activityType)
+    }
+
+    @Test
+    fun `saving the edit dialog with a blank name is a no-op`() = runTest(dispatcher) {
+        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
+        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // null editDialog
+
+            viewModel.onEditClick()
+            awaitItem() // dialog opened
+
+            viewModel.onEditNameChange("   ")
+            awaitItem()
+            viewModel.onSaveEditClick()
+
+            expectNoEvents()
+        }
+
+        assertEquals(true, rideRepository.updateCalls.isEmpty())
+    }
+
+    @Test
+    fun `tag suggestions exclude an exact match and anything not matching what's typed`() = runTest(dispatcher) {
+        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true, tags = listOf("Race", "Wet", "Training"))
+        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // null editDialog
+
+            viewModel.onEditClick()
+            awaitItem() // dialog opened, empty tag -> no suggestions yet
+
+            viewModel.onEditTagChange("we")
+            assertEquals(listOf("Wet"), awaitItem().editDialog?.tagSuggestions)
+
+            viewModel.onEditTagChange("Race")
+            assertEquals(emptyList<String>(), awaitItem().editDialog?.tagSuggestions)
+        }
+    }
+
     private fun viewModel(
         ride: Ride?,
         hasTrack: Boolean,
@@ -316,9 +424,9 @@ class RideDetailViewModelTest {
         stravaResult: Result<List<StravaSegmentEffort>> = Result.success(emptyList()),
         cachedEfforts: List<StravaSegmentEffort> = emptyList(),
         detailResult: Result<StravaSegmentEffortDetail> = Result.failure(UnsupportedOperationException("not used")),
+        rideRepository: FakeRideDetailRideRepository = FakeRideDetailRideRepository(ride, hasTrack),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
-        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack)
         val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(matches)
         val stravaActivityRepository = FakeStravaActivityRepository(stravaResult, detailResult)
         val stravaEffortRepository = FakeStravaSegmentEffortRepository(mutableMapOf(1L to cachedEfforts))
@@ -328,6 +436,7 @@ class RideDetailViewModelTest {
             ObserveRideHasTrackUseCase(rideRepository),
             ObserveSegmentMatchesForRideUseCase(segmentAttemptRepository),
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
+            com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase(rideRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
             FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository, stravaEffortRepository),
             com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase(
@@ -337,6 +446,7 @@ class RideDetailViewModelTest {
                 segmentAttemptRepository,
                 com.segmentanalyzer.domain.usecase.MatchNewSegmentsToRidesUseCase(segmentAttemptRepository),
             ),
+            com.segmentanalyzer.domain.usecase.UpdateRideUseCase(rideRepository),
         )
     }
 }
@@ -344,12 +454,23 @@ class RideDetailViewModelTest {
 private class FakeRideDetailRideRepository(
     private val ride: Ride?,
     private val hasTrack: Boolean,
+    private val tags: List<String> = emptyList(),
 ) : RideRepository {
+    data class UpdateCall(val rideId: Long, val name: String, val tag: String?, val activityType: ActivityType)
+
+    val updateCalls = mutableListOf<UpdateCall>()
+
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
     override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(ride)
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(hasTrack)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
+
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) {
+        updateCalls += UpdateCall(rideId, name, tag, activityType)
+    }
+
+    override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 
 private class FakeRideDetailSegmentAttemptRepository(
@@ -383,6 +504,11 @@ private class FakeRideDetailSegmentRepository(
 ) : com.segmentanalyzer.domain.repository.SegmentRepository {
     override fun observeSegments(): Flow<List<com.segmentanalyzer.domain.model.Segment>> = MutableStateFlow(segments)
     override suspend fun saveSegments(segments: List<com.segmentanalyzer.domain.model.Segment>): List<Long> = emptyList()
+    override fun observeFilteredSegments(
+        tag: String?,
+        afterEpochMillis: Long?,
+        beforeEpochMillis: Long?,
+    ): Flow<List<com.segmentanalyzer.domain.model.Segment>> = throw UnsupportedOperationException("not used in this test")
 }
 
 private class FakeRideDetailStravaSegmentRepository :

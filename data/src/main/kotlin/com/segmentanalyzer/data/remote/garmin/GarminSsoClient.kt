@@ -51,11 +51,37 @@ internal class GarminSsoClient @Inject constructor(
         val (accessToken, refreshToken, expiresInSeconds) =
             exchangeOAuth1ForOAuth2(oauth1Token, oauth1Secret, consumer)
         return GarminSession(
-            username = username,
+            username = fetchDisplayName(accessToken) ?: username,
             accessToken = accessToken,
             refreshToken = refreshToken,
             expiresAt = Instant.now().plusSeconds(expiresInSeconds),
         )
+    }
+
+    /**
+     * The rider's Garmin display name/handle, for local "Connected as ___" display only — never
+     * used for API calls (those are all keyed by the OAuth2 [accessToken] itself). [username] is
+     * always empty in practice: the WebView sign-in rewrite means the rider types their email
+     * straight into Garmin's own page, never into this app, so there's nothing local to display
+     * unless it's fetched back from Garmin after the fact. This endpoint is unverified against a
+     * real account (reverse-engineered, following garth/python-garminconnect's precedent) — logs
+     * the raw response either way so a live test can confirm/fix the field name if this guess is
+     * wrong. A failure here (wrong endpoint, wrong field, network) is non-fatal: the connection
+     * still succeeds, just without a nice display name.
+     */
+    private fun fetchDisplayName(accessToken: String): String? = try {
+        val request = Request.Builder()
+            .url(PROFILE_URL)
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        val body = executeApi(request)
+        Log.d(TAG, "Profile response: $body")
+        jsonStringField("displayName").find(body)?.groupValues?.get(1)
+            ?: jsonStringField("userName").find(body)?.groupValues?.get(1)
+    } catch (e: Exception) {
+        Log.d(TAG, "Couldn't fetch Garmin profile for display name: ${e.message}")
+        null
     }
 
     private fun exchangeTicketForOAuth1(ticket: String, service: String, consumer: OAuthConsumer): Pair<String, String> {
@@ -151,6 +177,7 @@ internal class GarminSsoClient @Inject constructor(
         const val SSO_BASE_URL = "https://sso.garmin.com/sso"
         const val OAUTH_BASE_URL = "https://connectapi.garmin.com/oauth-service/oauth"
         const val OAUTH_CONSUMER_URL = "https://thegarth.s3.amazonaws.com/oauth_consumer.json"
+        const val PROFILE_URL = "https://connectapi.garmin.com/userprofile-service/socialProfile"
 
         val SIGNIN_PARAMS = linkedMapOf(
             "id" to "gauth-widget",

@@ -85,6 +85,9 @@ private class FakeGpxRideRepository : RideRepository {
         savedRides += ride
         return nextId++
     }
+
+    override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
+    override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }
 
 private class FakeGpxSegmentAttemptRepository : SegmentAttemptRepository {

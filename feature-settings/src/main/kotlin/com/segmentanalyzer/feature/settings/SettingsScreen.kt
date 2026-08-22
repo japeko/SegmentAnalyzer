@@ -9,10 +9,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -25,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.GarminConnectionState
@@ -43,6 +49,7 @@ fun SettingsScreen(
     onConfirmDisconnectStrava: () -> Unit,
     onDismissDisconnectStrava: () -> Unit,
     stravaAuthorizationUrl: String,
+    onAboutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -65,7 +72,8 @@ fun SettingsScreen(
                 source = ActivitySource.GARMIN,
                 isConnected = uiState.garminConnectionState is GarminConnectionState.Connected,
                 statusText = when (val state = uiState.garminConnectionState) {
-                    is GarminConnectionState.Connected -> "Connected as ${state.username}"
+                    is GarminConnectionState.Connected ->
+                        state.username.takeIf { it.isNotBlank() }?.let { "Connected as $it" } ?: "Connected"
                     GarminConnectionState.Disconnected -> "Not connected"
                 },
                 onConnectClick = onConnectGarminClick,
@@ -81,6 +89,14 @@ fun SettingsScreen(
                 onConnectClick = { onConnectStravaClick(stravaAuthorizationUrl) },
                 onDisconnectClick = onDisconnectStravaClick,
             )
+
+            Text(
+                text = "App",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            AboutRow(onClick = onAboutClick)
         }
     }
 
@@ -152,6 +168,32 @@ private fun ConnectionCard(
             OutlinedButton(onClick = if (isConnected) onDisconnectClick else onConnectClick) {
                 Text(if (isConnected) "Disconnect" else "Connect", maxLines = 1, softWrap = false)
             }
+        }
+    }
+}
+
+@Composable
+private fun AboutRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = MaterialThemeExtras.textTertiary,
+                    modifier = Modifier.padding(end = 12.dp),
+                )
+                Text(text = "About Segment Analyzer", style = MaterialTheme.typography.bodyMedium)
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialThemeExtras.textTertiary,
+            )
         }
     }
 }
