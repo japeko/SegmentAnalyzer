@@ -2,11 +2,14 @@ package com.segmentanalyzer.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.segmentanalyzer.domain.model.ThemePreference
 import com.segmentanalyzer.domain.usecase.DisconnectGarminAccountUseCase
 import com.segmentanalyzer.domain.usecase.DisconnectStravaAccountUseCase
 import com.segmentanalyzer.domain.usecase.GetStravaAuthorizationUrlUseCase
 import com.segmentanalyzer.domain.usecase.ObserveGarminConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
+import com.segmentanalyzer.domain.usecase.ObserveThemePreferenceUseCase
+import com.segmentanalyzer.domain.usecase.SetThemePreferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,6 +26,8 @@ class SettingsViewModel @Inject constructor(
     observeStravaConnectionState: ObserveStravaConnectionStateUseCase,
     private val disconnectStravaAccount: DisconnectStravaAccountUseCase,
     getStravaAuthorizationUrl: GetStravaAuthorizationUrlUseCase,
+    observeThemePreference: ObserveThemePreferenceUseCase,
+    private val setThemePreference: SetThemePreferenceUseCase,
 ) : ViewModel() {
 
     /** Pure string building, no network — safe to compute once and hand to the browser launcher. */
@@ -36,12 +41,14 @@ class SettingsViewModel @Inject constructor(
         showDisconnectGarminConfirmation,
         observeStravaConnectionState(),
         showDisconnectStravaConfirmation,
-    ) { garminState, showGarminConfirmation, stravaState, showStravaConfirmation ->
+        observeThemePreference(),
+    ) { garminState, showGarminConfirmation, stravaState, showStravaConfirmation, themePreference ->
         SettingsUiState(
             garminConnectionState = garminState,
             showDisconnectGarminConfirmation = showGarminConfirmation,
             stravaConnectionState = stravaState,
             showDisconnectStravaConfirmation = showStravaConfirmation,
+            themePreference = themePreference,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -73,5 +80,9 @@ class SettingsViewModel @Inject constructor(
     fun onConfirmDisconnectStrava() {
         showDisconnectStravaConfirmation.value = false
         viewModelScope.launch { disconnectStravaAccount() }
+    }
+
+    fun onThemeSelected(preference: ThemePreference) {
+        viewModelScope.launch { setThemePreference(preference) }
     }
 }

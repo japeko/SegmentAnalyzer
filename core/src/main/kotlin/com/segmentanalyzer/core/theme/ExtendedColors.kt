@@ -1,6 +1,5 @@
 package com.segmentanalyzer.core.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -38,11 +37,19 @@ val MaterialThemeExtras: ExtendedColors
     get() = LocalExtendedColors.current
 
 @Composable
-fun ProvideExtendedColors(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val extended = if (darkTheme) {
-        ExtendedColors(textTertiary = DarkOnSurfaceTertiary, faster = DarkFaster, slower = DarkSlower, compareC = DarkCompareC)
-    } else {
-        ExtendedColors(textTertiary = LightOnSurfaceTertiary, faster = LightFaster, slower = LightSlower, compareC = LightCompareC)
+internal fun ProvideExtendedColors(variant: AppThemeVariant, content: @Composable () -> Unit) {
+    val extended = when (variant) {
+        AppThemeVariant.DARK ->
+            ExtendedColors(textTertiary = DarkOnSurfaceTertiary, faster = DarkFaster, slower = DarkSlower, compareC = DarkCompareC)
+        AppThemeVariant.LIGHT ->
+            ExtendedColors(textTertiary = LightOnSurfaceTertiary, faster = LightFaster, slower = LightSlower, compareC = LightCompareC)
+        AppThemeVariant.DRACULA ->
+            ExtendedColors(
+                textTertiary = DraculaOnSurfaceTertiary,
+                faster = DraculaFaster,
+                slower = DraculaSlower,
+                compareC = DraculaCompareC,
+            )
     }
     CompositionLocalProvider(LocalExtendedColors provides extended, content = content)
 }

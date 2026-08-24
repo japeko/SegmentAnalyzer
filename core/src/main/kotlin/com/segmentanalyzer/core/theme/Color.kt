@@ -20,6 +20,25 @@ val DarkFaster = Color(0xFF6FB8E8) // ahead-of-reference delta
 val DarkSlower = Color(0xFFE8935D) // behind-reference delta
 val DarkCompareC = Color(0xFF5FC4B8) // third ride-comparison slot (teal)
 
+// Dracula theme — the standard Dracula palette (draculatheme.com/contribute), mapped onto the
+// same roles as Dark/Light so every screen picks it up for free.
+val DraculaBackground = Color(0xFF282A36)
+val DraculaSurface = Color(0xFF2F3244)
+val DraculaSurfaceVariant = Color(0xFF44475A) // "Current Line"
+val DraculaOutline = Color(0xFF6272A4) // "Comment"
+val DraculaOnSurface = Color(0xFFF8F8F2) // "Foreground"
+val DraculaOnSurfaceSecondary = Color(0xFFC2C3D6)
+val DraculaOnSurfaceTertiary = Color(0xFF9A9CBF)
+val DraculaPrimary = Color(0xFFBD93F9) // "Purple"
+val DraculaOnPrimary = Color(0xFF282A36)
+val DraculaTertiary = Color(0xFFF1FA8C) // "Yellow" — personal-best accent
+val DraculaOnTertiary = Color(0xFF282A36)
+val DraculaError = Color(0xFFFF5555) // "Red"
+val DraculaOnError = Color(0xFF282A36)
+val DraculaFaster = Color(0xFF8BE9FD) // "Cyan" — ahead-of-reference delta
+val DraculaSlower = Color(0xFFFFB86C) // "Orange" — behind-reference delta
+val DraculaCompareC = Color(0xFF50FA7B) // "Green" — third ride-comparison slot
+
 // Light theme
 val LightBackground = Color(0xFFFAFAFB)
 val LightSurface = Color(0xFFFFFFFF)

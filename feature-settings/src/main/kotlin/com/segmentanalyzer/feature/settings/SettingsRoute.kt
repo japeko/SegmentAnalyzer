@@ -27,6 +27,7 @@ fun SettingsRoute(
         onConfirmDisconnectStrava = viewModel::onConfirmDisconnectStrava,
         onDismissDisconnectStrava = viewModel::onDismissDisconnectStrava,
         stravaAuthorizationUrl = viewModel.stravaAuthorizationUrl,
+        onThemeSelected = viewModel::onThemeSelected,
         onAboutClick = onAboutClick,
         modifier = modifier,
     )

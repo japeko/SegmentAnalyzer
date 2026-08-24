@@ -3,13 +3,17 @@ package com.segmentanalyzer.feature.settings
 import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.model.StravaConnectionState
+import com.segmentanalyzer.domain.model.ThemePreference
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
+import com.segmentanalyzer.domain.repository.SettingsRepository
 import com.segmentanalyzer.domain.repository.StravaAccountRepository
 import com.segmentanalyzer.domain.usecase.DisconnectGarminAccountUseCase
 import com.segmentanalyzer.domain.usecase.DisconnectStravaAccountUseCase
 import com.segmentanalyzer.domain.usecase.GetStravaAuthorizationUrlUseCase
 import com.segmentanalyzer.domain.usecase.ObserveGarminConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
+import com.segmentanalyzer.domain.usecase.ObserveThemePreferenceUseCase
+import com.segmentanalyzer.domain.usecase.SetThemePreferenceUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -119,15 +123,35 @@ class SettingsViewModelTest {
         assertEquals("https://www.strava.com/oauth/authorize?fake=true", viewModel.stravaAuthorizationUrl)
     }
 
+    @Test
+    fun `selecting a theme persists it and is reflected in uiState`() = runTest(dispatcher) {
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = viewModel(settingsRepository = settingsRepository)
+
+        viewModel.uiState.test {
+            // stateIn's initialValue and the first real combine emission are both SYSTEM/Disconnected
+            // here, so StateFlow collapses them into one item — only skip, don't also await it.
+            skipItems(1)
+            assertEquals(ThemePreference.SYSTEM, viewModel.uiState.value.themePreference)
+
+            viewModel.onThemeSelected(ThemePreference.DARK)
+            assertEquals(ThemePreference.DARK, awaitItem().themePreference)
+        }
+        assertEquals(ThemePreference.DARK, settingsRepository.savedPreference)
+    }
+
     private fun viewModel(
         garminRepository: GarminAccountRepository = FakeGarminAccountRepository(),
         stravaRepository: StravaAccountRepository = FakeStravaAccountRepository(),
+        settingsRepository: SettingsRepository = FakeSettingsRepository(),
     ) = SettingsViewModel(
         ObserveGarminConnectionStateUseCase(garminRepository),
         DisconnectGarminAccountUseCase(garminRepository),
         ObserveStravaConnectionStateUseCase(stravaRepository),
         DisconnectStravaAccountUseCase(stravaRepository),
         GetStravaAuthorizationUrlUseCase(stravaRepository),
+        ObserveThemePreferenceUseCase(settingsRepository),
+        SetThemePreferenceUseCase(settingsRepository),
     )
 }
 
@@ -164,5 +188,20 @@ private class FakeStravaAccountRepository(
 
     override suspend fun disconnect() {
         state.value = StravaConnectionState.Disconnected
+    }
+}
+
+private class FakeSettingsRepository(
+    initialPreference: ThemePreference = ThemePreference.SYSTEM,
+) : SettingsRepository {
+    private val preference = MutableStateFlow(initialPreference)
+    var savedPreference: ThemePreference = initialPreference
+        private set
+
+    override fun observeThemePreference(): Flow<ThemePreference> = preference
+
+    override suspend fun setThemePreference(preference: ThemePreference) {
+        savedPreference = preference
+        this.preference.value = preference
     }
 }

@@ -13,7 +13,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Bloodtype
+import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,6 +25,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -35,6 +42,7 @@ import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.GarminConnectionState
 import com.segmentanalyzer.domain.model.StravaConnectionState
+import com.segmentanalyzer.domain.model.ThemePreference
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +57,7 @@ fun SettingsScreen(
     onConfirmDisconnectStrava: () -> Unit,
     onDismissDisconnectStrava: () -> Unit,
     stravaAuthorizationUrl: String,
+    onThemeSelected: (ThemePreference) -> Unit,
     onAboutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -89,6 +98,14 @@ fun SettingsScreen(
                 onConnectClick = { onConnectStravaClick(stravaAuthorizationUrl) },
                 onDisconnectClick = onDisconnectStravaClick,
             )
+
+            Text(
+                text = "Appearance",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            ThemeSelectorCard(selected = uiState.themePreference, onThemeSelected = onThemeSelected)
 
             Text(
                 text = "App",
@@ -170,6 +187,50 @@ private fun ConnectionCard(
             }
         }
     }
+}
+
+@Composable
+private fun ThemeSelectorCard(
+    selected: ThemePreference,
+    onThemeSelected: (ThemePreference) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            ThemePreference.entries.forEachIndexed { index, preference ->
+                SegmentedButton(
+                    selected = preference == selected,
+                    onClick = { onThemeSelected(preference) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primary,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                        activeBorderColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    icon = {
+                        Icon(
+                            imageVector = when (preference) {
+                                ThemePreference.SYSTEM -> Icons.Filled.Brightness6
+                                ThemePreference.LIGHT -> Icons.Filled.LightMode
+                                ThemePreference.DARK -> Icons.Filled.DarkMode
+                                ThemePreference.DRACULA -> Icons.Filled.Bloodtype
+                            },
+                            contentDescription = null,
+                        )
+                    },
+                ) {
+                    Text(preference.label())
+                }
+            }
+        }
+    }
+}
+
+private fun ThemePreference.label(): String = when (this) {
+    ThemePreference.SYSTEM -> "System"
+    ThemePreference.LIGHT -> "Light"
+    ThemePreference.DARK -> "Dark"
+    ThemePreference.DRACULA -> "Dracula"
 }
 
 @Composable
