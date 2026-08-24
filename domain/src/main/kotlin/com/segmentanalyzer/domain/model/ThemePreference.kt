@@ -6,4 +6,6 @@ enum class ThemePreference {
     LIGHT,
     DARK,
     DRACULA,
+    /** Sourced from the app icon on the About page: its stopwatch orange and sky blue on a deep navy. */
+    TRAILHEAD,
 }

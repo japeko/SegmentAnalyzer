@@ -39,6 +39,26 @@ val DraculaFaster = Color(0xFF8BE9FD) // "Cyan" — ahead-of-reference delta
 val DraculaSlower = Color(0xFFFFB86C) // "Orange" — behind-reference delta
 val DraculaCompareC = Color(0xFF50FA7B) // "Green" — third ride-comparison slot
 
+// Trailhead theme — sampled from the app icon (about_hero.png): its stopwatch orange and sky
+// blue on the deep navy the sky gradient fades into, with the icon's muted teal-green forest as
+// the third comparison slot.
+val TrailheadBackground = Color(0xFF0A1C33)
+val TrailheadSurface = Color(0xFF122B4A)
+val TrailheadSurfaceVariant = Color(0xFF1D3B5C)
+val TrailheadOutline = Color(0xFF3D5F7D)
+val TrailheadOnSurface = Color(0xFFF3EFE2)
+val TrailheadOnSurfaceSecondary = Color(0xFFB8C7D9)
+val TrailheadOnSurfaceTertiary = Color(0xFF8098B0)
+val TrailheadPrimary = Color(0xFFEF6923) // stopwatch/trail orange
+val TrailheadOnPrimary = Color(0xFF1A0D02)
+val TrailheadTertiary = Color(0xFF29A3F5) // sky blue — personal-best accent
+val TrailheadOnTertiary = Color(0xFF04162B)
+val TrailheadError = Color(0xFFE5484D)
+val TrailheadOnError = Color(0xFF1A0704)
+val TrailheadFaster = Color(0xFF60CEF9) // ahead-of-reference delta
+val TrailheadSlower = Color(0xFFC96A4E) // behind-reference delta
+val TrailheadCompareC = Color(0xFF7FB8A8) // third ride-comparison slot (icon's forest teal)
+
 // Light theme
 val LightBackground = Color(0xFFFAFAFB)
 val LightSurface = Color(0xFFFFFFFF)

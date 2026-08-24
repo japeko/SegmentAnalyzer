@@ -67,8 +67,28 @@ private val DraculaColors = darkColorScheme(
     onError = DraculaOnError,
 )
 
+private val TrailheadColors = darkColorScheme(
+    background = TrailheadBackground,
+    surface = TrailheadSurface,
+    surfaceVariant = TrailheadSurfaceVariant,
+    outline = TrailheadOutline,
+    onBackground = TrailheadOnSurface,
+    onSurface = TrailheadOnSurface,
+    onSurfaceVariant = TrailheadOnSurfaceSecondary,
+    primary = TrailheadPrimary,
+    onPrimary = TrailheadOnPrimary,
+    primaryContainer = TrailheadPrimary,
+    onPrimaryContainer = TrailheadOnPrimary,
+    tertiary = TrailheadTertiary,
+    onTertiary = TrailheadOnTertiary,
+    tertiaryContainer = TrailheadTertiary,
+    onTertiaryContainer = TrailheadOnTertiary,
+    error = TrailheadError,
+    onError = TrailheadOnError,
+)
+
 /** Which fixed palette [SegmentAnalyzerTheme] renders — [ThemePreference.SYSTEM] resolves to [LIGHT]/[DARK] before reaching here. */
-internal enum class AppThemeVariant { LIGHT, DARK, DRACULA }
+internal enum class AppThemeVariant { LIGHT, DARK, DRACULA, TRAILHEAD }
 
 /** The tertiary color role doubles as this app's "personal best" accent throughout. */
 @Composable
@@ -79,7 +99,7 @@ fun SegmentAnalyzerTheme(
     SegmentAnalyzerTheme(variant = if (darkTheme) AppThemeVariant.DARK else AppThemeVariant.LIGHT, content = content)
 }
 
-/** Resolves the rider's [ThemePreference] (including [ThemePreference.DRACULA]) to a rendered theme. */
+/** Resolves the rider's [ThemePreference] (including [ThemePreference.DRACULA]/[ThemePreference.TRAILHEAD]) to a rendered theme. */
 @Composable
 fun SegmentAnalyzerTheme(themePreference: ThemePreference, content: @Composable () -> Unit) {
     val variant = when (themePreference) {
@@ -87,6 +107,7 @@ fun SegmentAnalyzerTheme(themePreference: ThemePreference, content: @Composable 
         ThemePreference.LIGHT -> AppThemeVariant.LIGHT
         ThemePreference.DARK -> AppThemeVariant.DARK
         ThemePreference.DRACULA -> AppThemeVariant.DRACULA
+        ThemePreference.TRAILHEAD -> AppThemeVariant.TRAILHEAD
     }
     SegmentAnalyzerTheme(variant = variant, content = content)
 }
@@ -97,6 +118,7 @@ private fun SegmentAnalyzerTheme(variant: AppThemeVariant, content: @Composable 
         AppThemeVariant.DARK -> DarkColors
         AppThemeVariant.LIGHT -> LightColors
         AppThemeVariant.DRACULA -> DraculaColors
+        AppThemeVariant.TRAILHEAD -> TrailheadColors
     }
     ProvideExtendedColors(variant = variant) {
         MaterialTheme(

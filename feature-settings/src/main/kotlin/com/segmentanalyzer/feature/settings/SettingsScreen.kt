@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -196,32 +197,41 @@ private fun ThemeSelectorCard(
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier.fillMaxWidth()) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            ThemePreference.entries.forEachIndexed { index, preference ->
-                SegmentedButton(
-                    selected = preference == selected,
-                    onClick = { onThemeSelected(preference) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        activeBorderColor = MaterialTheme.colorScheme.primary,
-                    ),
-                    icon = {
-                        Icon(
-                            imageVector = when (preference) {
-                                ThemePreference.SYSTEM -> Icons.Filled.Brightness6
-                                ThemePreference.LIGHT -> Icons.Filled.LightMode
-                                ThemePreference.DARK -> Icons.Filled.DarkMode
-                                ThemePreference.DRACULA -> Icons.Filled.Bloodtype
-                            },
-                            contentDescription = null,
-                        )
-                    },
-                ) {
-                    Text(preference.label())
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                ThemePreference.entries.forEachIndexed { index, preference ->
+                    SegmentedButton(
+                        selected = preference == selected,
+                        onClick = { onThemeSelected(preference) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = ThemePreference.entries.size),
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = MaterialTheme.colorScheme.primary,
+                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                            activeBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
+                        icon = {},
+                        label = {
+                            Icon(
+                                imageVector = when (preference) {
+                                    ThemePreference.SYSTEM -> Icons.Filled.Brightness6
+                                    ThemePreference.LIGHT -> Icons.Filled.LightMode
+                                    ThemePreference.DARK -> Icons.Filled.DarkMode
+                                    ThemePreference.DRACULA -> Icons.Filled.Bloodtype
+                                    ThemePreference.TRAILHEAD -> Icons.Filled.Timer
+                                },
+                                contentDescription = preference.label(),
+                            )
+                        },
+                    )
                 }
             }
+            Text(
+                text = selected.label(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 10.dp),
+            )
         }
     }
 }
@@ -231,6 +241,7 @@ private fun ThemePreference.label(): String = when (this) {
     ThemePreference.LIGHT -> "Light"
     ThemePreference.DARK -> "Dark"
     ThemePreference.DRACULA -> "Dracula"
+    ThemePreference.TRAILHEAD -> "Trailhead"
 }
 
 @Composable

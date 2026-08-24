@@ -50,6 +50,13 @@ internal fun ProvideExtendedColors(variant: AppThemeVariant, content: @Composabl
                 slower = DraculaSlower,
                 compareC = DraculaCompareC,
             )
+        AppThemeVariant.TRAILHEAD ->
+            ExtendedColors(
+                textTertiary = TrailheadOnSurfaceTertiary,
+                faster = TrailheadFaster,
+                slower = TrailheadSlower,
+                compareC = TrailheadCompareC,
+            )
     }
     CompositionLocalProvider(LocalExtendedColors provides extended, content = content)
 }
