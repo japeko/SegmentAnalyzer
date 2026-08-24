@@ -47,6 +47,12 @@ class RideRepositoryImpl @Inject constructor(
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) =
         rideDao.updateDetails(rideId, name, tag?.trim()?.takeIf { it.isNotEmpty() }, activityType)
 
+    override suspend fun setTagForRides(rideIds: List<Long>, tag: String?) =
+        rideDao.setTagForRides(rideIds, tag?.trim()?.takeIf { it.isNotEmpty() })
+
+    override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) =
+        rideDao.setActivityTypeForRides(rideIds, activityType)
+
     override fun observeAllTags(): Flow<List<String>> = rideDao.observeDistinctTags()
 }
 

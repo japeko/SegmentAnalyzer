@@ -31,6 +31,12 @@ interface RideRepository {
     /** Renames [rideId], sets its tag (null clears it) and its activity type. */
     suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType)
 
+    /** Sets (or, if [tag] is blank, clears) the same tag on every ride in [rideIds] at once. */
+    suspend fun setTagForRides(rideIds: List<Long>, tag: String?)
+
+    /** Sets the same activity type on every ride in [rideIds] at once. */
+    suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType)
+
     /** Every distinct, non-blank tag currently in use, for autocomplete when editing a ride. */
     fun observeAllTags(): Flow<List<String>>
 }

@@ -19,10 +19,13 @@ import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.usecase.RideSummary
 import com.segmentanalyzer.feature.history.history.components.ActivityTypeFilterRow
+import com.segmentanalyzer.feature.history.history.components.BulkActivityTypeDialog
+import com.segmentanalyzer.feature.history.history.components.BulkTagDialog
 import com.segmentanalyzer.feature.history.history.components.ImportFab
 import com.segmentanalyzer.feature.history.history.components.QuickStatsRow
 import com.segmentanalyzer.feature.history.history.components.RideCard
 import com.segmentanalyzer.feature.history.history.components.RideHistoryTopBar
+import com.segmentanalyzer.feature.history.history.components.RideSelectionTopBar
 import com.segmentanalyzer.feature.history.history.components.SummaryPeriodRow
 
 @Composable
@@ -31,15 +34,40 @@ fun RideHistoryScreen(
     onFilterSelected: (ActivityType?) -> Unit,
     onPeriodSelected: (SummaryPeriod) -> Unit,
     onRideClick: (Long) -> Unit,
+    onRideLongPress: (Long) -> Unit,
+    onRideSelectionToggled: (Long) -> Unit,
+    onExitSelectionMode: () -> Unit,
+    onSetTagClick: () -> Unit,
+    onTagDialogValueChange: (String) -> Unit,
+    onTagSuggestionClick: (String) -> Unit,
+    onDismissTagDialog: () -> Unit,
+    onConfirmSetTag: () -> Unit,
+    onSetActivityTypeClick: () -> Unit,
+    onActivityTypeDialogSelected: (ActivityType) -> Unit,
+    onDismissActivityTypeDialog: () -> Unit,
+    onConfirmSetActivityType: () -> Unit,
     onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
     onNewPBsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isSelectionMode = uiState.selectedRideIds.isNotEmpty()
+
     Scaffold(
         modifier = modifier,
-        topBar = { RideHistoryTopBar(onSearchClick = onSearchClick) },
-        floatingActionButton = { ImportFab(onClick = onImportClick) },
+        topBar = {
+            if (isSelectionMode) {
+                RideSelectionTopBar(
+                    selectedCount = uiState.selectedRideIds.size,
+                    onExitSelectionMode = onExitSelectionMode,
+                    onSetTagClick = onSetTagClick,
+                    onSetActivityTypeClick = onSetActivityTypeClick,
+                )
+            } else {
+                RideHistoryTopBar(onSearchClick = onSearchClick)
+            }
+        },
+        floatingActionButton = { if (!isSelectionMode) ImportFab(onClick = onImportClick) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
@@ -80,11 +108,33 @@ fun RideHistoryScreen(
             items(uiState.rides, key = { it.id }) { ride ->
                 RideCard(
                     item = ride,
-                    onClick = onRideClick,
+                    isSelectionMode = isSelectionMode,
+                    isSelected = ride.id in uiState.selectedRideIds,
+                    onClick = { id -> if (isSelectionMode) onRideSelectionToggled(id) else onRideClick(id) },
+                    onLongClick = onRideLongPress,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
                 )
             }
         }
+    }
+
+    uiState.tagDialog?.let { dialog ->
+        BulkTagDialog(
+            dialog = dialog,
+            onDismiss = onDismissTagDialog,
+            onTagChange = onTagDialogValueChange,
+            onTagSuggestionClick = onTagSuggestionClick,
+            onSaveClick = onConfirmSetTag,
+        )
+    }
+
+    uiState.activityTypeDialog?.let { dialog ->
+        BulkActivityTypeDialog(
+            dialog = dialog,
+            onTypeSelected = onActivityTypeDialogSelected,
+            onDismiss = onDismissActivityTypeDialog,
+            onSaveClick = onConfirmSetActivityType,
+        )
     }
 }
 
@@ -101,6 +151,7 @@ private val previewRides = listOf(
         avgSpeedKmh = 18.8,
         isPersonalBest = false,
         elevationProfile = listOf(0.1f, 0.4f, 0.8f, 1f, 0.5f, 0.2f),
+        tag = null,
     ),
     RideListItem(
         id = 2,
@@ -114,6 +165,7 @@ private val previewRides = listOf(
         avgSpeedKmh = 23.6,
         isPersonalBest = true,
         elevationProfile = listOf(0.9f, 0.6f, 0.4f, 0.2f, 0.1f, 0.05f),
+        tag = "Race",
     ),
 )
 
@@ -139,6 +191,18 @@ private fun RideHistoryScreenLightPreview() {
             onFilterSelected = {},
             onPeriodSelected = {},
             onRideClick = {},
+            onRideLongPress = {},
+            onRideSelectionToggled = {},
+            onExitSelectionMode = {},
+            onSetTagClick = {},
+            onTagDialogValueChange = {},
+            onTagSuggestionClick = {},
+            onDismissTagDialog = {},
+            onConfirmSetTag = {},
+            onSetActivityTypeClick = {},
+            onActivityTypeDialogSelected = {},
+            onDismissActivityTypeDialog = {},
+            onConfirmSetActivityType = {},
             onSearchClick = {},
             onImportClick  = {},
             onNewPBsClick = {},
@@ -155,6 +219,18 @@ private fun RideHistoryScreenDarkPreview() {
             onFilterSelected = {},
             onPeriodSelected = {},
             onRideClick = {},
+            onRideLongPress = {},
+            onRideSelectionToggled = {},
+            onExitSelectionMode = {},
+            onSetTagClick = {},
+            onTagDialogValueChange = {},
+            onTagSuggestionClick = {},
+            onDismissTagDialog = {},
+            onConfirmSetTag = {},
+            onSetActivityTypeClick = {},
+            onActivityTypeDialogSelected = {},
+            onDismissActivityTypeDialog = {},
+            onConfirmSetActivityType = {},
             onSearchClick = {},
             onImportClick = {},
             onNewPBsClick = {},

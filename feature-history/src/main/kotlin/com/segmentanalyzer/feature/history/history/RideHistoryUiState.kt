@@ -11,6 +11,25 @@ data class RideHistoryUiState(
     val summaryPeriod: SummaryPeriod = SummaryPeriod.THIS_MONTH,
     val selectedFilter: ActivityType? = null,
     val rides: List<RideListItem> = emptyList(),
+    /** Non-empty means selection mode is active — tapping a ride toggles it instead of opening it. */
+    val selectedRideIds: Set<Long> = emptySet(),
+    /** Non-null while the "set tag for selected rides" dialog is open. */
+    val tagDialog: BulkTagDialogState? = null,
+    /** Non-null while the "set activity type for selected rides" dialog is open. */
+    val activityTypeDialog: BulkActivityTypeDialogState? = null,
+)
+
+/** Live state of the bulk tag dialog — [tagSuggestions] narrows as [tag] is typed. */
+data class BulkTagDialogState(
+    val tag: String,
+    val tagSuggestions: List<String> = emptyList(),
+    val selectedCount: Int,
+)
+
+/** Live state of the bulk activity-type dialog — [selectedType] is null until the rider picks one. */
+data class BulkActivityTypeDialogState(
+    val selectedCount: Int,
+    val selectedType: ActivityType? = null,
 )
 
 /** A ride pre-formatted for display — the ViewModel does the formatting, not the composable. */
@@ -26,4 +45,5 @@ data class RideListItem(
     val avgSpeedKmh: Double,
     val isPersonalBest: Boolean,
     val elevationProfile: List<Float>,
+    val tag: String?,
 )

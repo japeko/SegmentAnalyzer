@@ -282,6 +282,8 @@ private class FakeRideRepository(private val newRideCount: Int) : RideRepository
     }
 
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
+    override suspend fun setTagForRides(rideIds: List<Long>, tag: String?) = Unit
+    override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }
 

@@ -7,6 +7,9 @@ import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
+import com.segmentanalyzer.domain.usecase.SetActivityTypeForRidesUseCase
+import com.segmentanalyzer.domain.usecase.SetTagForRidesUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +21,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Duration
@@ -68,6 +72,9 @@ class RideHistoryViewModelTest {
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
         )
 
         // `onFilterSelected` changes both the direct selectedFilter flow and (via flatMapLatest)
@@ -97,6 +104,9 @@ class RideHistoryViewModelTest {
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -127,6 +137,9 @@ class RideHistoryViewModelTest {
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -141,15 +154,172 @@ class RideHistoryViewModelTest {
         assertEquals(setOf("Skyline Ridge Loop", "Old MTB Ride"), filtered.rides.map { it.name }.toSet())
         collectJob.cancel()
     }
+
+    @Test
+    fun `long-pressing a ride enters selection mode and selects it`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB), ride(2, "Sunday Club Ride", ActivityType.ROAD))
+        val repository = FakeRideRepository(rides)
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(emptySet<Long>(), viewModel.uiState.value.selectedRideIds)
+
+        viewModel.onRideLongPress(1)
+        advanceUntilIdle()
+        assertEquals(setOf(1L), viewModel.uiState.value.selectedRideIds)
+
+        viewModel.onRideSelectionToggled(2)
+        advanceUntilIdle()
+        assertEquals(setOf(1L, 2L), viewModel.uiState.value.selectedRideIds)
+
+        viewModel.onRideSelectionToggled(1)
+        advanceUntilIdle()
+        assertEquals(setOf(2L), viewModel.uiState.value.selectedRideIds)
+
+        viewModel.onExitSelectionMode()
+        advanceUntilIdle()
+        assertEquals(emptySet<Long>(), viewModel.uiState.value.selectedRideIds)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `setting a tag applies it to every selected ride and exits selection mode`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB), ride(2, "Sunday Club Ride", ActivityType.ROAD))
+        val repository = FakeRideRepository(rides, tags = listOf("Race", "Training"))
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        viewModel.onRideLongPress(1)
+        viewModel.onRideSelectionToggled(2)
+        advanceUntilIdle()
+
+        viewModel.onSetTagClick()
+        advanceUntilIdle()
+        assertEquals("", viewModel.uiState.value.tagDialog?.tag)
+        assertEquals(2, viewModel.uiState.value.tagDialog?.selectedCount)
+
+        viewModel.onTagDialogValueChange("Rac")
+        advanceUntilIdle()
+        assertEquals(listOf("Race"), viewModel.uiState.value.tagDialog?.tagSuggestions)
+
+        viewModel.onTagSuggestionClick("Race")
+        advanceUntilIdle()
+        assertEquals("Race", viewModel.uiState.value.tagDialog?.tag)
+
+        viewModel.onConfirmSetTag()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.tagDialog)
+        assertEquals(emptySet<Long>(), viewModel.uiState.value.selectedRideIds)
+        val call = repository.setTagCalls.single()
+        assertEquals(setOf(1L, 2L), call.rideIds.toSet())
+        assertEquals("Race", call.tag)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `setting an activity type applies it to every selected ride and exits selection mode`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB), ride(2, "Sunday Club Ride", ActivityType.ROAD))
+        val repository = FakeRideRepository(rides)
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        viewModel.onRideLongPress(1)
+        viewModel.onRideSelectionToggled(2)
+        advanceUntilIdle()
+
+        viewModel.onSetActivityTypeClick()
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.activityTypeDialog?.selectedCount)
+        assertEquals(null, viewModel.uiState.value.activityTypeDialog?.selectedType)
+
+        viewModel.onActivityTypeDialogSelected(ActivityType.EMTB)
+        advanceUntilIdle()
+        assertEquals(ActivityType.EMTB, viewModel.uiState.value.activityTypeDialog?.selectedType)
+
+        viewModel.onConfirmSetActivityType()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.activityTypeDialog)
+        assertEquals(emptySet<Long>(), viewModel.uiState.value.selectedRideIds)
+        val call = repository.setActivityTypeCalls.single()
+        assertEquals(setOf(1L, 2L), call.rideIds.toSet())
+        assertEquals(ActivityType.EMTB, call.activityType)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `confirming the activity type dialog with nothing picked does nothing`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB))
+        val repository = FakeRideRepository(rides)
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository),
+            ObserveRideTagsUseCase(repository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        viewModel.onRideLongPress(1)
+        viewModel.onSetActivityTypeClick()
+        advanceUntilIdle()
+
+        viewModel.onConfirmSetActivityType()
+        advanceUntilIdle()
+
+        assertTrue(repository.setActivityTypeCalls.isEmpty())
+        assertEquals(1, viewModel.uiState.value.activityTypeDialog?.selectedCount) // dialog still open
+        collectJob.cancel()
+    }
 }
 
-private class FakeRideRepository(rides: List<Ride>) : RideRepository {
+private class FakeRideRepository(rides: List<Ride>, tags: List<String> = emptyList()) : RideRepository {
     private val flow = MutableStateFlow(rides)
+    private val tagsFlow = MutableStateFlow(tags)
+
+    data class SetTagCall(val rideIds: List<Long>, val tag: String?)
+    val setTagCalls = mutableListOf<SetTagCall>()
+
+    data class SetActivityTypeCall(val rideIds: List<Long>, val activityType: ActivityType)
+    val setActivityTypeCalls = mutableListOf<SetActivityTypeCall>()
+
     override fun observeRides() = flow
     override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
-    override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
+
+    override suspend fun setTagForRides(rideIds: List<Long>, tag: String?) {
+        setTagCalls += SetTagCall(rideIds, tag)
+    }
+
+    override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) {
+        setActivityTypeCalls += SetActivityTypeCall(rideIds, activityType)
+    }
+
+    override fun observeAllTags(): Flow<List<String>> = tagsFlow
 }

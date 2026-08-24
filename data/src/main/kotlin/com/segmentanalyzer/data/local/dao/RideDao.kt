@@ -38,6 +38,12 @@ interface RideDao {
     @Query("UPDATE rides SET name = :name, tag = :tag, activityType = :activityType WHERE id = :rideId")
     suspend fun updateDetails(rideId: Long, name: String, tag: String?, activityType: ActivityType)
 
+    @Query("UPDATE rides SET tag = :tag WHERE id IN (:rideIds)")
+    suspend fun setTagForRides(rideIds: List<Long>, tag: String?)
+
+    @Query("UPDATE rides SET activityType = :activityType WHERE id IN (:rideIds)")
+    suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType)
+
     @Query("SELECT DISTINCT tag FROM rides WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC")
     fun observeDistinctTags(): Flow<List<String>>
 }

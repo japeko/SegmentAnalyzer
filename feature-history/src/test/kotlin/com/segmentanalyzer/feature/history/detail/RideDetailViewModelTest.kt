@@ -470,6 +470,9 @@ private class FakeRideDetailRideRepository(
         updateCalls += UpdateCall(rideId, name, tag, activityType)
     }
 
+    override suspend fun setTagForRides(rideIds: List<Long>, tag: String?) = Unit
+    override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) = Unit
+
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 

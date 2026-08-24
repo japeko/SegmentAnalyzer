@@ -274,6 +274,8 @@ private class FakeSegmentsVmRideRepository(private val tags: List<String>) : Rid
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
+    override suspend fun setTagForRides(rideIds: List<Long>, tag: String?) = Unit
+    override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) = Unit
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 
