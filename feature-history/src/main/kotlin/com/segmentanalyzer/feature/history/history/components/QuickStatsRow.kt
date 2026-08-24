@@ -12,7 +12,10 @@ import com.segmentanalyzer.domain.usecase.RideSummary
 import kotlin.math.roundToInt
 
 @Composable
-fun QuickStatsRow(summary: RideSummary?, period: SummaryPeriod, modifier: Modifier = Modifier) {
+fun QuickStatsRow(summary: RideSummary?,
+                  period: SummaryPeriod,
+                  modifier: Modifier = Modifier,
+                  onNewPBsClick: () -> Unit = {},) {
     if (summary == null) return
 
     LazyRow(
@@ -33,6 +36,7 @@ fun QuickStatsRow(summary: RideSummary?, period: SummaryPeriod, modifier: Modifi
                 value = summary.newPersonalBestCount.toString(),
                 caption = "personal bests ${period.captionSuffix()}",
                 accented = true,
+                onClick = onNewPBsClick,
             )
         }
     }

@@ -62,6 +62,13 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onRideClick = { rideId -> navController.navigate("$RIDE_DETAIL_ROUTE/$rideId") },
                 onSearchClick = { /* Search isn't implemented yet. */ },
                 onImportClick = { navController.navigate(IMPORT_SOURCE_ROUTE) },
+                onNewPBsClick =  { navController.navigate(TopLevelDestination.Records.route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                } },
             )
         }
         composable(TopLevelDestination.Segments.route) {
@@ -70,7 +77,10 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onSegmentClick = { segmentId -> navController.navigate("$SEGMENT_DETAIL_ROUTE/$segmentId") },
             )
         }
-        composable(TopLevelDestination.Records.route) { RecordsRoute() }
+        composable(TopLevelDestination.Records.route) {
+            RecordsRoute(
+            )
+        }
         composable(TopLevelDestination.Settings.route) {
             SettingsRoute(
                 onConnectGarminClick = { navController.navigate(GARMIN_LOGIN_ROUTE) },

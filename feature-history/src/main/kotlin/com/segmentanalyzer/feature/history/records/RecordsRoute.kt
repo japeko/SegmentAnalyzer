@@ -10,5 +10,6 @@ import com.segmentanalyzer.core.ui.ComingSoonScreen
  */
 @Composable
 fun RecordsRoute(modifier: Modifier = Modifier) {
-    ComingSoonScreen(title = "Records", modifier = modifier)
+    ComingSoonScreen(title = "Records", modifier = modifier
+    )
 }

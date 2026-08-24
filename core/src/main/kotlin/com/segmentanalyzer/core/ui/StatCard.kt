@@ -1,6 +1,7 @@
 package com.segmentanalyzer.core.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -24,22 +25,41 @@ fun StatCard(
     modifier: Modifier = Modifier,
     caption: String? = null,
     accented: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
-    val borderColor = if (accented) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
-    val labelColor = if (accented) MaterialTheme.colorScheme.tertiary else MaterialThemeExtras.textTertiary
+    val borderColor =
+        if (accented) MaterialTheme.colorScheme.tertiary
+        else MaterialTheme.colorScheme.outline
+
+    val labelColor =
+        if (accented) MaterialTheme.colorScheme.tertiary
+        else MaterialThemeExtras.textTertiary
 
     Card(
-        modifier = modifier.width(186.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier
+            .width(186.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
         border = BorderStroke(1.dp, borderColor),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = labelColor,
             )
+
             Text(
                 text = value,
                 fontFamily = NumericFontFamily,
@@ -48,6 +68,7 @@ fun StatCard(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 6.dp),
             )
+
             if (caption != null) {
                 Text(
                     text = caption,

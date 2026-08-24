@@ -11,6 +11,7 @@ fun RideHistoryRoute(
     onRideClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
+    onNewPBsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RideHistoryViewModel = hiltViewModel(),
 ) {
@@ -23,6 +24,7 @@ fun RideHistoryRoute(
         onRideClick = onRideClick,
         onSearchClick = onSearchClick,
         onImportClick = onImportClick,
+        onNewPBsClick = onNewPBsClick,
         modifier = modifier,
     )
 }
