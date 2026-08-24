@@ -23,6 +23,14 @@ data class SegmentAttemptWithSegment(
     val isPersonalBest: Boolean,
 )
 
+data class SegmentAttemptRecordRow(
+    @Embedded val attempt: SegmentAttemptEntity,
+    val segmentName: String,
+    val segmentDistanceMeters: Double,
+    val rideName: String,
+    val rideSource: ActivitySource,
+)
+
 @Dao
 interface SegmentAttemptDao {
 
@@ -55,6 +63,27 @@ interface SegmentAttemptDao {
 
     @Query("SELECT * FROM segment_attempts WHERE id = :attemptId")
     suspend fun attemptById(attemptId: Long): SegmentAttemptEntity?
+
+    /**
+     * The single fastest attempt per segment — its current record. Ties (identical
+     * [SegmentAttemptEntity.durationMillis]) resolve to whichever happened first, so a segment
+     * never contributes more than one row.
+     */
+    @Query(
+        """
+        SELECT a.*, s.name AS segmentName, s.distanceMeters AS segmentDistanceMeters, r.name AS rideName, r.source AS rideSource
+        FROM segment_attempts a
+        JOIN segments s ON s.id = a.segmentId
+        JOIN rides r ON r.id = a.rideId
+        WHERE a.id = (
+            SELECT b.id FROM segment_attempts b
+            WHERE b.segmentId = a.segmentId
+            ORDER BY b.durationMillis ASC, b.startTimeEpochMillis ASC
+            LIMIT 1
+        )
+        """,
+    )
+    fun observeRecords(): Flow<List<SegmentAttemptRecordRow>>
 
     @Insert
     suspend fun insert(attempt: SegmentAttemptEntity): Long

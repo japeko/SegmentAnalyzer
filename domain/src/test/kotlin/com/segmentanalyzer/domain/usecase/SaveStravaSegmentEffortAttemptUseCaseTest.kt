@@ -237,6 +237,7 @@ private class FakeSaveAttemptSegmentAttemptRepository(private val hasLocal: Bool
 
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
     override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> = MutableStateFlow(emptyList())
+    override fun observeRecords() = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentRecord>())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
 

@@ -1,15 +1,23 @@
 package com.segmentanalyzer.feature.history.records
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.segmentanalyzer.core.ui.ComingSoonScreen
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-/**
- * Personal records live conceptually under History per CLAUDE.md, but aren't implemented yet —
- * this is a real bottom-nav destination with a placeholder screen.
- */
 @Composable
-fun RecordsRoute(modifier: Modifier = Modifier) {
-    ComingSoonScreen(title = "Records", modifier = modifier
+fun RecordsRoute(
+    onSegmentClick: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: RecordsViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    RecordsScreen(
+        uiState = uiState,
+        onPeriodSelected = viewModel::onPeriodSelected,
+        onRecordClick = onSegmentClick,
+        modifier = modifier,
     )
 }

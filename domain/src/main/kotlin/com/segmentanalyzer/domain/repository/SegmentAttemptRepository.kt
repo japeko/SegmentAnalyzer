@@ -2,6 +2,7 @@ package com.segmentanalyzer.domain.repository
 
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.SegmentRecord
 import com.segmentanalyzer.domain.model.TrackPoint
 import kotlinx.coroutines.flow.Flow
 import java.time.Duration
@@ -13,6 +14,9 @@ interface SegmentAttemptRepository {
 
     /** Segments [rideId] passed through, chronological. */
     fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>>
+
+    /** The current fastest attempt for every segment that has at least one, most recent first. */
+    fun observeRecords(): Flow<List<SegmentRecord>>
 
     /**
      * The attempt's sub-track, distance re-based so the first point is 0 — real GPS points for a

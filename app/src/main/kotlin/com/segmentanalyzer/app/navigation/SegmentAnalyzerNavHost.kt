@@ -79,6 +79,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         }
         composable(TopLevelDestination.Records.route) {
             RecordsRoute(
+                onSegmentClick = { segmentId -> navController.navigate("$SEGMENT_DETAIL_ROUTE/$segmentId") },
             )
         }
         composable(TopLevelDestination.Settings.route) {

@@ -3,6 +3,7 @@ package com.segmentanalyzer.data.repository
 import com.segmentanalyzer.common.DispatcherProvider
 import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptDao
+import com.segmentanalyzer.data.local.dao.SegmentAttemptRecordRow
 import com.segmentanalyzer.data.local.dao.SegmentAttemptWithRide
 import com.segmentanalyzer.data.local.dao.SegmentDao
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortPointDao
@@ -13,6 +14,7 @@ import com.segmentanalyzer.data.local.entity.SegmentEntity
 import com.segmentanalyzer.data.local.entity.StravaSegmentEffortPointEntity
 import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.SegmentRecord
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.util.decodePolyline
@@ -37,6 +39,9 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
 
     override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> =
         segmentAttemptDao.observeForRide(rideId).map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeRecords(): Flow<List<SegmentRecord>> =
+        segmentAttemptDao.observeRecords().map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> =
         withContext(dispatcherProvider.io) {
@@ -185,6 +190,19 @@ private fun SegmentAttemptWithSegment.toDomain(): RideSegmentMatch = RideSegment
     duration = Duration.ofMillis(attempt.durationMillis),
     avgSpeedKmh = attempt.avgSpeedKmh,
     isPersonalBest = isPersonalBest,
+)
+
+private fun SegmentAttemptRecordRow.toDomain(): SegmentRecord = SegmentRecord(
+    attemptId = attempt.id,
+    segmentId = attempt.segmentId,
+    segmentName = segmentName,
+    segmentDistanceMeters = segmentDistanceMeters,
+    rideId = attempt.rideId,
+    rideName = rideName,
+    rideSource = rideSource,
+    startTime = Instant.ofEpochMilli(attempt.startTimeEpochMillis),
+    duration = Duration.ofMillis(attempt.durationMillis),
+    avgSpeedKmh = attempt.avgSpeedKmh,
 )
 
 private fun SegmentAttemptWithRide.toDomain(): SegmentAttempt = SegmentAttempt(
