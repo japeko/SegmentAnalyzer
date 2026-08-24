@@ -5,9 +5,11 @@ import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.repository.RideRepository
+import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveSegmentRecordsUseCase
 import com.segmentanalyzer.domain.usecase.SetActivityTypeForRidesUseCase
 import com.segmentanalyzer.domain.usecase.SetTagForRidesUseCase
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +49,8 @@ private fun ride(
     sourceFilePath = null,
 )
 
+private fun fakeSegmentRecordsUseCase() = ObserveSegmentRecordsUseCase(FakeRideHistorySegmentAttemptRepository())
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class RideHistoryViewModelTest {
 
@@ -71,7 +75,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -103,7 +107,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -136,7 +140,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -161,7 +165,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -195,7 +199,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides, tags = listOf("Race", "Training"))
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -237,7 +241,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -275,7 +279,7 @@ class RideHistoryViewModelTest {
         val repository = FakeRideRepository(rides)
         val viewModel = RideHistoryViewModel(
             ObserveRideHistoryUseCase(repository),
-            ObserveRideSummaryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
@@ -322,4 +326,18 @@ private class FakeRideRepository(rides: List<Ride>, tags: List<String> = emptyLi
     }
 
     override fun observeAllTags(): Flow<List<String>> = tagsFlow
+}
+
+private class FakeRideHistorySegmentAttemptRepository : SegmentAttemptRepository {
+    override fun observeAttemptsForSegment(segmentId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentAttempt>())
+    override fun observeMatchesForRide(rideId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.RideSegmentMatch>())
+    override fun observeRecords() = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentRecord>())
+    override suspend fun trackPointsForAttempt(attemptId: Long) = emptyList<com.segmentanalyzer.domain.model.TrackPoint>()
+    override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0
+    override suspend fun matchSegmentAgainstAllRides(segmentId: Long) = 0
+    override suspend fun saveStravaEffortAttempt(
+        segmentId: Long, rideId: Long, startTime: java.time.Instant, duration: java.time.Duration,
+        avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
+    ) = Unit
+    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
 }

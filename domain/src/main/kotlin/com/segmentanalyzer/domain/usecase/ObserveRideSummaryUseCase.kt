@@ -4,7 +4,7 @@ import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.model.isIn
 import com.segmentanalyzer.domain.repository.RideRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 data class RideSummary(
@@ -19,18 +19,23 @@ data class RideSummary(
  * Computed here, over the repository's already-collected [Flow], rather than as a separate SQL
  * aggregate query — at personal-ride-log scale this keeps the aggregation logic in the domain
  * layer instead of duplicating it in SQL.
+ *
+ * [newPersonalBestCount] comes from [ObserveSegmentRecordsUseCase] — the same segment-record
+ * source the Records screen uses — rather than [com.segmentanalyzer.domain.model.Ride.isPersonalBest],
+ * which no repository ever sets true for a real imported ride.
  */
 class ObserveRideSummaryUseCase @Inject constructor(
     private val rideRepository: RideRepository,
+    private val observeSegmentRecords: ObserveSegmentRecordsUseCase,
 ) {
     operator fun invoke(period: SummaryPeriod): Flow<RideSummary> =
-        rideRepository.observeRides().map { rides ->
+        combine(rideRepository.observeRides(), observeSegmentRecords(period)) { rides, records ->
             val inPeriod = rides.filter { it.startTime.isIn(period) }
             RideSummary(
                 totalDistanceKm = inPeriod.sumOf { it.distanceMeters } / 1000.0,
                 rideCount = inPeriod.size,
                 elevationGainMeters = inPeriod.sumOf { it.elevationGainMeters },
-                newPersonalBestCount = inPeriod.count { it.isPersonalBest },
+                newPersonalBestCount = records.newPersonalBests.size,
             )
         }
 }
