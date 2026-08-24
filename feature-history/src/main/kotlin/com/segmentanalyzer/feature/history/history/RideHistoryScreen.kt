@@ -33,8 +33,8 @@ fun RideHistoryScreen(
     onRideClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
-    modifier: Modifier = Modifier,
     onNewPBsClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Scaffold(
         modifier = modifier,
@@ -140,8 +140,9 @@ private fun RideHistoryScreenLightPreview() {
             onPeriodSelected = {},
             onRideClick = {},
             onSearchClick = {},
-            onImportClick  = {}
-        ) {}
+            onImportClick  = {},
+            onNewPBsClick = {},
+        )
     }
 }
 
@@ -155,7 +156,8 @@ private fun RideHistoryScreenDarkPreview() {
             onPeriodSelected = {},
             onRideClick = {},
             onSearchClick = {},
-            onImportClick = {}
-        ) {}
+            onImportClick = {},
+            onNewPBsClick = {},
+        )
     }
 }
