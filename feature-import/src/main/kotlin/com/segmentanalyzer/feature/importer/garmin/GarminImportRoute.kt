@@ -17,7 +17,13 @@ fun GarminImportRoute(
 
     GarminImportScreen(
         uiState = uiState,
-        onImportClick = viewModel::onImportClick,
+        onDateFromSelected = viewModel::onDateFromSelected,
+        onDateToSelected = viewModel::onDateToSelected,
+        onBrowseRidesClick = viewModel::onBrowseRidesClick,
+        onRideToggled = viewModel::onRideToggled,
+        onSelectAllToggled = viewModel::onSelectAllToggled,
+        onImportSelectedClick = viewModel::onImportSelectedClick,
+        onBackToIdleClick = viewModel::onBackToIdleClick,
         onGoToSettingsClick = onGoToSettingsClick,
         onBackClick = onBackClick,
         modifier = modifier,
