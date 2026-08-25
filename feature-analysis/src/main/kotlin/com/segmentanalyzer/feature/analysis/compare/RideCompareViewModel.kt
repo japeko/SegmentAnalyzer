@@ -210,22 +210,6 @@ private fun buildStatRows(chips: List<AttemptChip>, attempts: List<SegmentAttemp
         },
     )
 
-    val maxGain = chipAttempts.maxOf { it.second.elevationGainMeters }
-    rows += CompareStatRow(
-        label = "Elevation Gain",
-        // No "best" checkmark here — every attempt covers the same fixed route, so differences
-        // mostly reflect GPS noise rather than a meaningful performance signal.
-        values = chipAttempts.map { (chip, attempt) ->
-            CompareStatValue(
-                attemptId = chip.attemptId,
-                colorIndex = chip.colorIndex,
-                label = "%.0f m".format(attempt.elevationGainMeters),
-                fraction = fraction(attempt.elevationGainMeters, maxGain),
-                isBest = false,
-            )
-        },
-    )
-
     val powers = chipAttempts.mapNotNull { it.second.avgPowerWatts }
     if (powers.isNotEmpty()) {
         val maxPower = powers.max()
