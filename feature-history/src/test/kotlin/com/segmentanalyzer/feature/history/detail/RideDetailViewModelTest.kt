@@ -5,7 +5,6 @@ import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
-import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
@@ -17,9 +16,7 @@ import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
-import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
-import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,17 +50,6 @@ private val ride = Ride(
     sourceFilePath = "content://imports/ride.fit",
 )
 
-private fun match(id: Long, name: String, isPersonalBest: Boolean) = RideSegmentMatch(
-    attemptId = id,
-    segmentId = id,
-    segmentName = name,
-    segmentDistanceMeters = 2_100.0,
-    startTime = Instant.parse("2026-08-17T06:10:00Z"),
-    duration = Duration.ofSeconds(200),
-    avgSpeedKmh = 20.0,
-    isPersonalBest = isPersonalBest,
-)
-
 @OptIn(ExperimentalCoroutinesApi::class)
 class RideDetailViewModelTest {
 
@@ -80,9 +66,8 @@ class RideDetailViewModelTest {
     }
 
     @Test
-    fun `formats ride stats and matched segments for a ride with a track`() = runTest(dispatcher) {
-        val matches = listOf(match(1, "Widow Creek Descent", isPersonalBest = true))
-        val viewModel = viewModel(ride = ride, hasTrack = true, matches = matches)
+    fun `formats ride stats for a ride`() = runTest(dispatcher) {
+        val viewModel = viewModel(ride = ride)
 
         val collectJob = launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -92,35 +77,13 @@ class RideDetailViewModelTest {
         assertEquals("Tampere Pyöräily", state.ride?.name)
         assertEquals(38.8, state.ride?.distanceKm)
         assertEquals(true, state.ride?.isPersonalBest)
-        assertEquals(true, state.hasTrack)
-        assertEquals(1, state.matchedSegments.size)
-        assertEquals("Widow Creek Descent", state.matchedSegments.first().name)
-        assertEquals(true, state.matchedSegments.first().isPersonalBest)
-        collectJob.cancel()
-    }
-
-    @Test
-    fun `a ride without a track has hasTrack false and no matches`() = runTest(dispatcher) {
-        val viewModel = viewModel(ride = ride, hasTrack = false, matches = emptyList())
-
-        val collectJob = launch { viewModel.uiState.collect {} }
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals(false, state.hasTrack)
-        assertEquals(emptyList<MatchedSegmentItem>(), state.matchedSegments)
         collectJob.cancel()
     }
 
     @Test
     fun `opening a ride's detail marks it as viewed`() = runTest(dispatcher) {
         val viewedRidesRepository = FakeRideDetailViewedRidesRepository()
-        val viewModel = viewModel(
-            ride = ride,
-            hasTrack = true,
-            matches = emptyList(),
-            viewedRidesRepository = viewedRidesRepository,
-        )
+        val viewModel = viewModel(ride = ride, viewedRidesRepository = viewedRidesRepository)
 
         val collectJob = launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -131,7 +94,7 @@ class RideDetailViewModelTest {
 
     @Test
     fun `an unknown ride id yields a null ride`() = runTest(dispatcher) {
-        val viewModel = viewModel(ride = null, hasTrack = false, matches = emptyList())
+        val viewModel = viewModel(ride = null)
 
         val collectJob = launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -143,7 +106,7 @@ class RideDetailViewModelTest {
     }
 
     @Test
-    fun `fetching Strava segments shows loading then the fetched efforts`() = runTest(dispatcher) {
+    fun `opening a ride's detail automatically fetches Strava segment data, no manual click needed`() = runTest(dispatcher) {
         val efforts = listOf(
             StravaSegmentEffort(
                 effortExternalId = "effort-1",
@@ -155,73 +118,33 @@ class RideDetailViewModelTest {
                 prRank = 2,
             ),
         )
-        val viewModel = viewModel(
-            ride = ride,
-            hasTrack = true,
-            matches = emptyList(),
-            stravaResult = Result.success(efforts),
-        )
-
-        viewModel.uiState.test {
-            skipItems(1)
-            assertEquals(StravaEffortsUiState.Idle, awaitItem().stravaSegmentEfforts)
-
-            viewModel.onFetchStravaSegmentsClick()
-
-            assertEquals(StravaEffortsUiState.Loading, awaitItem().stravaSegmentEfforts)
-            val loaded = awaitItem().stravaSegmentEfforts
-            assertEquals(1, (loaded as StravaEffortsUiState.Loaded).efforts.size)
-            assertEquals("Skyline Climb", loaded.efforts.first().segmentName)
-            assertEquals(2, loaded.efforts.first().prRank)
-        }
-    }
-
-    @Test
-    fun `previously cached Strava efforts show immediately without needing a fetch`() = runTest(dispatcher) {
-        val cached = listOf(
-            StravaSegmentEffort(
-                effortExternalId = "effort-2",
-                segmentExternalId = "seg-2",
-                segmentName = "Fireroad Descent",
-                elapsedTime = Duration.ofMinutes(2),
-                distanceMeters = 800.0,
-                komRank = 4,
-                prRank = null,
-            ),
-        )
-        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), cachedEfforts = cached)
+        val viewModel = viewModel(ride = ride, stravaResult = Result.success(efforts))
 
         val collectJob = launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
 
-        val state = (viewModel.uiState.value.stravaSegmentEfforts as StravaEffortsUiState.Loaded)
-        assertEquals(1, state.efforts.size)
-        assertEquals("Fireroad Descent", state.efforts.first().segmentName)
-        assertEquals(4, state.efforts.first().komRank)
+        val state = viewModel.uiState.value.stravaSegmentEfforts
+        val loaded = state as StravaEffortsUiState.Loaded
+        assertEquals(1, loaded.efforts.size)
+        assertEquals("Skyline Climb", loaded.efforts.first().segmentName)
+        assertEquals(2, loaded.efforts.first().prRank)
         collectJob.cancel()
     }
 
     @Test
-    fun `a failed Strava fetch shows the error message`() = runTest(dispatcher) {
-        val viewModel = viewModel(
-            ride = ride,
-            hasTrack = true,
-            matches = emptyList(),
-            stravaResult = Result.failure(IllegalStateException("Strava session expired")),
-        )
+    fun `a failed automatic Strava fetch shows the error message, retryable via onFetchStravaSegmentsClick`() = runTest(dispatcher) {
+        val viewModel = viewModel(ride = ride, stravaResult = Result.failure(IllegalStateException("Strava session expired")))
 
-        viewModel.uiState.test {
-            skipItems(1)
-            assertEquals(StravaEffortsUiState.Idle, awaitItem().stravaSegmentEfforts)
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
 
-            viewModel.onFetchStravaSegmentsClick()
+        assertEquals(StravaEffortsUiState.Error("Strava session expired"), viewModel.uiState.value.stravaSegmentEfforts)
 
-            assertEquals(StravaEffortsUiState.Loading, awaitItem().stravaSegmentEfforts)
-            assertEquals(
-                StravaEffortsUiState.Error("Strava session expired"),
-                awaitItem().stravaSegmentEfforts,
-            )
-        }
+        viewModel.onFetchStravaSegmentsClick()
+        advanceUntilIdle()
+
+        assertEquals(StravaEffortsUiState.Error("Strava session expired"), viewModel.uiState.value.stravaSegmentEfforts)
+        collectJob.cancel()
     }
 
     @Test
@@ -234,15 +157,13 @@ class RideDetailViewModelTest {
             avgHeartRateBpm = 152.0,
             avgCadenceRpm = 78.0,
         )
-        val viewModel = viewModel(
-            ride = ride,
-            hasTrack = true,
-            matches = emptyList(),
-            detailResult = Result.success(detail),
-        )
+        val viewModel = viewModel(ride = ride, detailResult = Result.success(detail))
+
+        val settle = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        settle.cancel()
 
         viewModel.uiState.test {
-            skipItems(1)
             assertEquals(null, awaitItem().expandedSegmentEffortDetail)
 
             viewModel.onStravaSegmentEffortClick(0, "effort-1")
@@ -285,14 +206,19 @@ class RideDetailViewModelTest {
         )
         val viewModel = viewModel(
             ride = ride,
-            hasTrack = true,
-            matches = emptyList(),
+            // The automatic live fetch on load replaces whatever's cached with its own result, so
+            // it must return this same effort (detail attached) for the cache-first click path to
+            // still have something to find — this branch has no matching persisted between visits.
+            stravaResult = Result.success(cached),
             cachedEfforts = cached,
             detailResult = Result.failure(IllegalStateException("should not be called")),
         )
 
+        val settle = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        settle.cancel()
+
         viewModel.uiState.test {
-            skipItems(1)
             assertEquals(null, awaitItem().expandedSegmentEffortDetail)
 
             viewModel.onStravaSegmentEffortClick(0, "effort-1")
@@ -307,15 +233,13 @@ class RideDetailViewModelTest {
 
     @Test
     fun `a failed segment effort detail fetch shows the error message`() = runTest(dispatcher) {
-        val viewModel = viewModel(
-            ride = ride,
-            hasTrack = true,
-            matches = emptyList(),
-            detailResult = Result.failure(IllegalStateException("Couldn't reach Strava")),
-        )
+        val viewModel = viewModel(ride = ride, detailResult = Result.failure(IllegalStateException("Couldn't reach Strava")))
+
+        val settle = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        settle.cancel()
 
         viewModel.uiState.test {
-            skipItems(1)
             assertEquals(null, awaitItem().expandedSegmentEffortDetail)
 
             viewModel.onStravaSegmentEffortClick(0, "effort-1")
@@ -328,7 +252,7 @@ class RideDetailViewModelTest {
 
     @Test
     fun `edit click opens the dialog pre-filled with the ride's current name and tag`() = runTest(dispatcher) {
-        val viewModel = viewModel(ride = ride.copy(tag = "Race"), hasTrack = true, matches = emptyList())
+        val viewModel = viewModel(ride = ride.copy(tag = "Race"))
 
         viewModel.uiState.test {
             skipItems(1)
@@ -344,8 +268,8 @@ class RideDetailViewModelTest {
 
     @Test
     fun `saving the edit dialog persists the trimmed name and tag, then closes it`() = runTest(dispatcher) {
-        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
-        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+        val rideRepository = FakeRideDetailRideRepository(ride)
+        val viewModel = viewModel(ride = ride, rideRepository = rideRepository)
 
         viewModel.uiState.test {
             skipItems(1)
@@ -372,8 +296,8 @@ class RideDetailViewModelTest {
 
     @Test
     fun `saving the edit dialog after changing activity type persists the new type`() = runTest(dispatcher) {
-        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
-        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+        val rideRepository = FakeRideDetailRideRepository(ride)
+        val viewModel = viewModel(ride = ride, rideRepository = rideRepository)
 
         viewModel.uiState.test {
             skipItems(1)
@@ -394,8 +318,8 @@ class RideDetailViewModelTest {
 
     @Test
     fun `saving the edit dialog with a blank name is a no-op`() = runTest(dispatcher) {
-        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true)
-        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+        val rideRepository = FakeRideDetailRideRepository(ride)
+        val viewModel = viewModel(ride = ride, rideRepository = rideRepository)
 
         viewModel.uiState.test {
             skipItems(1)
@@ -416,8 +340,8 @@ class RideDetailViewModelTest {
 
     @Test
     fun `tag suggestions exclude an exact match and anything not matching what's typed`() = runTest(dispatcher) {
-        val rideRepository = FakeRideDetailRideRepository(ride, hasTrack = true, tags = listOf("Race", "Wet", "Training"))
-        val viewModel = viewModel(ride = ride, hasTrack = true, matches = emptyList(), rideRepository = rideRepository)
+        val rideRepository = FakeRideDetailRideRepository(ride, tags = listOf("Race", "Wet", "Training"))
+        val viewModel = viewModel(ride = ride, rideRepository = rideRepository)
 
         viewModel.uiState.test {
             skipItems(1)
@@ -436,23 +360,19 @@ class RideDetailViewModelTest {
 
     private fun viewModel(
         ride: Ride?,
-        hasTrack: Boolean,
-        matches: List<RideSegmentMatch>,
         stravaResult: Result<List<StravaSegmentEffort>> = Result.success(emptyList()),
         cachedEfforts: List<StravaSegmentEffort> = emptyList(),
         detailResult: Result<StravaSegmentEffortDetail> = Result.failure(UnsupportedOperationException("not used")),
-        rideRepository: FakeRideDetailRideRepository = FakeRideDetailRideRepository(ride, hasTrack),
+        rideRepository: FakeRideDetailRideRepository = FakeRideDetailRideRepository(ride),
         viewedRidesRepository: FakeRideDetailViewedRidesRepository = FakeRideDetailViewedRidesRepository(),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
-        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(matches)
+        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository()
         val stravaActivityRepository = FakeStravaActivityRepository(stravaResult, detailResult)
         val stravaEffortRepository = FakeStravaSegmentEffortRepository(mutableMapOf(1L to cachedEfforts))
         return RideDetailViewModel(
             savedStateHandle,
             ObserveRideUseCase(rideRepository),
-            ObserveRideHasTrackUseCase(rideRepository),
-            ObserveSegmentMatchesForRideUseCase(segmentAttemptRepository),
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
             com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase(rideRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
@@ -472,7 +392,6 @@ class RideDetailViewModelTest {
 
 private class FakeRideDetailRideRepository(
     private val ride: Ride?,
-    private val hasTrack: Boolean,
     private val tags: List<String> = emptyList(),
 ) : RideRepository {
     data class UpdateCall(val rideId: Long, val name: String, val tag: String?, val activityType: ActivityType)
@@ -481,7 +400,7 @@ private class FakeRideDetailRideRepository(
 
     override fun observeRides(): Flow<List<Ride>> = MutableStateFlow(emptyList())
     override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(ride)
-    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(hasTrack)
+    override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
     override suspend fun saveRide(ride: Ride): Long? = null
 
@@ -495,13 +414,12 @@ private class FakeRideDetailRideRepository(
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 
-private class FakeRideDetailSegmentAttemptRepository(
-    private val matches: List<RideSegmentMatch>,
-) : SegmentAttemptRepository {
+private class FakeRideDetailSegmentAttemptRepository : SegmentAttemptRepository {
     val savedStravaEffortAttempts = mutableListOf<String>()
 
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
-    override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> = MutableStateFlow(matches)
+    override fun observeMatchesForRide(rideId: Long): Flow<List<com.segmentanalyzer.domain.model.RideSegmentMatch>> =
+        MutableStateFlow(emptyList())
     override fun observeRecords() = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentRecord>())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0

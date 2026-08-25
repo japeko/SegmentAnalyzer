@@ -9,7 +9,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun RideDetailRoute(
     onBackClick: () -> Unit,
-    onSegmentClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RideDetailViewModel = hiltViewModel(),
 ) {
@@ -18,7 +17,6 @@ fun RideDetailRoute(
     RideDetailScreen(
         uiState = uiState,
         onBackClick = onBackClick,
-        onSegmentClick = onSegmentClick,
         onFetchStravaSegmentsClick = viewModel::onFetchStravaSegmentsClick,
         onStravaSegmentEffortClick = viewModel::onStravaSegmentEffortClick,
         onEditClick = viewModel::onEditClick,

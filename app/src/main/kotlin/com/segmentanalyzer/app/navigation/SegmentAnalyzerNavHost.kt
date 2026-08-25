@@ -17,10 +17,7 @@ import com.segmentanalyzer.feature.auth.strava.StravaCallbackRoute
 import com.segmentanalyzer.feature.history.detail.RideDetailRoute
 import com.segmentanalyzer.feature.history.history.RideHistoryRoute
 import com.segmentanalyzer.feature.history.records.RecordsRoute
-import com.segmentanalyzer.feature.importer.ImportSourceRoute
-import com.segmentanalyzer.feature.importer.fit.FitFileImportRoute
 import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
-import com.segmentanalyzer.feature.importer.gpx.GpxFileImportRoute
 import com.segmentanalyzer.feature.segments.SegmentsRoute
 import com.segmentanalyzer.feature.segments.detail.SegmentDetailRoute
 import com.segmentanalyzer.feature.settings.AboutScreen
@@ -29,9 +26,6 @@ import com.segmentanalyzer.feature.settings.SettingsRoute
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
 private const val ABOUT_ROUTE = "about"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
-private const val IMPORT_SOURCE_ROUTE = "import_source"
-private const val FIT_FILE_IMPORT_ROUTE = "fit_file_import"
-private const val GPX_FILE_IMPORT_ROUTE = "gpx_file_import"
 private const val SEGMENT_DETAIL_ROUTE = "segment_detail"
 private const val RIDE_COMPARE_ROUTE = "ride_compare"
 private const val RIDE_DETAIL_ROUTE = "ride_detail"
@@ -61,7 +55,9 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
             RideHistoryRoute(
                 onRideClick = { rideId -> navController.navigate("$RIDE_DETAIL_ROUTE/$rideId") },
                 onSearchClick = { /* Search isn't implemented yet. */ },
-                onImportClick = { navController.navigate(IMPORT_SOURCE_ROUTE) },
+                // No FIT/GPX import on this branch — Garmin is the only import source, so skip
+                // straight past the (now unreachable) source picker.
+                onImportClick = { navController.navigate(GARMIN_IMPORT_ROUTE) },
                 onNewPBsClick =  { navController.navigate(TopLevelDestination.Records.route) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
@@ -106,20 +102,6 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onBackClick = { navController.popBackStack() },
             )
         }
-        composable(IMPORT_SOURCE_ROUTE) {
-            ImportSourceRoute(
-                onGarminClick = { navController.navigate(GARMIN_IMPORT_ROUTE) },
-                onFitFileClick = { navController.navigate(FIT_FILE_IMPORT_ROUTE) },
-                onGpxFileClick = { navController.navigate(GPX_FILE_IMPORT_ROUTE) },
-                onBackClick = { navController.popBackStack() },
-            )
-        }
-        composable(FIT_FILE_IMPORT_ROUTE) {
-            FitFileImportRoute(onBackClick = { navController.popBackStack() })
-        }
-        composable(GPX_FILE_IMPORT_ROUTE) {
-            GpxFileImportRoute(onBackClick = { navController.popBackStack() })
-        }
         composable(
             route = "$SEGMENT_DETAIL_ROUTE/{segmentId}",
             arguments = listOf(navArgument("segmentId") { type = NavType.LongType }),
@@ -137,7 +119,6 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         ) {
             RideDetailRoute(
                 onBackClick = { navController.popBackStack() },
-                onSegmentClick = { segmentId -> navController.navigate("$SEGMENT_DETAIL_ROUTE/$segmentId") },
             )
         }
         composable(
