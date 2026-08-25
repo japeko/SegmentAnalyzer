@@ -6,15 +6,20 @@ import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.usecase.SetSegmentStarredUseCase
 import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
 import com.segmentanalyzer.domain.util.routePoints
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,14 +27,34 @@ class SegmentDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeSegments: ObserveSegmentsUseCase,
     observeSegmentAttempts: ObserveSegmentAttemptsUseCase,
+    private val checkSegmentStarred: CheckSegmentStarredUseCase,
+    private val setSegmentStarred: SetSegmentStarredUseCase,
 ) : ViewModel() {
 
     private val segmentId: Long = checkNotNull(savedStateHandle["segmentId"])
 
+    /** Non-null once we've confirmed via Strava that this segment isn't starred there yet. */
+    private val starPromptState = MutableStateFlow<StarPromptState?>(null)
+
+    /** The segment's external id, once resolved, so the star actions don't need a second lookup. */
+    private var latestSegmentExternalId: String? = null
+
+    init {
+        viewModelScope.launch {
+            val segment = observeSegments().map { segments -> segments.find { it.id == segmentId } }.first { it != null }
+            checkNotNull(segment)
+            checkSegmentStarred(segment.externalId).onSuccess { starred ->
+                if (!starred) starPromptState.value = StarPromptState()
+            }
+        }
+    }
+
     val uiState = combine(
         observeSegments().map { segments -> segments.find { it.id == segmentId } },
         observeSegmentAttempts(segmentId),
-    ) { segment, attempts ->
+        starPromptState,
+    ) { segment, attempts, starPrompt ->
+        latestSegmentExternalId = segment?.externalId
         val sortedByDuration = attempts.sortedBy { it.duration }
         val personalBest = sortedByDuration.firstOrNull()
         val personalBestDeltaSeconds = if (sortedByDuration.size >= 2) {
@@ -61,12 +86,28 @@ class SegmentDetailViewModel @Inject constructor(
             attempts = chronological.map {
                 it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
             },
+            starPrompt = starPrompt,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SegmentDetailUiState(),
     )
+
+    fun onDismissStarPrompt() {
+        starPromptState.value = null
+    }
+
+    fun onStarSegmentClick() {
+        val externalId = latestSegmentExternalId ?: return
+        starPromptState.value = StarPromptState(isSaving = true)
+        viewModelScope.launch {
+            setSegmentStarred(externalId, true).fold(
+                onSuccess = { starPromptState.value = null },
+                onFailure = { starPromptState.value = StarPromptState(isSaving = false) },
+            )
+        }
+    }
 }
 
 /** Faster (lower seconds) plots higher on the chart — the intuitive "improving" reading. */

@@ -8,6 +8,12 @@ interface StravaSegmentRepository {
 
     /** Fetches one segment by Strava id, whether or not the user has starred it. */
     suspend fun fetchSegment(segmentExternalId: String): Result<Segment>
+
+    /** Whether the connected athlete currently has [segmentExternalId] starred on Strava. */
+    suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean>
+
+    /** Stars or unstars [segmentExternalId] for the connected athlete. Requires `profile:write`. */
+    suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit>
 }
 
 /** Thrown when there's no usable Strava session to sync segments with. */

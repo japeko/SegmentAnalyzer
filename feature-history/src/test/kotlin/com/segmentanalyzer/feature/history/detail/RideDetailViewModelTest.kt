@@ -549,6 +549,10 @@ private class FakeRideDetailStravaSegmentRepository :
 
     override suspend fun fetchSegment(segmentExternalId: String): Result<com.segmentanalyzer.domain.model.Segment> =
         Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
 private class FakeStravaActivityRepository(

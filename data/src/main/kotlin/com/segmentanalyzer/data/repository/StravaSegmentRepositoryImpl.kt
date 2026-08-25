@@ -46,6 +46,23 @@ internal class StravaSegmentRepositoryImpl @Inject constructor(
                 segmentApi.fetchSegmentDetail(session.accessToken, segmentExternalId).toDomain()
             }
         }
+
+    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val session = validStravaSession(sessionStore, authApi) ?: throw StravaSessionExpiredException()
+                segmentApi.fetchSegmentDetail(session.accessToken, segmentExternalId).starred
+            }
+        }
+
+    override suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val session = validStravaSession(sessionStore, authApi) ?: throw StravaSessionExpiredException()
+                segmentApi.starSegment(session.accessToken, segmentExternalId, starred)
+                Unit
+            }
+        }
 }
 
 /**

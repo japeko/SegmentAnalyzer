@@ -28,7 +28,9 @@ internal class StravaAccountRepositoryImpl @Inject constructor(
             "&redirect_uri=$encodedRedirect" +
             "&response_type=code" +
             "&approval_prompt=auto" +
-            "&scope=read,activity:read_all"
+            // profile:write is needed to star/unstar a segment (PUT /segments/{id}/starred) —
+            // existing connections predate this scope and must disconnect/reconnect to grant it.
+            "&scope=read,activity:read_all,profile:write"
     }
 
     override suspend fun exchangeAuthorizationCode(code: String): Result<Unit> =

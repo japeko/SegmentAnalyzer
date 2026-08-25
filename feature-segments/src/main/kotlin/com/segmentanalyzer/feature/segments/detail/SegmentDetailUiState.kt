@@ -12,7 +12,12 @@ data class SegmentDetailUiState(
     val personalBestDeltaSeconds: Long? = null,
     val progressPoints: List<ProgressPoint> = emptyList(),
     val attempts: List<AttemptItem> = emptyList(),
+    /** Non-null once we've confirmed via Strava that this segment isn't starred there yet. */
+    val starPrompt: StarPromptState? = null,
 )
+
+/** Live state of the "star this segment?" prompt. */
+data class StarPromptState(val isSaving: Boolean = false)
 
 data class AttemptItem(
     val id: Long,

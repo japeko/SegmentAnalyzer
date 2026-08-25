@@ -217,6 +217,10 @@ private class FakeSaveAttemptStravaSegmentRepository(
         Result.failure(UnsupportedOperationException("not used in this test"))
 
     override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> = fetchResult
+    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
 private class FakeSaveAttemptRideRepository(private val ride: Ride?) : RideRepository {

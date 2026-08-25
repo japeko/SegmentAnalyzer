@@ -64,6 +64,10 @@ private class FakeStravaSegmentRepository(private val result: Result<List<Segmen
     override suspend fun fetchStarredSegments(): Result<List<Segment>> = result
     override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> =
         Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
 }
 
 private class FakeSegmentRepository(private val newCount: Int) : SegmentRepository {

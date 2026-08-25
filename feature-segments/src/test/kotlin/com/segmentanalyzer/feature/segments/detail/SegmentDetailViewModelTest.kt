@@ -7,8 +7,11 @@ import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
+import com.segmentanalyzer.domain.repository.StravaSegmentRepository
+import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.usecase.SetSegmentStarredUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -132,12 +135,65 @@ class SegmentDetailViewModelTest {
         }
     }
 
-    private fun viewModel(attempts: List<SegmentAttempt>): SegmentDetailViewModel {
+    @Test
+    fun `a segment already starred on Strava shows no prompt`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            emptyList(),
+            stravaSegmentRepository = FakeDetailStravaSegmentRepository(starredResult = Result.success(true)),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.starPrompt)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a segment not starred on Strava shows the star prompt, and starring it dismisses the prompt`() = runTest(dispatcher) {
+        val stravaSegmentRepository = FakeDetailStravaSegmentRepository(starredResult = Result.success(false))
+        val viewModel = viewModel(emptyList(), stravaSegmentRepository = stravaSegmentRepository)
+
+        viewModel.uiState.test {
+            skipItems(1) // initial stateIn value, before the star check resolves
+            val prompted = awaitItem()
+            assertEquals(false, prompted.starPrompt?.isSaving)
+
+            viewModel.onStarSegmentClick()
+            assertEquals(true, awaitItem().starPrompt?.isSaving)
+            assertEquals(null, awaitItem().starPrompt)
+        }
+
+        assertEquals(listOf(segment.externalId to true), stravaSegmentRepository.setStarredCalls)
+    }
+
+    @Test
+    fun `dismissing the star prompt does not call the API`() = runTest(dispatcher) {
+        val stravaSegmentRepository = FakeDetailStravaSegmentRepository(starredResult = Result.success(false))
+        val viewModel = viewModel(emptyList(), stravaSegmentRepository = stravaSegmentRepository)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // prompt shown
+
+            viewModel.onDismissStarPrompt()
+            assertEquals(null, awaitItem().starPrompt)
+        }
+
+        assertEquals(true, stravaSegmentRepository.setStarredCalls.isEmpty())
+    }
+
+    private fun viewModel(
+        attempts: List<SegmentAttempt>,
+        stravaSegmentRepository: FakeDetailStravaSegmentRepository = FakeDetailStravaSegmentRepository(),
+    ): SegmentDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L))
         return SegmentDetailViewModel(
             savedStateHandle,
             ObserveSegmentsUseCase(FakeDetailSegmentRepository()),
             ObserveSegmentAttemptsUseCase(FakeDetailSegmentAttemptRepository(attempts)),
+            CheckSegmentStarredUseCase(stravaSegmentRepository),
+            SetSegmentStarredUseCase(stravaSegmentRepository),
         )
     }
 }
@@ -161,4 +217,21 @@ private class FakeDetailSegmentAttemptRepository(private val attempts: List<Segm
         avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
     ) = Unit
     override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
+}
+
+private class FakeDetailStravaSegmentRepository(
+    private val starredResult: Result<Boolean> = Result.success(true),
+    private val setStarredResult: Result<Unit> = Result.success(Unit),
+) : StravaSegmentRepository {
+    val setStarredCalls = mutableListOf<Pair<String, Boolean>>()
+
+    override suspend fun fetchStarredSegments(): Result<List<Segment>> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> =
+        Result.failure(UnsupportedOperationException("not used in this test"))
+    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> = starredResult
+    override suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit> {
+        setStarredCalls += segmentExternalId to starred
+        return setStarredResult
+    }
 }

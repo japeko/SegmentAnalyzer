@@ -3,6 +3,7 @@ package com.segmentanalyzer.data.remote.strava
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
@@ -53,6 +54,7 @@ internal data class StravaSegmentDetailDto(
     @SerialName("start_latlng") val startLatLng: List<Double>? = null,
     @SerialName("end_latlng") val endLatLng: List<Double>? = null,
     val map: StravaPolylineMapDto? = null,
+    val starred: Boolean = false,
 )
 
 /** Fetches the athlete's starred segments from Strava's official REST API. */
@@ -103,6 +105,29 @@ internal class StravaSegmentApi @Inject constructor(
             json.decodeFromString(body)
         } catch (e: Exception) {
             throw StravaApiException("couldn't parse Strava's segment detail response", e)
+        }
+    }
+
+    /** Stars or unstars [segmentId] for the authenticated athlete. Requires the `profile:write` OAuth scope. */
+    fun starSegment(accessToken: String, segmentId: String, starred: Boolean): StravaSegmentDetailDto {
+        val request = Request.Builder()
+            .url("$SEGMENT_URL/$segmentId/starred")
+            .header("Authorization", "Bearer $accessToken")
+            .put(FormBody.Builder().add("starred", starred.toString()).build())
+            .build()
+        val body = try {
+            okHttpClient.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw StravaApiException("HTTP ${response.code}: $text")
+                text
+            }
+        } catch (e: IOException) {
+            throw StravaApiException(e.message ?: "network error", e)
+        }
+        return try {
+            json.decodeFromString(body)
+        } catch (e: Exception) {
+            throw StravaApiException("couldn't parse Strava's star segment response", e)
         }
     }
 
