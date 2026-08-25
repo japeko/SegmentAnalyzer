@@ -7,8 +7,10 @@ import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
+import com.segmentanalyzer.domain.usecase.ObserveExcludedAttemptIdsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.usecase.SetAttemptExcludedUseCase
 import com.segmentanalyzer.domain.usecase.SetSegmentStarredUseCase
 import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
 import com.segmentanalyzer.domain.util.routePoints
@@ -27,8 +29,10 @@ class SegmentDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeSegments: ObserveSegmentsUseCase,
     observeSegmentAttempts: ObserveSegmentAttemptsUseCase,
+    observeExcludedAttemptIds: ObserveExcludedAttemptIdsUseCase,
     private val checkSegmentStarred: CheckSegmentStarredUseCase,
     private val setSegmentStarred: SetSegmentStarredUseCase,
+    private val setAttemptExcluded: SetAttemptExcludedUseCase,
 ) : ViewModel() {
 
     private val segmentId: Long = checkNotNull(savedStateHandle["segmentId"])
@@ -43,6 +47,12 @@ class SegmentDetailViewModel @Inject constructor(
      * available on touch anyway).
      */
     private val selectedAttemptId = MutableStateFlow<Long?>(null)
+
+    /**
+     * Display order for "All Attempts"/"Excluded" — lives here (not composition-local `remember`)
+     * so it survives navigating to Compare Rides and back, same reason as [selectedAttemptId].
+     */
+    private val attemptsReversed = MutableStateFlow(false)
 
     /** The segment's external id, once resolved, so the star actions don't need a second lookup. */
     private var latestSegmentExternalId: String? = null
@@ -62,9 +72,20 @@ class SegmentDetailViewModel @Inject constructor(
         observeSegmentAttempts(segmentId),
         starPromptState,
         selectedAttemptId,
-    ) { segment, attempts, starPrompt, selectedId ->
+        combine(observeExcludedAttemptIds(), attemptsReversed) { excludedIds, reversed -> excludedIds to reversed },
+    ) { segment, attempts, starPrompt, selectedId, (excludedIds, reversed) ->
         latestSegmentExternalId = segment?.externalId
-        val sortedByDuration = attempts.sortedBy { it.duration }
+
+        // Lap numbering ("Ride 1", "Ride 2", ...) stays stable regardless of exclusion — it's
+        // computed over every attempt, not just the ones currently shown in "All Attempts".
+        val chronological = attempts.sortedBy { it.startTime }
+        val lapLabels = lapLabelsByAttemptId(chronological)
+        val (visible, excluded) = chronological.partition { it.id !in excludedIds }
+
+        // Personal best, deltas, and the chart itself only ever consider visible (non-excluded)
+        // attempts — an excluded attempt shouldn't be able to set the PR everything else is
+        // measured against.
+        val sortedByDuration = visible.sortedBy { it.duration }
         val personalBest = sortedByDuration.firstOrNull()
         val personalBestDeltaSeconds = if (sortedByDuration.size >= 2) {
             sortedByDuration[1].duration.seconds - sortedByDuration[0].duration.seconds
@@ -72,18 +93,15 @@ class SegmentDetailViewModel @Inject constructor(
             null
         }
 
-        val chronological = attempts.sortedBy { it.startTime }
-        val minSeconds = chronological.minOfOrNull { it.duration.seconds }
-        val maxSeconds = chronological.maxOfOrNull { it.duration.seconds }
-        val progressPoints = chronological.map { attempt ->
+        val minSeconds = visible.minOfOrNull { it.duration.seconds }
+        val maxSeconds = visible.maxOfOrNull { it.duration.seconds }
+        val progressPoints = visible.map { attempt ->
             ProgressPoint(
                 attemptId = attempt.id,
                 normalizedY = normalizedSpeed(attempt.duration.seconds, minSeconds, maxSeconds),
                 isPersonalBest = attempt.id == personalBest?.id,
             )
         }
-
-        val lapLabels = lapLabelsByAttemptId(chronological)
 
         SegmentDetailUiState(
             isLoading = false,
@@ -92,11 +110,15 @@ class SegmentDetailViewModel @Inject constructor(
             personalBest = personalBest?.toItem(personalBest.duration.seconds, personalBest.id, lapLabels.getValue(personalBest.id)),
             personalBestDeltaSeconds = personalBestDeltaSeconds,
             progressPoints = progressPoints,
-            attempts = chronological.map {
+            attempts = visible.map {
                 it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
-            },
+            }.let { if (reversed) it.asReversed() else it },
+            excludedAttempts = excluded.map {
+                it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
+            }.let { if (reversed) it.asReversed() else it },
             starPrompt = starPrompt,
             selectedAttemptId = selectedId,
+            attemptsReversed = reversed,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -106,6 +128,20 @@ class SegmentDetailViewModel @Inject constructor(
 
     fun onAttemptSelected(attemptId: Long) {
         selectedAttemptId.value = attemptId
+    }
+
+    /** Swiped out of "All Attempts" — hides it from the chart and moves it to the excluded section. */
+    fun onAttemptExcluded(attemptId: Long) {
+        viewModelScope.launch { setAttemptExcluded(attemptId, true) }
+    }
+
+    /** Swiped back in from the excluded section — restores it to "All Attempts" and the chart. */
+    fun onAttemptIncluded(attemptId: Long) {
+        viewModelScope.launch { setAttemptExcluded(attemptId, false) }
+    }
+
+    fun onToggleAttemptsOrder() {
+        attemptsReversed.value = !attemptsReversed.value
     }
 
     fun onDismissStarPrompt() {
