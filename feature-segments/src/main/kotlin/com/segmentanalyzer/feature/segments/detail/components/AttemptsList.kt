@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,11 +58,16 @@ fun AttemptRow(
         item.isPersonalBest -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.outline
     }
+    // Composited to a fully opaque color rather than left translucent — this row can be the
+    // foreground of a SwipeToDismissBox, and a translucent container lets the swipe-reveal bar
+    // underneath bleed through even at rest (not just mid-swipe). This is what was making
+    // "Exclude" visible by default specifically on PR rows.
+    val surface = MaterialTheme.colorScheme.surface
     val containerColor = when {
-        isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-        item.isPersonalBest -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
-        else -> MaterialTheme.colorScheme.surface
+        isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f).compositeOver(surface)
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f).compositeOver(surface)
+        item.isPersonalBest -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f).compositeOver(surface)
+        else -> surface
     }
 
     Card(
@@ -143,13 +149,13 @@ fun ExcludableAttemptRow(
         state = dismissState,
         modifier = modifier,
         enableDismissFromStartToEnd = false,
-        backgroundContent = { SwipeActionBackground(alignEnd = true, icon = Icons.Filled.VisibilityOff, label = "Exclude") },
+        backgroundContent = { SwipeActionBackground(alignment = Alignment.CenterEnd, icon = Icons.Filled.VisibilityOff, label = "Exclude") },
     ) {
         AttemptRow(item = item, isSelected = isSelected, onClick = onClick, onHoverChange = onHoverChange)
     }
 }
 
-/** An [AttemptRow] in the excluded section — swipe right to restore it to "All Attempts" and the chart. */
+/** An [AttemptRow] in the excluded section — swipe either direction to restore it to "All Attempts" and the chart. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IncludableAttemptRow(
@@ -159,29 +165,39 @@ fun IncludableAttemptRow(
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.StartToEnd) onIncluded(item.id)
+            if (value != SwipeToDismissBoxValue.Settled) onIncluded(item.id)
             true
         },
     )
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier,
-        enableDismissFromEndToStart = false,
-        backgroundContent = { SwipeActionBackground(alignEnd = false, icon = Icons.Filled.Visibility, label = "Restore") },
+        backgroundContent = {
+            // The revealed strip grows in from whichever edge content is sliding away from, not
+            // from the center — align to that edge so the label is visible from the start of the
+            // drag instead of only past the halfway point.
+            val alignment = when (dismissState.dismissDirection) {
+                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                SwipeToDismissBoxValue.Settled -> Alignment.Center
+            }
+            SwipeActionBackground(alignment = alignment, icon = Icons.Filled.Visibility, label = "Restore")
+        },
     ) {
         AttemptRow(item = item, isSelected = false, onClick = {}, onHoverChange = {})
     }
 }
 
 @Composable
-private fun SwipeActionBackground(alignEnd: Boolean, icon: ImageVector, label: String) {
+private fun SwipeActionBackground(alignment: Alignment, icon: ImageVector, label: String) {
+    val alignEnd = alignment == Alignment.CenterEnd
     Box(
         modifier = Modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
-            .padding(horizontal = 20.dp),
-        contentAlignment = if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart,
+            .padding(horizontal = 50.dp),
+        contentAlignment = alignment,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (alignEnd) {
