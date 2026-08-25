@@ -7,16 +7,13 @@ import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
-import com.segmentanalyzer.domain.model.RideSegmentMatch
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.MarkRideViewedUseCase
-import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
-import com.segmentanalyzer.domain.usecase.ObserveSegmentMatchesForRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase
 import com.segmentanalyzer.domain.usecase.UpdateRideUseCase
@@ -24,6 +21,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -32,8 +31,6 @@ import javax.inject.Inject
 class RideDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeRide: ObserveRideUseCase,
-    observeRideHasTrack: ObserveRideHasTrackUseCase,
-    observeSegmentMatchesForRide: ObserveSegmentMatchesForRideUseCase,
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
     observeRideTags: ObserveRideTagsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
@@ -47,6 +44,12 @@ class RideDetailViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { markRideViewed(rideId) }
+        // No local segment-matching cache on this branch — go straight to Strava's live API as
+        // soon as the ride is known, instead of waiting for a manual "fetch" tap.
+        viewModelScope.launch {
+            val ride = observeRide(rideId).filterNotNull().first()
+            fetchSegments(ride)
+        }
     }
 
     /** The ride from the most recent [uiState] emission, so onFetchStravaSegmentsClick can read it without a lag-prone second subscription. */
@@ -70,17 +73,13 @@ class RideDetailViewModel @Inject constructor(
 
     private val coreState = combine(
         observeRide(rideId),
-        observeRideHasTrack(rideId),
-        observeSegmentMatchesForRide(rideId),
         observeStravaSegmentEfforts(rideId),
         stravaEffortsOverride,
-    ) { ride, hasTrack, matches, cachedEfforts, override ->
+    ) { ride, cachedEfforts, override ->
         latestRide = ride
         latestEfforts = cachedEfforts
         CoreRideDetail(
             ride = ride?.toInfo(),
-            hasTrack = hasTrack,
-            matchedSegments = matches.map { it.toItem() },
             stravaSegmentEfforts = override ?: cachedEfforts.toUiState(),
         )
     }
@@ -89,8 +88,6 @@ class RideDetailViewModel @Inject constructor(
         RideDetailUiState(
             isLoading = false,
             ride = core.ride,
-            hasTrack = core.hasTrack,
-            matchedSegments = core.matchedSegments,
             stravaSegmentEfforts = core.stravaSegmentEfforts,
             expandedSegmentEffortDetail = expandedDetail,
             editDialog = edit?.let { request ->
@@ -112,15 +109,17 @@ class RideDetailViewModel @Inject constructor(
 
     fun onFetchStravaSegmentsClick() {
         val ride = latestRide ?: return
+        viewModelScope.launch { fetchSegments(ride) }
+    }
+
+    private suspend fun fetchSegments(ride: Ride) {
         stravaEffortsOverride.value = StravaEffortsUiState.Loading
-        viewModelScope.launch {
-            stravaEffortsOverride.value = fetchStravaSegmentEfforts(ride).fold(
-                onSuccess = { efforts -> StravaEffortsUiState.Loaded(efforts.map { it.toItem() }) },
-                onFailure = { throwable ->
-                    StravaEffortsUiState.Error(throwable.message ?: "Couldn't fetch Strava segment data.")
-                },
-            )
-        }
+        stravaEffortsOverride.value = fetchStravaSegmentEfforts(ride).fold(
+            onSuccess = { efforts -> StravaEffortsUiState.Loaded(efforts.map { it.toItem() }) },
+            onFailure = { throwable ->
+                StravaEffortsUiState.Error(throwable.message ?: "Couldn't fetch Strava segment data.")
+            },
+        )
     }
 
     /**
@@ -204,8 +203,6 @@ private data class EditRideRequest(val name: String, val tag: String, val activi
 
 private data class CoreRideDetail(
     val ride: RideDetailInfo?,
-    val hasTrack: Boolean,
-    val matchedSegments: List<MatchedSegmentItem>,
     val stravaSegmentEfforts: StravaEffortsUiState,
 )
 
@@ -224,17 +221,6 @@ private fun Ride.toInfo(): RideDetailInfo = RideDetailInfo(
     elevationProfile = elevationProfile,
     isPersonalBest = isPersonalBest,
     tag = tag,
-)
-
-private fun RideSegmentMatch.toItem(): MatchedSegmentItem = MatchedSegmentItem(
-    attemptId = attemptId,
-    segmentId = segmentId,
-    name = segmentName,
-    distanceKm = segmentDistanceMeters / 1000.0,
-    dateLabel = startTime.toRideCardDate(),
-    durationLabel = duration.toRideClock(),
-    avgSpeedKmh = avgSpeedKmh,
-    isPersonalBest = isPersonalBest,
 )
 
 private fun StravaSegmentEffort.toItem(): StravaSegmentEffortItem = StravaSegmentEffortItem(

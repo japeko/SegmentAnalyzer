@@ -67,9 +67,10 @@ fun RideCard(
                 Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.padding(end = 4.dp))
             }
 
-            ElevationSparkline(profile = item.elevationProfile)
-
-            Spacer(modifier = Modifier.width(12.dp))
+            if (item.elevationProfile.size >= 2) {
+                ElevationSparkline(profile = item.elevationProfile)
+                Spacer(modifier = Modifier.width(12.dp))
+            }
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(

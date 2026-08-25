@@ -6,9 +6,6 @@ import com.segmentanalyzer.domain.model.ActivityType
 data class RideDetailUiState(
     val isLoading: Boolean = true,
     val ride: RideDetailInfo? = null,
-    /** Whether this ride has a stored GPS track — only FIT/GPX imports do. */
-    val hasTrack: Boolean = false,
-    val matchedSegments: List<MatchedSegmentItem> = emptyList(),
     val stravaSegmentEfforts: StravaEffortsUiState = StravaEffortsUiState.Idle,
     /** The effort (if any) whose full pace/power/HR detail is currently expanded below its row. */
     val expandedSegmentEffortDetail: ExpandedSegmentEffortDetail? = null,
@@ -85,16 +82,4 @@ data class RideDetailInfo(
     val elevationProfile: List<Float>,
     val isPersonalBest: Boolean,
     val tag: String?,
-)
-
-/** A starred Strava segment this ride passed through. */
-data class MatchedSegmentItem(
-    val attemptId: Long,
-    val segmentId: Long,
-    val name: String,
-    val distanceKm: Double,
-    val dateLabel: String,
-    val durationLabel: String,
-    val avgSpeedKmh: Double,
-    val isPersonalBest: Boolean,
 )

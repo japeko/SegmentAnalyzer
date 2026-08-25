@@ -50,7 +50,6 @@ import com.segmentanalyzer.core.ui.ElevationSparkline
 import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.ActivityType
-import com.segmentanalyzer.feature.history.detail.components.MatchedSegmentRow
 import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortDetailPanel
 import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortRow
 
@@ -59,7 +58,6 @@ import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffort
 fun RideDetailScreen(
     uiState: RideDetailUiState,
     onBackClick: () -> Unit,
-    onSegmentClick: (Long) -> Unit,
     onFetchStravaSegmentsClick: () -> Unit,
     onStravaSegmentEffortClick: (Int, String) -> Unit,
     onEditClick: () -> Unit,
@@ -146,9 +144,11 @@ fun RideDetailScreen(
                     }
                 }
                 item { StatsRow(ride = ride) }
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-                        ElevationSparkline(profile = ride.elevationProfile)
+                if (ride.elevationProfile.size >= 2) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                            ElevationSparkline(profile = ride.elevationProfile)
+                        }
                     }
                 }
             }
@@ -156,28 +156,6 @@ fun RideDetailScreen(
             item {
                 Text(
                     text = "Segments in this Ride",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialThemeExtras.textTertiary,
-                    modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
-                )
-            }
-
-            when {
-                !uiState.hasTrack -> item { EmptyMessage("No GPS track for this ride — segment matching needs a FIT or GPX import.") }
-                uiState.matchedSegments.isEmpty() -> item { EmptyMessage("No known segments matched this ride yet.") }
-                else -> items(uiState.matchedSegments, key = { it.attemptId }) { match ->
-                    MatchedSegmentRow(
-                        item = match,
-                        onClick = onSegmentClick,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-            }
-
-            item {
-                Text(
-                    text = "Strava Segment Times",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialThemeExtras.textTertiary,
