@@ -12,6 +12,7 @@ import com.segmentanalyzer.data.repository.StravaAccountRepositoryImpl
 import com.segmentanalyzer.data.repository.StravaActivityRepositoryImpl
 import com.segmentanalyzer.data.repository.StravaSegmentEffortRepositoryImpl
 import com.segmentanalyzer.data.repository.StravaSegmentRepositoryImpl
+import com.segmentanalyzer.data.repository.ViewedRidesRepositoryImpl
 import com.segmentanalyzer.domain.repository.FitFileRepository
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.repository.GarminImportRepository
@@ -24,6 +25,7 @@ import com.segmentanalyzer.domain.repository.StravaAccountRepository
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentEffortRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
+import com.segmentanalyzer.domain.repository.ViewedRidesRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -83,4 +85,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     internal abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds
+    @Singleton
+    internal abstract fun bindViewedRidesRepository(impl: ViewedRidesRepositoryImpl): ViewedRidesRepository
 }

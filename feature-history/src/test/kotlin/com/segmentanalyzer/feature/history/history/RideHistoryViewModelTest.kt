@@ -6,10 +6,12 @@ import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
+import com.segmentanalyzer.domain.repository.ViewedRidesRepository
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentRecordsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveViewedRideIdsUseCase
 import com.segmentanalyzer.domain.usecase.SetActivityTypeForRidesUseCase
 import com.segmentanalyzer.domain.usecase.SetTagForRidesUseCase
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +79,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -98,6 +101,33 @@ class RideHistoryViewModelTest {
     }
 
     @Test
+    fun `a ride already marked viewed shows isViewed true, others stay false`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(
+            ride(1, "Skyline Ridge Loop", ActivityType.MTB),
+            ride(2, "Sunday Club Ride", ActivityType.ROAD),
+        )
+        val repository = FakeRideRepository(rides)
+        val viewedRidesRepository = FakeRideHistoryViewedRidesRepository()
+        viewedRidesRepository.markRideViewed(1)
+        val viewModel = RideHistoryViewModel(
+            ObserveRideHistoryUseCase(repository),
+            ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
+            ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(viewedRidesRepository),
+            SetTagForRidesUseCase(repository),
+            SetActivityTypeForRidesUseCase(repository),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val items = viewModel.uiState.value.rides
+        assertEquals(true, items.first { it.id == 1L }.isViewed)
+        assertEquals(false, items.first { it.id == 2L }.isViewed)
+        collectJob.cancel()
+    }
+
+    @Test
     fun `changing the summary period also filters the ride list`() = kotlinx.coroutines.test.runTest(dispatcher) {
         val lastYear = Instant.now().atZone(java.time.ZoneId.systemDefault()).minusYears(1).toInstant()
         val rides = listOf(
@@ -109,6 +139,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -142,6 +173,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -167,6 +199,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -201,6 +234,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -243,6 +277,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -281,6 +316,7 @@ class RideHistoryViewModelTest {
             ObserveRideHistoryUseCase(repository),
             ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
             ObserveRideTagsUseCase(repository),
+            ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
         )
@@ -340,4 +376,12 @@ private class FakeRideHistorySegmentAttemptRepository : SegmentAttemptRepository
         avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
     ) = Unit
     override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
+}
+
+private class FakeRideHistoryViewedRidesRepository : ViewedRidesRepository {
+    private val viewedIds = MutableStateFlow(emptySet<Long>())
+    override fun observeViewedRideIds(): Flow<Set<Long>> = viewedIds
+    override suspend fun markRideViewed(rideId: Long) {
+        viewedIds.value = viewedIds.value + rideId
+    }
 }

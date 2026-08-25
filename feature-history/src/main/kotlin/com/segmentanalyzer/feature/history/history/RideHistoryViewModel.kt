@@ -10,6 +10,7 @@ import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveViewedRideIdsUseCase
 import com.segmentanalyzer.domain.usecase.RideSummary
 import com.segmentanalyzer.domain.usecase.SetActivityTypeForRidesUseCase
 import com.segmentanalyzer.domain.usecase.SetTagForRidesUseCase
@@ -30,6 +31,7 @@ class RideHistoryViewModel @Inject constructor(
     observeRideHistory: ObserveRideHistoryUseCase,
     observeRideSummary: ObserveRideSummaryUseCase,
     observeRideTags: ObserveRideTagsUseCase,
+    observeViewedRideIds: ObserveViewedRideIdsUseCase,
     private val setTagForRides: SetTagForRidesUseCase,
     private val setActivityTypeForRides: SetActivityTypeForRidesUseCase,
 ) : ViewModel() {
@@ -66,13 +68,14 @@ class RideHistoryViewModel @Inject constructor(
         selectedRideIds,
         dialogsState,
         observeRideTags(),
-    ) { core, selectedIds, dialogs, tags ->
+        observeViewedRideIds(),
+    ) { core, selectedIds, dialogs, tags, viewedIds ->
         RideHistoryUiState(
             isLoading = false,
             summary = core.summary,
             summaryPeriod = core.period,
             selectedFilter = core.filter,
-            rides = core.rides.map { it.toListItem() },
+            rides = core.rides.map { it.toListItem(isViewed = it.id in viewedIds) },
             selectedRideIds = selectedIds,
             tagDialog = dialogs.tagText?.let { text ->
                 BulkTagDialogState(
@@ -185,7 +188,7 @@ private data class DialogsState(
     val activityTypeSelection: ActivityType?,
 )
 
-private fun Ride.toListItem(): RideListItem = RideListItem(
+private fun Ride.toListItem(isViewed: Boolean): RideListItem = RideListItem(
     id = id,
     name = name,
     activityType = activityType,
@@ -198,4 +201,5 @@ private fun Ride.toListItem(): RideListItem = RideListItem(
     isPersonalBest = isPersonalBest,
     elevationProfile = elevationProfile,
     tag = tag,
+    isViewed = isViewed,
 )

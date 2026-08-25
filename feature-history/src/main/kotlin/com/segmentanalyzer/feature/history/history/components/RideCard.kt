@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -73,13 +75,23 @@ fun RideCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = item.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.5.sp,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
+                    Row(modifier = Modifier.weight(1f, fill = false), verticalAlignment = Alignment.CenterVertically) {
+                        if (item.isViewed) {
+                            Icon(
+                                imageVector = Icons.Filled.Visibility,
+                                contentDescription = "Already viewed",
+                                tint = MaterialThemeExtras.textTertiary,
+                                modifier = Modifier.padding(end = 5.dp).size(14.dp),
+                            )
+                        }
+                        Text(
+                            text = item.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.5.sp,
+                        )
+                    }
                     SourceTag(source = item.source)
                 }
 

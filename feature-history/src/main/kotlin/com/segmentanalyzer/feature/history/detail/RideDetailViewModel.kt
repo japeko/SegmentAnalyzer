@@ -12,6 +12,7 @@ import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
+import com.segmentanalyzer.domain.usecase.MarkRideViewedUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHasTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
@@ -39,9 +40,14 @@ class RideDetailViewModel @Inject constructor(
     private val fetchStravaSegmentEffortDetail: FetchStravaSegmentEffortDetailUseCase,
     private val saveStravaSegmentEffortAttempt: SaveStravaSegmentEffortAttemptUseCase,
     private val updateRide: UpdateRideUseCase,
+    markRideViewed: MarkRideViewedUseCase,
 ) : ViewModel() {
 
     private val rideId: Long = checkNotNull(savedStateHandle["rideId"])
+
+    init {
+        viewModelScope.launch { markRideViewed(rideId) }
+    }
 
     /** The ride from the most recent [uiState] emission, so onFetchStravaSegmentsClick can read it without a lag-prone second subscription. */
     private var latestRide: Ride? = null

@@ -113,6 +113,23 @@ class RideDetailViewModelTest {
     }
 
     @Test
+    fun `opening a ride's detail marks it as viewed`() = runTest(dispatcher) {
+        val viewedRidesRepository = FakeRideDetailViewedRidesRepository()
+        val viewModel = viewModel(
+            ride = ride,
+            hasTrack = true,
+            matches = emptyList(),
+            viewedRidesRepository = viewedRidesRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(setOf(ride.id), viewedRidesRepository.viewedIds.value)
+        collectJob.cancel()
+    }
+
+    @Test
     fun `an unknown ride id yields a null ride`() = runTest(dispatcher) {
         val viewModel = viewModel(ride = null, hasTrack = false, matches = emptyList())
 
@@ -425,6 +442,7 @@ class RideDetailViewModelTest {
         cachedEfforts: List<StravaSegmentEffort> = emptyList(),
         detailResult: Result<StravaSegmentEffortDetail> = Result.failure(UnsupportedOperationException("not used")),
         rideRepository: FakeRideDetailRideRepository = FakeRideDetailRideRepository(ride, hasTrack),
+        viewedRidesRepository: FakeRideDetailViewedRidesRepository = FakeRideDetailViewedRidesRepository(),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
         val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(matches)
@@ -447,6 +465,7 @@ class RideDetailViewModelTest {
                 com.segmentanalyzer.domain.usecase.MatchNewSegmentsToRidesUseCase(segmentAttemptRepository),
             ),
             com.segmentanalyzer.domain.usecase.UpdateRideUseCase(rideRepository),
+            com.segmentanalyzer.domain.usecase.MarkRideViewedUseCase(viewedRidesRepository),
         )
     }
 }
@@ -501,6 +520,14 @@ private class FakeRideDetailSegmentAttemptRepository(
     }
 
     override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
+}
+
+private class FakeRideDetailViewedRidesRepository : com.segmentanalyzer.domain.repository.ViewedRidesRepository {
+    val viewedIds = MutableStateFlow(emptySet<Long>())
+    override fun observeViewedRideIds(): Flow<Set<Long>> = viewedIds
+    override suspend fun markRideViewed(rideId: Long) {
+        viewedIds.value = viewedIds.value + rideId
+    }
 }
 
 private class FakeRideDetailSegmentRepository(

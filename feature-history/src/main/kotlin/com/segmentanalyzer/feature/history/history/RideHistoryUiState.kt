@@ -46,4 +46,6 @@ data class RideListItem(
     val isPersonalBest: Boolean,
     val elevationProfile: List<Float>,
     val tag: String?,
+    /** True once the rider has opened this ride's detail screen at least once. */
+    val isViewed: Boolean = false,
 )
