@@ -20,6 +20,25 @@ private const val EXIT_SEARCH_SLACK_POINTS = 4
 /** Fraction of the entry..exit sub-track that must stay near the polyline for a match to be accepted. */
 private const val MIN_ON_ROUTE_FRACTION = 0.5
 
+/**
+ * Well under anyone's realistic riding (or walking-the-bike) pace through even a technical
+ * segment — used only to bound how long a single match may plausibly span. Without this, a rider
+ * passing near a segment's end coordinate again much later in a long ride (a different pass by a
+ * shared trailhead, lift queue, or access road) gets stitched to an earlier, unrelated entry into
+ * one wildly-long "attempt" — confirmed live: a 1.1km segment (2:32 PB) matched a 1:02:58 "attempt"
+ * because the true exit crossing was never within range, and the search kept going until the
+ * track happened to pass the end coordinate again roughly an hour later.
+ */
+private const val MIN_PLAUSIBLE_SPEED_METERS_PER_SECOND = 1.0
+
+/** Floor under [MIN_PLAUSIBLE_SPEED_METERS_PER_SECOND]'s bound, so a very short segment still allows a brief stop. */
+private const val MIN_PLAUSIBLE_DURATION_SECONDS = 120L
+
+private fun maxPlausibleDuration(segmentDistanceMeters: Double): Duration =
+    Duration.ofSeconds(
+        (segmentDistanceMeters / MIN_PLAUSIBLE_SPEED_METERS_PER_SECOND).toLong().coerceAtLeast(MIN_PLAUSIBLE_DURATION_SECONDS),
+    )
+
 data class SegmentMatchResult(
     val entryIndex: Int,
     val exitIndex: Int,
@@ -40,6 +59,10 @@ data class SegmentMatchResult(
  * pin each entry/exit to the closest actual approach (tighter than just "first/last point in
  * range") and to reject a pass that only clips near both endpoints via an unrelated path. With
  * no polyline, falls back to matching against the two endpoint coordinates alone.
+ *
+ * [segmentDistanceMeters] — the segment's own known real-world length — bounds how long a single
+ * pass may plausibly span, so an entry never gets stitched to an unrelated, much-later exit; see
+ * [maxPlausibleDuration].
  */
 fun matchAllSegmentPasses(
     track: List<TrackPoint>,
@@ -47,6 +70,7 @@ fun matchAllSegmentPasses(
     startLon: Double,
     endLat: Double,
     endLon: Double,
+    segmentDistanceMeters: Double,
     proximityMeters: Double = SEGMENT_PROXIMITY_METERS,
     polyline: List<LatLng> = emptyList(),
 ): List<SegmentMatchResult> {
@@ -54,9 +78,9 @@ fun matchAllSegmentPasses(
     var searchOffset = 0
     while (searchOffset < track.size) {
         val bounds = if (polyline.size >= 2) {
-            findEntryExitViaPolyline(track, polyline, proximityMeters, searchOffset)
+            findEntryExitViaPolyline(track, polyline, proximityMeters, searchOffset, segmentDistanceMeters)
         } else {
-            findEntryExitViaEndpoints(track, startLat, startLon, endLat, endLon, proximityMeters, searchOffset)
+            findEntryExitViaEndpoints(track, startLat, startLon, endLat, endLon, proximityMeters, searchOffset, segmentDistanceMeters)
         } ?: break
         val (entryIndex, exitIndex) = bounds
         results += buildMatchResult(track, entryIndex, exitIndex)
@@ -72,10 +96,11 @@ fun matchSegment(
     startLon: Double,
     endLat: Double,
     endLon: Double,
+    segmentDistanceMeters: Double,
     proximityMeters: Double = SEGMENT_PROXIMITY_METERS,
     polyline: List<LatLng> = emptyList(),
 ): SegmentMatchResult? =
-    matchAllSegmentPasses(track, startLat, startLon, endLat, endLon, proximityMeters, polyline).firstOrNull()
+    matchAllSegmentPasses(track, startLat, startLon, endLat, endLon, segmentDistanceMeters, proximityMeters, polyline).firstOrNull()
 
 private fun buildMatchResult(track: List<TrackPoint>, entryIndex: Int, exitIndex: Int): SegmentMatchResult {
     val entry = track[entryIndex]
@@ -115,14 +140,19 @@ private fun findEntryExitViaEndpoints(
     endLon: Double,
     proximityMeters: Double,
     searchOffset: Int,
+    segmentDistanceMeters: Double,
 ): Pair<Int, Int>? {
     val firstNearStart = (searchOffset until track.size).firstOrNull { index ->
         haversineMeters(track[index].latitude, track[index].longitude, startLat, startLon) <= proximityMeters
     } ?: return null
 
-    val exitIndex = ((firstNearStart + 1) until track.size).firstOrNull { index ->
-        haversineMeters(track[index].latitude, track[index].longitude, endLat, endLon) <= proximityMeters
-    } ?: return null
+    val latestPlausibleExit = track[firstNearStart].timestamp.plus(maxPlausibleDuration(segmentDistanceMeters))
+    val exitIndex = ((firstNearStart + 1) until track.size)
+        .asSequence()
+        .takeWhile { index -> !track[index].timestamp.isAfter(latestPlausibleExit) }
+        .firstOrNull { index ->
+            haversineMeters(track[index].latitude, track[index].longitude, endLat, endLon) <= proximityMeters
+        } ?: return null
 
     // Riders often linger near the trailhead before actually starting (prepping, regrouping) —
     // that produces a run of consecutive points within range of the start. Use the *last* of
@@ -140,6 +170,7 @@ private fun findEntryExitViaPolyline(
     polyline: List<LatLng>,
     proximityMeters: Double,
     searchOffset: Int,
+    segmentDistanceMeters: Double,
 ): Pair<Int, Int>? {
     val start = polyline.first()
     val end = polyline.last()
@@ -147,9 +178,13 @@ private fun findEntryExitViaPolyline(
     val roughEntry = (searchOffset until track.size).firstOrNull { index ->
         haversineMeters(track[index].latitude, track[index].longitude, start.latitude, start.longitude) <= proximityMeters
     } ?: return null
-    val roughExit = ((roughEntry + 1) until track.size).firstOrNull { index ->
-        haversineMeters(track[index].latitude, track[index].longitude, end.latitude, end.longitude) <= proximityMeters
-    } ?: return null
+    val latestPlausibleExit = track[roughEntry].timestamp.plus(maxPlausibleDuration(segmentDistanceMeters))
+    val roughExit = ((roughEntry + 1) until track.size)
+        .asSequence()
+        .takeWhile { index -> !track[index].timestamp.isAfter(latestPlausibleExit) }
+        .firstOrNull { index ->
+            haversineMeters(track[index].latitude, track[index].longitude, end.latitude, end.longitude) <= proximityMeters
+        } ?: return null
 
     // Refine to the point of *closest* approach rather than first-or-last in range — this both
     // resolves lingering near the trailhead and lands on the true crossing moment even when the

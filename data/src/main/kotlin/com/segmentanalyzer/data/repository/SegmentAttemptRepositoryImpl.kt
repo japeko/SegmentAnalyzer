@@ -132,7 +132,11 @@ private fun SegmentEntity.toAttempts(rideId: Long, track: List<TrackPoint>): Lis
 
     val decodedPolyline = polyline?.let { decodePolyline(it) }.orEmpty()
     val now = Instant.now().toEpochMilli()
-    return matchAllSegmentPasses(track, startLat, startLon, endLat, endLon, polyline = decodedPolyline).map { match ->
+    return matchAllSegmentPasses(
+        track, startLat, startLon, endLat, endLon,
+        segmentDistanceMeters = distanceMeters,
+        polyline = decodedPolyline,
+    ).map { match ->
         SegmentAttemptEntity(
             segmentId = id,
             rideId = rideId,

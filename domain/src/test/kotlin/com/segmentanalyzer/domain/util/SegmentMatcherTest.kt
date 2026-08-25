@@ -13,6 +13,9 @@ private const val START_LON = 24.000
 private const val END_LAT = 60.010
 private const val END_LON = 24.000
 
+/** Roughly the real-world distance between [START_LAT]/[END_LAT] — generous enough that none of this file's short test durations trip the plausible-duration bound. */
+private const val SEGMENT_DISTANCE_METERS = 1_000.0
+
 private val STRAIGHT_POLYLINE = listOf(
     LatLng(START_LAT, START_LON),
     LatLng(60.0025, 24.000),
@@ -42,7 +45,7 @@ class SegmentMatcherTest {
             point(60.020, 24.000, 100, 2_500.0),
         )
 
-        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON)
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS)
 
         assertEquals(1, result?.entryIndex)
         assertEquals(3, result?.exitIndex)
@@ -54,14 +57,14 @@ class SegmentMatcherTest {
     fun `no match when the track never comes near the segment start`() {
         val track = listOf(point(0.0, 0.0, 0, 0.0), point(1.0, 1.0, 10, 5_000.0))
 
-        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON))
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS))
     }
 
     @Test
     fun `no match when the track reaches the start but never the end`() {
         val track = listOf(point(START_LAT, START_LON, 0, 0.0), point(60.002, 24.000, 10, 300.0))
 
-        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON))
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS))
     }
 
     @Test
@@ -75,7 +78,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 345, 5_000.0),
         )
 
-        val results = matchAllSegmentPasses(track, START_LAT, START_LON, END_LAT, END_LON)
+        val results = matchAllSegmentPasses(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS)
 
         assertEquals(3, results.size)
         assertEquals(0 to 1, results[0].entryIndex to results[0].exitIndex)
@@ -95,7 +98,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 170, 3_000.0),
         )
 
-        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON)
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS)
 
         assertEquals(0, result?.entryIndex)
         assertEquals(1, result?.exitIndex)
@@ -110,7 +113,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 170, 3_000.0),
         )
 
-        val results = matchAllSegmentPasses(track, START_LAT, START_LON, END_LAT, END_LON, polyline = STRAIGHT_POLYLINE)
+        val results = matchAllSegmentPasses(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE)
 
         assertEquals(2, results.size)
         assertEquals(Duration.ofSeconds(60), results[0].duration)
@@ -128,7 +131,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 300, 1_000.0),
         )
 
-        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON)
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS)
 
         assertEquals(3, result?.entryIndex)
         assertEquals(5, result?.exitIndex)
@@ -143,7 +146,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 60, 1_000.0, power = 180),
         )
 
-        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON)
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS)
 
         assertEquals(200.0, result?.avgPowerWatts ?: -1.0, 0.01)
     }
@@ -158,7 +161,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 200, 1_000.0),
         )
 
-        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, polyline = STRAIGHT_POLYLINE)
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE)
 
         // The true closest approach (index 0, 0m away) wins over index 2 (last-in-range, 40m away).
         assertEquals(0, result?.entryIndex)
@@ -175,7 +178,7 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 200, 1_000.0), // exact — the true finish, just past the rough one
         )
 
-        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, polyline = STRAIGHT_POLYLINE)
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE)
 
         assertEquals(0, result?.entryIndex)
         assertEquals(3, result?.exitIndex)
@@ -192,6 +195,47 @@ class SegmentMatcherTest {
             point(END_LAT, END_LON, 240, 80_000.0),
         )
 
-        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, polyline = STRAIGHT_POLYLINE))
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE))
+    }
+
+    @Test
+    fun `endpoint-only matching rejects an exit crossing that's implausibly far in the future`() {
+        // The real crossing near "end" never comes shortly after entry — the track only passes
+        // near the end coordinate again ~63 minutes later, e.g. a shared trailhead/lift queue
+        // point revisited on a totally different part of the ride. Regression test for a real
+        // bug: a 1.1km segment (2:32 PB) matched a 1:02:58 "attempt" this exact way.
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(60.005, 24.000, 60, 500.0), // partway through, nowhere near "end"
+            point(END_LAT, END_LON, 3_800, 60_000.0), // ~63 min later — implausible for 1000m
+        )
+
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS))
+    }
+
+    @Test
+    fun `polyline-aware matching also rejects an exit crossing that's implausibly far in the future`() {
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(60.005, 24.000, 60, 500.0),
+            point(END_LAT, END_LON, 3_800, 60_000.0),
+        )
+
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE))
+    }
+
+    @Test
+    fun `a slow but still-plausible pass is not rejected by the duration guard`() {
+        // Much slower than the typical case (a stop to sort out a mechanical, say), but well
+        // within what's physically plausible for the segment's length — must still match.
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(60.005, 24.000, 300, 500.0),
+            point(END_LAT, END_LON, 600, 1_000.0), // 10 minutes total
+        )
+
+        val result = matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS)
+
+        assertEquals(Duration.ofSeconds(600), result?.duration)
     }
 }
