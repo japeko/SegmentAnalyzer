@@ -1,10 +1,12 @@
 package com.segmentanalyzer.feature.segments.detail
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,16 +44,20 @@ import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.ui.RoutePreviewCard
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.Segment
-import com.segmentanalyzer.feature.segments.detail.components.AttemptRow
+import com.segmentanalyzer.feature.segments.detail.components.ExcludableAttemptRow
+import com.segmentanalyzer.feature.segments.detail.components.IncludableAttemptRow
 import com.segmentanalyzer.feature.segments.detail.components.ProgressChart
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SegmentDetailScreen(
     uiState: SegmentDetailUiState,
     onBackClick: () -> Unit,
     onAttemptClick: (Long) -> Unit,
     onAttemptSelected: (Long) -> Unit,
+    onAttemptExcluded: (Long) -> Unit,
+    onAttemptIncluded: (Long) -> Unit,
+    onToggleAttemptsOrder: () -> Unit,
     onStarSegmentClick: () -> Unit,
     onDismissStarPrompt: () -> Unit,
     modifier: Modifier = Modifier,
@@ -93,7 +100,7 @@ fun SegmentDetailScreen(
         val segment = uiState.segment
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             if (segment != null) {
                 item {
@@ -122,26 +129,28 @@ fun SegmentDetailScreen(
                 item { PersonalBestCard(pr = pr, deltaSeconds = uiState.personalBestDeltaSeconds) }
             }
 
+            // Sticky: scrolls away with the map/stats above it, then pins at the top once reached,
+            // so the chart stays visible while the rest of "All Attempts" scrolls underneath it.
             if (uiState.progressPoints.size >= 2) {
-                item {
-                    Text(
-                        text = "Progress Over Time",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialThemeExtras.textTertiary,
-                        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
-                    )
-                }
-                item {
-                    ProgressChart(
-                        points = uiState.progressPoints,
-                        highlightedAttemptId = highlightedAttemptId,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                stickyHeader {
+                    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                        Text(
+                            text = "Progress Over Time",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialThemeExtras.textTertiary,
+                            modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp),
+                        )
+                        ProgressChart(
+                            points = uiState.progressPoints,
+                            highlightedAttemptId = highlightedAttemptId,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp).padding(bottom = 12.dp),
+                        )
+                    }
                 }
             }
 
-            if (uiState.attempts.isEmpty()) {
+            if (uiState.attempts.isEmpty() && uiState.excludedAttempts.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -155,28 +164,62 @@ fun SegmentDetailScreen(
                     }
                 }
             } else {
-                item {
-                    Text(
-                        text = "All Attempts",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialThemeExtras.textTertiary,
-                        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
-                    )
+                if (uiState.attempts.isNotEmpty()) {
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 10.dp),
+                        ) {
+                            Text(
+                                text = "All Attempts",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialThemeExtras.textTertiary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = onToggleAttemptsOrder) {
+                                Icon(
+                                    imageVector = Icons.Filled.SwapVert,
+                                    contentDescription = "Reverse order",
+                                    tint = MaterialThemeExtras.textTertiary,
+                                )
+                            }
+                        }
+                    }
+                    items(uiState.attempts, key = { it.id }) { attempt ->
+                        ExcludableAttemptRow(
+                            item = attempt,
+                            isSelected = attempt.id == uiState.selectedAttemptId,
+                            onClick = { attemptId ->
+                                onAttemptSelected(attemptId)
+                                onAttemptClick(attemptId)
+                            },
+                            onHoverChange = { isHovered ->
+                                hoveredAttemptId = if (isHovered) attempt.id else hoveredAttemptId.takeUnless { it == attempt.id }
+                            },
+                            onExcluded = onAttemptExcluded,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                 }
-                items(uiState.attempts, key = { it.id }) { attempt ->
-                    AttemptRow(
-                        item = attempt,
-                        isSelected = attempt.id == uiState.selectedAttemptId,
-                        onClick = { attemptId ->
-                            onAttemptSelected(attemptId)
-                            onAttemptClick(attemptId)
-                        },
-                        onHoverChange = { isHovered ->
-                            hoveredAttemptId = if (isHovered) attempt.id else hoveredAttemptId.takeUnless { it == attempt.id }
-                        },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
+
+                if (uiState.excludedAttempts.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Excluded",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialThemeExtras.textTertiary,
+                            modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
+                        )
+                    }
+                    items(uiState.excludedAttempts, key = { it.id }) { attempt ->
+                        IncludableAttemptRow(
+                            item = attempt,
+                            onIncluded = onAttemptIncluded,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                 }
             }
         }

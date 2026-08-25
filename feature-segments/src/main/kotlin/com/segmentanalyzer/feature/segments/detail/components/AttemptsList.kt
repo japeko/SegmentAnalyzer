@@ -1,24 +1,38 @@
 package com.segmentanalyzer.feature.segments.detail.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -103,6 +117,79 @@ fun AttemptRow(
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+/** An [AttemptRow] in "All Attempts" — swipe left to exclude it from the chart and this list. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExcludableAttemptRow(
+    item: AttemptItem,
+    isSelected: Boolean,
+    onClick: (Long) -> Unit,
+    onHoverChange: (Boolean) -> Unit,
+    onExcluded: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) onExcluded(item.id)
+            true
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = { SwipeActionBackground(alignEnd = true, icon = Icons.Filled.VisibilityOff, label = "Exclude") },
+    ) {
+        AttemptRow(item = item, isSelected = isSelected, onClick = onClick, onHoverChange = onHoverChange)
+    }
+}
+
+/** An [AttemptRow] in the excluded section — swipe right to restore it to "All Attempts" and the chart. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun IncludableAttemptRow(
+    item: AttemptItem,
+    onIncluded: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd) onIncluded(item.id)
+            true
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        enableDismissFromEndToStart = false,
+        backgroundContent = { SwipeActionBackground(alignEnd = false, icon = Icons.Filled.Visibility, label = "Restore") },
+    ) {
+        AttemptRow(item = item, isSelected = false, onClick = {}, onHoverChange = {})
+    }
+}
+
+@Composable
+private fun SwipeActionBackground(alignEnd: Boolean, icon: ImageVector, label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
+            .padding(horizontal = 20.dp),
+        contentAlignment = if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (alignEnd) {
+                Text(text = label, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(start = 8.dp))
+            } else {
+                Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(end = 8.dp))
+                Text(text = label, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     }

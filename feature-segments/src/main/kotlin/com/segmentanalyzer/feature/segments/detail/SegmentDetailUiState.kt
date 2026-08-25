@@ -10,12 +10,17 @@ data class SegmentDetailUiState(
     val routePoints: List<LatLng> = emptyList(),
     val personalBest: AttemptItem? = null,
     val personalBestDeltaSeconds: Long? = null,
+    /** Excludes [excludedAttempts] — nothing the rider has hidden shows a dot. */
     val progressPoints: List<ProgressPoint> = emptyList(),
     val attempts: List<AttemptItem> = emptyList(),
+    /** Attempts the rider has swiped out of [attempts] — hidden from the chart, shown in a separate section they can restore from. */
+    val excludedAttempts: List<AttemptItem> = emptyList(),
     /** Non-null once we've confirmed via Strava that this segment isn't starred there yet. */
     val starPrompt: StarPromptState? = null,
     /** The attempt last tapped in "All Attempts" — stays highlighted on the chart across nav to Compare Rides and back. */
     val selectedAttemptId: Long? = null,
+    /** True when [attempts]/[excludedAttempts] are shown newest-first instead of the default oldest-first. */
+    val attemptsReversed: Boolean = false,
 )
 
 /** Live state of the "star this segment?" prompt. */

@@ -5,12 +5,15 @@ import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.repository.ExcludedAttemptsRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
+import com.segmentanalyzer.domain.usecase.ObserveExcludedAttemptIdsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.usecase.SetAttemptExcludedUseCase
 import com.segmentanalyzer.domain.usecase.SetSegmentStarredUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -156,6 +159,77 @@ class SegmentDetailViewModelTest {
     }
 
     @Test
+    fun `excluding an attempt hides it from the chart and moves it to the excluded section`() = runTest(dispatcher) {
+        val attempts = listOf(
+            attempt(1, "Ride A", seconds = 200, startTime = Instant.parse("2026-06-01T00:00:00Z")),
+            attempt(2, "Ride B", seconds = 192, startTime = Instant.parse("2026-08-14T00:00:00Z")),
+        )
+        val viewModel = viewModel(attempts)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            val initial = awaitItem()
+            assertEquals(2, initial.attempts.size)
+            assertEquals(true, initial.excludedAttempts.isEmpty())
+
+            viewModel.onAttemptExcluded(2)
+            val afterExclude = awaitItem()
+            assertEquals(listOf(1L), afterExclude.attempts.map { it.id })
+            assertEquals(listOf(2L), afterExclude.excludedAttempts.map { it.id })
+            assertEquals(listOf(1L), afterExclude.progressPoints.map { it.attemptId })
+
+            viewModel.onAttemptIncluded(2)
+            val afterInclude = awaitItem()
+            assertEquals(listOf(1L, 2L), afterInclude.attempts.map { it.id })
+            assertEquals(true, afterInclude.excludedAttempts.isEmpty())
+        }
+    }
+
+    @Test
+    fun `an excluded attempt cannot become the personal best`() = runTest(dispatcher) {
+        val attempts = listOf(
+            attempt(1, "Ride A", seconds = 200, startTime = Instant.parse("2026-06-01T00:00:00Z")),
+            attempt(2, "Ride B", seconds = 100, startTime = Instant.parse("2026-08-14T00:00:00Z")),
+        )
+        val viewModel = viewModel(attempts)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            assertEquals(2L, awaitItem().personalBest?.id)
+
+            viewModel.onAttemptExcluded(2)
+            assertEquals(1L, awaitItem().personalBest?.id)
+        }
+    }
+
+    @Test
+    fun `toggling attempts order reverses All Attempts and Excluded, independent of chronology used elsewhere`() = runTest(dispatcher) {
+        val attempts = listOf(
+            attempt(1, "Ride A", seconds = 200, startTime = Instant.parse("2026-06-01T00:00:00Z")),
+            attempt(2, "Ride B", seconds = 192, startTime = Instant.parse("2026-08-14T00:00:00Z")),
+            attempt(3, "Ride C", seconds = 195, startTime = Instant.parse("2026-07-01T00:00:00Z")),
+        )
+        val viewModel = viewModel(attempts)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            val initial = awaitItem()
+            assertEquals(false, initial.attemptsReversed)
+            assertEquals(listOf(1L, 3L, 2L), initial.attempts.map { it.id })
+
+            viewModel.onToggleAttemptsOrder()
+            val reversed = awaitItem()
+            assertEquals(true, reversed.attemptsReversed)
+            assertEquals(listOf(2L, 3L, 1L), reversed.attempts.map { it.id })
+            // Chart and lap numbering are unaffected by display order.
+            assertEquals(listOf(1L, 3L, 2L), reversed.progressPoints.map { it.attemptId })
+
+            viewModel.onToggleAttemptsOrder()
+            assertEquals(listOf(1L, 3L, 2L), awaitItem().attempts.map { it.id })
+        }
+    }
+
+    @Test
     fun `a segment already starred on Strava shows no prompt`() = runTest(dispatcher) {
         val viewModel = viewModel(
             emptyList(),
@@ -206,14 +280,17 @@ class SegmentDetailViewModelTest {
     private fun viewModel(
         attempts: List<SegmentAttempt>,
         stravaSegmentRepository: FakeDetailStravaSegmentRepository = FakeDetailStravaSegmentRepository(),
+        excludedAttemptsRepository: FakeExcludedAttemptsRepository = FakeExcludedAttemptsRepository(),
     ): SegmentDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L))
         return SegmentDetailViewModel(
             savedStateHandle,
             ObserveSegmentsUseCase(FakeDetailSegmentRepository()),
             ObserveSegmentAttemptsUseCase(FakeDetailSegmentAttemptRepository(attempts)),
+            ObserveExcludedAttemptIdsUseCase(excludedAttemptsRepository),
             CheckSegmentStarredUseCase(stravaSegmentRepository),
             SetSegmentStarredUseCase(stravaSegmentRepository),
+            SetAttemptExcludedUseCase(excludedAttemptsRepository),
         )
     }
 }
@@ -237,6 +314,16 @@ private class FakeDetailSegmentAttemptRepository(private val attempts: List<Segm
         avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
     ) = Unit
     override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
+}
+
+private class FakeExcludedAttemptsRepository : ExcludedAttemptsRepository {
+    private val excludedIds = MutableStateFlow<Set<Long>>(emptySet())
+
+    override fun observeExcludedAttemptIds(): Flow<Set<Long>> = excludedIds
+
+    override suspend fun setExcluded(attemptId: Long, excluded: Boolean) {
+        excludedIds.value = if (excluded) excludedIds.value + attemptId else excludedIds.value - attemptId
+    }
 }
 
 private class FakeDetailStravaSegmentRepository(
