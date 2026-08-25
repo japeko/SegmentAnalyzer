@@ -165,6 +165,16 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
             ),
         ) {
             val backToSettings = {
+                // This destination (a one-off deep-link landing page, never meant to be
+                // revisited) must never become part of the saved/restored back-stack state the
+                // bottom nav's tab switches rely on — pop it off explicitly first (default
+                // saveState = false) so it isn't lying around when the popUpTo below saves state
+                // for everything else. Skipping this step, or replacing the two calls below with
+                // a single popUpTo(startDestinationId){saveState=true} that also happens to sweep
+                // this destination up, was confirmed live to leave it saved under the Rides tab's
+                // restoration bucket: the *next* bottom-nav tap on Rides silently restored this
+                // screen instead of switching tabs, with no crash and no visible cause.
+                navController.popBackStack(route = STRAVA_CALLBACK_ROUTE, inclusive = true)
                 // Must match the bottom-nav tab switch's own navigate options exactly (see
                 // SegmentAnalyzerApp) — this is also a jump to a top-level destination, just
                 // triggered by the Strava OAuth deep link instead of a tab tap. Without
