@@ -21,15 +21,13 @@ The application should work primarily offline and keep all analysis on the user'
 # Primary Goals
 
 * Import rides from Garmin Connect
-* Import FIT files
-* Import GPX files
-* Optional Strava integration
+* Strava integration — live segment data for each ride, no local FIT/GPX import
 * Automatic segment detection
 * Advanced split analysis
 * Compare rides against personal bests
 * Visualize where time was gained or lost
 * Privacy-first
-* Offline-first
+* Offline-first (ride history and stats; a ride's Strava segment list needs a live connection)
 
 ---
 
@@ -141,13 +139,17 @@ common/
 Support importing rides from
 
 * Garmin Connect (if API access is available)
-* FIT files
-* GPX files
-* Strava activities (optional)
+
+FIT and GPX file import is not used — Garmin Connect is the only ride import
+source. (The `feature-import` module still contains FIT/GPX parsing code;
+it's just not wired into navigation.)
+
+For each ride, the segment list ("Segments in this Ride") is fetched live
+from Strava's API rather than matched locally against a GPS track — a ride
+opened offline shows no segment list until a connection is available.
 
 The import process should automatically
 
-* identify segments
 * calculate ride statistics
 * detect climbs and descents
 * calculate elevation gain
@@ -269,7 +271,7 @@ No cloud synchronization is required.
 
 # Offline First
 
-Everything except authentication and ride import should work without internet access.
+Everything except authentication, ride import, and a ride's Strava segment list should work without internet access.
 
 Users should always own their ride data.
 
