@@ -14,6 +14,8 @@ data class SegmentDetailUiState(
     val attempts: List<AttemptItem> = emptyList(),
     /** Non-null once we've confirmed via Strava that this segment isn't starred there yet. */
     val starPrompt: StarPromptState? = null,
+    /** The attempt last tapped in "All Attempts" — stays highlighted on the chart across nav to Compare Rides and back. */
+    val selectedAttemptId: Long? = null,
 )
 
 /** Live state of the "star this segment?" prompt. */

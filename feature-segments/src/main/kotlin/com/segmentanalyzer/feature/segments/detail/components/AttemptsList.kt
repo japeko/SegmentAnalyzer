@@ -1,7 +1,9 @@
 package com.segmentanalyzer.feature.segments.detail.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -22,20 +27,35 @@ import com.segmentanalyzer.core.theme.NumericFontFamily
 import com.segmentanalyzer.feature.segments.detail.AttemptItem
 
 @Composable
-fun AttemptRow(item: AttemptItem, onClick: (Long) -> Unit, modifier: Modifier = Modifier) {
-    val borderColor = if (item.isPersonalBest) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
-    val containerColor = if (item.isPersonalBest) {
-        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
-    } else {
-        MaterialTheme.colorScheme.surface
+fun AttemptRow(
+    item: AttemptItem,
+    isSelected: Boolean,
+    onClick: (Long) -> Unit,
+    onHoverChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    LaunchedEffect(isHovered) { onHoverChange(isHovered) }
+
+    val borderColor = when {
+        isHovered || isSelected -> MaterialTheme.colorScheme.primary
+        item.isPersonalBest -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val containerColor = when {
+        isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        item.isPersonalBest -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
+        else -> MaterialTheme.colorScheme.surface
     }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onClick(item.id) },
+        onClick = { onClick(item.id) },
+        modifier = modifier.fillMaxWidth().hoverable(interactionSource),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        border = BorderStroke(1.dp, borderColor),
+        border = BorderStroke(if (isHovered || isSelected) 2.dp else 1.dp, borderColor),
+        interactionSource = interactionSource,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

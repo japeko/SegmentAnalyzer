@@ -125,6 +125,26 @@ class SegmentDetailViewModelTest {
     }
 
     @Test
+    fun `selecting an attempt highlights it, and it stays highlighted until another is selected`() = runTest(dispatcher) {
+        val attempts = listOf(
+            attempt(1, "Ride A", seconds = 200, startTime = Instant.parse("2026-06-01T00:00:00Z")),
+            attempt(2, "Ride B", seconds = 192, startTime = Instant.parse("2026-08-14T00:00:00Z")),
+        )
+        val viewModel = viewModel(attempts)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            assertEquals(null, awaitItem().selectedAttemptId)
+
+            viewModel.onAttemptSelected(1)
+            assertEquals(1L, awaitItem().selectedAttemptId)
+
+            viewModel.onAttemptSelected(2)
+            assertEquals(2L, awaitItem().selectedAttemptId)
+        }
+    }
+
+    @Test
     fun `no attempts yields an empty state without a personal best`() = runTest(dispatcher) {
         val viewModel = viewModel(emptyList())
 

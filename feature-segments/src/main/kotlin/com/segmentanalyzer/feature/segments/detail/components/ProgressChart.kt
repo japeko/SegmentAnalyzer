@@ -19,9 +19,10 @@ import com.segmentanalyzer.feature.segments.detail.ProgressPoint
 
 /** One point per attempt, chronological, faster times plotted higher. Same normalize→Path technique as ElevationSparkline. */
 @Composable
-fun ProgressChart(points: List<ProgressPoint>, modifier: Modifier = Modifier) {
+fun ProgressChart(points: List<ProgressPoint>, highlightedAttemptId: Long? = null, modifier: Modifier = Modifier) {
     val lineColor = MaterialTheme.colorScheme.onSurfaceVariant
     val prColor = MaterialTheme.colorScheme.tertiary
+    val highlightColor = MaterialTheme.colorScheme.primary
 
     Canvas(
         modifier = modifier
@@ -54,10 +55,14 @@ fun ProgressChart(points: List<ProgressPoint>, modifier: Modifier = Modifier) {
 
         points.forEachIndexed { index, point ->
             val offset = pointAt(index)
-            if (point.isPersonalBest) {
-                drawCircle(color = prColor, radius = 5.dp.toPx(), center = offset)
-            } else {
-                drawCircle(color = lineColor, radius = 3.dp.toPx(), center = offset)
+            val isHighlighted = point.attemptId == highlightedAttemptId
+            when {
+                isHighlighted -> {
+                    drawCircle(color = highlightColor.copy(alpha = 0.25f), radius = 9.dp.toPx(), center = offset)
+                    drawCircle(color = highlightColor, radius = 6.dp.toPx(), center = offset)
+                }
+                point.isPersonalBest -> drawCircle(color = prColor, radius = 5.dp.toPx(), center = offset)
+                else -> drawCircle(color = lineColor, radius = 3.dp.toPx(), center = offset)
             }
         }
     }

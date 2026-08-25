@@ -27,6 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,10 +50,16 @@ fun SegmentDetailScreen(
     uiState: SegmentDetailUiState,
     onBackClick: () -> Unit,
     onAttemptClick: (Long) -> Unit,
+    onAttemptSelected: (Long) -> Unit,
     onStarSegmentClick: () -> Unit,
     onDismissStarPrompt: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var hoveredAttemptId by remember { mutableStateOf<Long?>(null) }
+    // Hover (pointer devices only) previews live and wins while active; the persisted tap
+    // selection is what touch users actually see, and what survives navigating away and back.
+    val highlightedAttemptId = hoveredAttemptId ?: uiState.selectedAttemptId
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -122,7 +132,13 @@ fun SegmentDetailScreen(
                         modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
                     )
                 }
-                item { ProgressChart(points = uiState.progressPoints, modifier = Modifier.padding(horizontal = 16.dp)) }
+                item {
+                    ProgressChart(
+                        points = uiState.progressPoints,
+                        highlightedAttemptId = highlightedAttemptId,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
             }
 
             if (uiState.attempts.isEmpty()) {
@@ -151,7 +167,14 @@ fun SegmentDetailScreen(
                 items(uiState.attempts, key = { it.id }) { attempt ->
                     AttemptRow(
                         item = attempt,
-                        onClick = onAttemptClick,
+                        isSelected = attempt.id == uiState.selectedAttemptId,
+                        onClick = { attemptId ->
+                            onAttemptSelected(attemptId)
+                            onAttemptClick(attemptId)
+                        },
+                        onHoverChange = { isHovered ->
+                            hoveredAttemptId = if (isHovered) attempt.id else hoveredAttemptId.takeUnless { it == attempt.id }
+                        },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }

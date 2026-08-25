@@ -36,6 +36,14 @@ class SegmentDetailViewModel @Inject constructor(
     /** Non-null once we've confirmed via Strava that this segment isn't starred there yet. */
     private val starPromptState = MutableStateFlow<StarPromptState?>(null)
 
+    /**
+     * The attempt last tapped in "All Attempts", so its dot on the Progress Over Time chart stays
+     * highlighted — a persistent marker of "what am I comparing" that survives navigating to
+     * Compare Rides and back (unlike hover, which is transient composition-local state and isn't
+     * available on touch anyway).
+     */
+    private val selectedAttemptId = MutableStateFlow<Long?>(null)
+
     /** The segment's external id, once resolved, so the star actions don't need a second lookup. */
     private var latestSegmentExternalId: String? = null
 
@@ -53,7 +61,8 @@ class SegmentDetailViewModel @Inject constructor(
         observeSegments().map { segments -> segments.find { it.id == segmentId } },
         observeSegmentAttempts(segmentId),
         starPromptState,
-    ) { segment, attempts, starPrompt ->
+        selectedAttemptId,
+    ) { segment, attempts, starPrompt, selectedId ->
         latestSegmentExternalId = segment?.externalId
         val sortedByDuration = attempts.sortedBy { it.duration }
         val personalBest = sortedByDuration.firstOrNull()
@@ -87,12 +96,17 @@ class SegmentDetailViewModel @Inject constructor(
                 it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
             },
             starPrompt = starPrompt,
+            selectedAttemptId = selectedId,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SegmentDetailUiState(),
     )
+
+    fun onAttemptSelected(attemptId: Long) {
+        selectedAttemptId.value = attemptId
+    }
 
     fun onDismissStarPrompt() {
         starPromptState.value = null

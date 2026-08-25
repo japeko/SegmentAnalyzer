@@ -19,6 +19,7 @@ fun SegmentDetailRoute(
         uiState = uiState,
         onBackClick = onBackClick,
         onAttemptClick = { attemptId -> uiState.segment?.let { onAttemptClick(it.id, attemptId) } },
+        onAttemptSelected = viewModel::onAttemptSelected,
         onStarSegmentClick = viewModel::onStarSegmentClick,
         onDismissStarPrompt = viewModel::onDismissStarPrompt,
         modifier = modifier,
