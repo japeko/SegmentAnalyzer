@@ -1,12 +1,14 @@
 package com.segmentanalyzer.feature.history.detail.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,14 +21,26 @@ import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.theme.NumericFontFamily
 import com.segmentanalyzer.feature.history.detail.StravaSegmentEffortItem
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StravaSegmentEffortRow(item: StravaSegmentEffortItem, onClick: (String) -> Unit, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth().clickable { onClick(item.segmentExternalId) }) {
+fun StravaSegmentEffortRow(
+    item: StravaSegmentEffortItem,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (isSelectionMode) {
+                Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.padding(end = 4.dp))
+            }
+
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = item.segmentName, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)

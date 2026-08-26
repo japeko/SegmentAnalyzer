@@ -66,6 +66,8 @@ fun HowToUseScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
                         "Tap + on the Rides tab to sign in with Garmin Connect and pull in recent activities.",
                     "Open a ride" to
                         "Tap it to see stats and, fetched live from Strava, every segment it passed through — needs a Strava activity recorded within a few minutes of the ride's start time, not just Strava being connected.",
+                    "Get Strava data for several segments" to
+                        "Long-press a segment in that list to select several, then tap Get Strava Data to fetch and save all of them at once instead of one by one.",
                     "Delete a ride" to
                         "Swipe it left, confirm, then tap Undo on the snackbar if you change your mind.",
                     "Bulk edit" to

@@ -78,6 +78,12 @@ class RideDetailViewModel @Inject constructor(
     /** Non-null while the rename/tag dialog is open, holding its in-progress (unsaved) field values. */
     private val editRequest = MutableStateFlow<EditRideRequest?>(null)
 
+    /** Non-empty means selection mode is active on "Segments in this Ride" — keyed by effortExternalId. */
+    private val selectedEffortIds = MutableStateFlow<Set<String>>(emptySet())
+
+    /** True while a bulk "Get Strava Data" fetch for [selectedEffortIds] is in flight. */
+    private val isFetchingSelectedEfforts = MutableStateFlow(false)
+
     private val coreState = combine(
         observeRide(rideId),
         observeStravaSegmentEfforts(rideId),
@@ -95,7 +101,13 @@ class RideDetailViewModel @Inject constructor(
         )
     }
 
-    val uiState = combine(coreState, expandedSegmentEffortDetail, observeRideTags(), editRequest) { core, expandedDetail, tags, edit ->
+    val uiState = combine(
+        coreState,
+        expandedSegmentEffortDetail,
+        observeRideTags(),
+        editRequest,
+        combine(selectedEffortIds, isFetchingSelectedEfforts) { selectedIds, fetching -> selectedIds to fetching },
+    ) { core, expandedDetail, tags, edit, (selectedIds, fetching) ->
         RideDetailUiState(
             isLoading = false,
             ride = core.ride,
@@ -111,6 +123,8 @@ class RideDetailViewModel @Inject constructor(
                     },
                 )
             },
+            selectedEffortIds = selectedIds,
+            isFetchingSelectedEfforts = fetching,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -171,6 +185,40 @@ class RideDetailViewModel @Inject constructor(
                     },
                 ),
             )
+        }
+    }
+
+    /** Long-pressed an effort row — enters selection mode (if not already in it) and selects it. */
+    fun onEffortLongPress(effortExternalId: String) {
+        selectedEffortIds.value = selectedEffortIds.value + effortExternalId
+    }
+
+    fun onEffortSelectionToggled(effortExternalId: String) {
+        val current = selectedEffortIds.value
+        selectedEffortIds.value = if (effortExternalId in current) current - effortExternalId else current + effortExternalId
+    }
+
+    fun onExitEffortSelectionMode() {
+        selectedEffortIds.value = emptySet()
+    }
+
+    /**
+     * Fetches and saves every selected effort's detail in one go, so the rider doesn't have to
+     * expand each row individually just to get it onto the Segments page.
+     */
+    fun onFetchSelectedEffortsClick() {
+        val ids = selectedEffortIds.value
+        if (ids.isEmpty()) return
+        isFetchingSelectedEfforts.value = true
+        viewModelScope.launch {
+            ids.forEach { effortExternalId ->
+                val effort = latestEfforts.find { it.effortExternalId == effortExternalId } ?: return@forEach
+                fetchStravaSegmentEffortDetail(effortExternalId).onSuccess { detail ->
+                    saveStravaSegmentEffortAttempt(rideId, effort, detail)
+                }
+            }
+            isFetchingSelectedEfforts.value = false
+            selectedEffortIds.value = emptySet()
         }
     }
 

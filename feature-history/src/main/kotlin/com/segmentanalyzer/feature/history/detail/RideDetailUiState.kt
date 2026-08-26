@@ -11,6 +11,10 @@ data class RideDetailUiState(
     val expandedSegmentEffortDetail: ExpandedSegmentEffortDetail? = null,
     /** Non-null while the rename/tag dialog is open. */
     val editDialog: EditRideDialogState? = null,
+    /** Non-empty means selection mode is active on "Segments in this Ride" — keyed by effortExternalId. */
+    val selectedEffortIds: Set<String> = emptySet(),
+    /** True while a bulk "Get Strava Data" fetch for [selectedEffortIds] is in flight. */
+    val isFetchingSelectedEfforts: Boolean = false,
 )
 
 /** Live state of the rename/tag/type dialog — [tagSuggestions] narrows as [tag] is typed. */

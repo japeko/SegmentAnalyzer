@@ -19,8 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Terrain
@@ -61,6 +63,10 @@ fun RideDetailScreen(
     onBackClick: () -> Unit,
     onFetchStravaSegmentsClick: () -> Unit,
     onStravaSegmentEffortClick: (Int, String) -> Unit,
+    onEffortLongPress: (String) -> Unit,
+    onEffortSelectionToggled: (String) -> Unit,
+    onExitEffortSelectionMode: () -> Unit,
+    onFetchSelectedEffortsClick: () -> Unit,
     onGoToSettingsClick: () -> Unit,
     onEditClick: () -> Unit,
     onDismissEdit: () -> Unit,
@@ -155,20 +161,34 @@ fun RideDetailScreen(
                 }
             }
 
+            val isEffortSelectionMode = uiState.selectedEffortIds.isNotEmpty()
             item {
-                Text(
-                    text = "Segments in this Ride",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialThemeExtras.textTertiary,
-                    modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
-                )
+                if (isEffortSelectionMode) {
+                    EffortSelectionActionRow(
+                        selectedCount = uiState.selectedEffortIds.size,
+                        isFetching = uiState.isFetchingSelectedEfforts,
+                        onFetchClick = onFetchSelectedEffortsClick,
+                        onCancelClick = onExitEffortSelectionMode,
+                    )
+                } else {
+                    Text(
+                        text = "Segments in this Ride",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialThemeExtras.textTertiary,
+                        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
+                    )
+                }
             }
             stravaEffortsSection(
                 state = uiState.stravaSegmentEfforts,
                 expandedDetail = uiState.expandedSegmentEffortDetail,
+                isSelectionMode = isEffortSelectionMode,
+                selectedEffortIds = uiState.selectedEffortIds,
                 onFetchClick = onFetchStravaSegmentsClick,
                 onEffortClick = onStravaSegmentEffortClick,
+                onEffortLongClick = onEffortLongPress,
+                onEffortSelectionToggled = onEffortSelectionToggled,
                 onGoToSettingsClick = onGoToSettingsClick,
             )
         }
@@ -257,8 +277,12 @@ private fun EditRideDialog(
 private fun LazyListScope.stravaEffortsSection(
     state: StravaEffortsUiState,
     expandedDetail: ExpandedSegmentEffortDetail?,
+    isSelectionMode: Boolean,
+    selectedEffortIds: Set<String>,
     onFetchClick: () -> Unit,
     onEffortClick: (Int, String) -> Unit,
+    onEffortLongClick: (String) -> Unit,
+    onEffortSelectionToggled: (String) -> Unit,
     onGoToSettingsClick: () -> Unit,
 ) {
     when (state) {
@@ -310,10 +334,19 @@ private fun LazyListScope.stravaEffortsSection(
                 Column {
                     StravaSegmentEffortRow(
                         item = effort,
-                        onClick = { onEffortClick(index, effort.effortExternalId) },
+                        isSelectionMode = isSelectionMode,
+                        isSelected = effort.effortExternalId in selectedEffortIds,
+                        onClick = {
+                            if (isSelectionMode) {
+                                onEffortSelectionToggled(effort.effortExternalId)
+                            } else {
+                                onEffortClick(index, effort.effortExternalId)
+                            }
+                        },
+                        onLongClick = { onEffortLongClick(effort.effortExternalId) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
-                    if (expandedDetail?.effortIndex == index) {
+                    if (!isSelectionMode && expandedDetail?.effortIndex == index) {
                         StravaSegmentEffortDetailPanel(
                             state = expandedDetail.state,
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -338,6 +371,38 @@ private fun StatsRow(ride: RideDetailInfo, modifier: Modifier = Modifier) {
         StatCard(label = "DURATION", value = ride.durationLabel)
         StatCard(label = "ELEV. GAIN", value = "%.0f m".format(ride.elevationGainMeters))
         StatCard(label = "AVG SPEED", value = "%.1f km/h".format(ride.avgSpeedKmh))
+    }
+}
+
+@Composable
+private fun EffortSelectionActionRow(
+    selectedCount: Int,
+    isFetching: Boolean,
+    onFetchClick: () -> Unit,
+    onCancelClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$selectedCount selected",
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialThemeExtras.textTertiary,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isFetching) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(end = 16.dp), strokeWidth = 2.dp)
+            } else {
+                TextButton(onClick = onFetchClick) { Text("Get Strava Data") }
+            }
+            IconButton(onClick = onCancelClick, enabled = !isFetching) {
+                Icon(Icons.Filled.Close, contentDescription = "Cancel selection")
+            }
+        }
     }
 }
 
