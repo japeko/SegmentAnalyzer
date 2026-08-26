@@ -139,8 +139,8 @@ private fun WhatItDoes(modifier: Modifier = Modifier) {
         FeatureRow(
             icon = Icons.Filled.Download,
             accent = MaterialTheme.colorScheme.primary,
-            title = "Import from anywhere",
-            description = "Garmin Connect sign-in, or a local .fit / .gpx file — no manual data entry.",
+            title = "Import from Garmin Connect",
+            description = "Sign in once and your rides pull in automatically — no manual data entry.",
         )
         FeatureRow(
             icon = Icons.Filled.Place,
@@ -158,7 +158,7 @@ private fun WhatItDoes(modifier: Modifier = Modifier) {
             icon = Icons.Filled.CloudOff,
             accent = MaterialTheme.colorScheme.tertiary,
             title = "Offline-first",
-            description = "Everything except import and map tiles works with no network connection.",
+            description = "Ride history and stats work with no network — import, map tiles, and a ride's live Strava segment list need one.",
         )
     }
 }
