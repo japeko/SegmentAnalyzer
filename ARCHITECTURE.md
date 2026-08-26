@@ -2,7 +2,7 @@
 
 *How the app is built, module by module: what each part does, how a ride gets from a file or an OAuth handshake into a gradient-colored line on a map, and where the current edges of the system are.*
 
-**Kotlin + Jetpack Compose · Clean Architecture, 11 Gradle modules · Room DB v6 · Offline-first**
+**Kotlin + Jetpack Compose · Clean Architecture, 11 Gradle modules · Room DB v13 · Offline-first**
 
 ---
 
@@ -16,7 +16,7 @@
 6. [Ride import](#6-ride-import--four-sources-one-contract)
 7. [Segment sync](#7-segment-sync)
 8. [Segment-attempt matching](#8-segment-attempt-matching)
-9. [Segment Detail & Compare Rides](#9-segment-detail--compare-rides)
+9. [Ride Detail, Segment Detail & Compare Rides](#9-ride-detail-segment-detail--compare-rides)
 10. [Navigation graph](#10-navigation-graph)
 11. [Known limits](#11-known-limits--stated-not-hidden)
 12. [Testing & verification](#12-testing--verification)
@@ -45,7 +45,7 @@ Segment Analyzer doesn't record rides and doesn't do leaderboards. It sits downs
 | Networking | OkHttp (+ Retrofit for Strava JSON) | Garmin SSO is HTML/form-based, not REST |
 | Maps | MapLibre GL (OSM raster tiles) | No API key, no vendor lock-in |
 | Charts | Hand-rolled Compose `Canvas` | No charting dependency yet |
-| Ride parsing | Official Garmin FIT SDK + built-in `XmlPullParser` | FIT for `.fit`, XML parsing for `.gpx` |
+| Ride parsing | Official Garmin FIT SDK + built-in `XmlPullParser` | FIT for `.fit`, XML parsing for `.gpx` — code still present, but not reachable from navigation; Garmin Connect is the only wired-up import source (see §6, §11) |
 | Testing | JUnit4 + MockK + Turbine | Flow-heavy ViewModels need Turbine |
 
 ---
@@ -62,7 +62,7 @@ Eleven Gradle modules, split so that business logic (`domain`) never imports an 
 | `core` | Shared Compose UI: theme, charts, the route map |
 | `common` | Date/duration formatting helpers |
 | `feature-history` | Rides tab, Records tab |
-| `feature-import` | Garmin / Strava / FIT / GPX import UI |
+| `feature-import` | Garmin import UI (only reachable import source); FIT/GPX import screens still exist here but aren't wired into the nav graph |
 | `feature-segments` | Segments list, Segment Detail |
 | `feature-analysis` | Compare Rides |
 | `feature-settings` | Account connections |
@@ -128,15 +128,17 @@ Every feature follows the same shape: a domain `repository` interface plus a `us
 
 ## 5. Data model
 
-Room database, currently at schema version 6, running in WAL mode. Four tables carry the whole app: a ride's summary, its raw GPS track, a starred segment's geometry, and the join between the two — a matched attempt.
+Room database, currently at schema version 13, running in WAL mode. Six tables carry the whole app: a ride's summary, its raw GPS track, a starred segment's geometry, the join between the two (a matched attempt), and a per-ride cache of Strava's own segment-effort data (list + optional point-by-point detail).
 
-**Fig. 2 — Entity-relationship diagram.** `RIDE_POINTS` only exists for FIT/GPX-imported rides (see §9). `SEGMENT_ATTEMPTS` is unique on `(segmentId, rideId, entryPointSequence)` so one ride can produce several rows — one per lap.
+**Fig. 2 — Entity-relationship diagram.** `RIDE_POINTS` only exists for legacy FIT/GPX-imported rides (see §6, §11) — Garmin-imported rides never have one. `SEGMENT_ATTEMPTS` is unique on `(segmentId, rideId, entryPointSequence)` so one ride can produce several rows — one per lap. `STRAVA_SEGMENT_EFFORTS` rows are fully replaced (delete-then-insert) on every live fetch for a ride, not accumulated as history. Deleting a ride cascades to both its `SEGMENT_ATTEMPTS` and `STRAVA_SEGMENT_EFFORTS` rows.
 
 ```mermaid
 erDiagram
     RIDES ||--o{ RIDE_POINTS : "has track"
     RIDES ||--o{ SEGMENT_ATTEMPTS : "matched in"
+    RIDES ||--o{ STRAVA_SEGMENT_EFFORTS : "cached from live fetch"
     SEGMENTS ||--o{ SEGMENT_ATTEMPTS : "matched in"
+    STRAVA_SEGMENT_EFFORTS ||--o{ STRAVA_SEGMENT_EFFORT_POINTS : "point-by-point detail"
 
     RIDES {
         long id PK
@@ -176,13 +178,34 @@ erDiagram
         int entryPointSequence
         int exitPointSequence
     }
+    STRAVA_SEGMENT_EFFORTS {
+        long id PK
+        long rideId FK
+        string effortExternalId
+        string segmentExternalId
+        long elapsedTimeSeconds
+        int komRank "nullable"
+        int prRank "nullable"
+        double avgWatts "nullable, fetched lazily"
+    }
+    STRAVA_SEGMENT_EFFORT_POINTS {
+        long id PK
+        string effortExternalId "no Room FK — not a rowid column"
+        int sequence
+        double latitude
+        double longitude
+    }
 ```
 
 Pre-release, schema changes use `fallbackToDestructiveMigration(dropAllTables = true)` rather than hand-written `Migration` objects — a deliberate, temporary trade explicitly chosen for this stage, not an oversight.
 
+Two small pieces of state live outside Room entirely, in plain `SharedPreferences` (not sensitive, no need for Room): which attempt ids the rider has swiped out of a segment's chart (`ExcludedAttemptsStore`) and which ride ids they've already opened (`ViewedRidesStore`). Both follow the same `*Store` (SharedPreferences) → `*RepositoryImpl` (`@Binds` in `RepositoryModule`) → domain `usecase` shape as everything else.
+
 ---
 
 ## 6. Ride import — four sources, one contract
+
+> **Current state.** Garmin Connect is the only import source reachable from the app's UI — the Rides tab's Import button goes straight to Garmin login, skipping the source picker entirely. FIT and GPX import (`ImportSourceScreen`, `FitFileImportRoute`, `GpxFileImportRoute`) and the Strava-ride-import path below still exist in `feature-import`/`domain`/`data` and still pass their own tests, they're just not wired into `SegmentAnalyzerNavHost`. See §11.
 
 Every importer ends at the same place: a domain `Ride` (plus, for two of the four sources, a full `List<TrackPoint>`) handed to `RideRepository.saveRide()`.
 
@@ -267,9 +290,19 @@ flowchart TD
 
 ---
 
-## 9. Segment Detail & Compare Rides
+## 9. Ride Detail, Segment Detail & Compare Rides
 
-Segments tab → tap a segment → **Segment Detail** (stats, PR hero card, progress-over-time chart, all-attempts list, each lap labeled `Ride 1`, `Ride 2`… in chronological order) → tap an attempt → **Compare Rides**.
+### Ride Detail
+
+Rides tab → tap a ride → **Ride Detail**. Its "Segments in this Ride" list is fetched live from Strava's API (`FetchStravaSegmentEffortsUseCase`) as soon as the ride loads — automatically, no manual "fetch" tap needed — rather than from the local GPS-matching pipeline in §8. It's cached locally (`STRAVA_SEGMENT_EFFORTS`, §5) so a re-fetch doesn't require re-opening the ride, but the cache is fully replaced on every live fetch, not accumulated. This needs a network connection every time; see §11.
+
+Swiping a ride left in the Rides list reveals "Delete" — crossing the threshold opens a confirmation dialog rather than deleting immediately (the row always snaps back into place; `SwipeToDismissBoxState.confirmValueChange` returns `false`), and confirming shows a "Deleted — Undo" snackbar. `DeleteRideUseCase` deletes the row (cascading to its `SEGMENT_ATTEMPTS`/`STRAVA_SEGMENT_EFFORTS` per the FK constraints in §5); `RestoreRideUseCase` re-inserts the captured `Ride` on Undo, but not its GPS track or cascaded rows — `Ride` objects read back from the repository never carry a track (see `RideRepository.observeRide`), and Garmin-imported rides never had one to begin with.
+
+### Segment Detail
+
+Segments tab → tap a segment → **Segment Detail** (stats, PR hero card, progress-over-time chart, all-attempts list, each lap labeled `Ride 1`, `Ride 2`… in chronological order — numbered over *every* attempt so it stays stable regardless of exclusion, computed separately from the personal-best/chart data below) → tap an attempt → **Compare Rides**.
+
+Swiping an attempt left excludes it from both the list and the chart (moving it to a collapsed "Excluded" section below); tapping the eye icon on an excluded attempt restores it. Exclusion is purely a display/PB-calculation filter — persisted in `ExcludedAttemptsStore` (§5), not a delete — so an excluded attempt can never become the segment's personal best, but it's never lost either. The attempt list itself can be reversed (oldest/newest first) via a header toggle, independent of the chart's own chronological ordering.
 
 ### Compare Rides
 
@@ -293,10 +326,8 @@ No charting library: `TimeGapChart` and the Segment Detail progress chart are ha
 
 ```mermaid
 graph LR
-    Rides(("Rides")) -->|"+"| ImportSrc["Import Rides"]
-    ImportSrc --> Garmin["Garmin Connect"]
-    ImportSrc --> FitI["FIT file"]
-    ImportSrc --> GpxI["GPX file"]
+    Rides(("Rides")) -->|"+"| Garmin["Garmin login"]
+    Rides -->|tap ride| RideDetail["Ride Detail"]
 
     Segments(("Segments")) -->|tap segment| Detail["Segment Detail"]
     Detail -->|tap attempt| Compare["Compare Rides"]
@@ -315,11 +346,16 @@ graph LR
     style Records fill:#ece9fc,stroke:#5b4fe0
 ```
 
+> The Rides tab's Import button used to open a source picker (Garmin/FIT/GPX); it now navigates straight to Garmin login (§6). The FIT/GPX routes and the picker screen are still registered in code but no longer reachable, so they're omitted above.
+
 ---
 
 ## 11. Known limits — stated, not hidden
 
-- **Garmin- and Strava-sourced rides never produce segment attempts.** Neither API returns a per-point track in what's currently integrated (Garmin's activity-list endpoint is summary-only; Strava ride import was explicitly declined). Only FIT/GPX imports have a track to match against.
+- **FIT/GPX import is currently unreachable from the UI.** Garmin Connect is the only wired-up import source (§6); the code, tests, and Room support for FIT/GPX still exist and pass, they're just not linked from `SegmentAnalyzerNavHost`. A consequence: since Garmin-imported rides never carry a GPS track (next bullet), essentially no ride imported going forward produces `SEGMENT_ATTEMPTS` via local matching (§8) — that pipeline is effectively dormant for new imports, kept alive only by legacy FIT/GPX rows and by re-matching when a new segment is starred.
+- **Garmin- and Strava-sourced rides never produce segment attempts via local matching.** Neither API returns a per-point track in what's currently integrated (Garmin's activity-list endpoint is summary-only; Strava ride import was explicitly declined). Only FIT/GPX imports have a track to match against — see above for why that path is currently dormant.
+- **Ride Detail's segment list needs a live connection every time.** Unlike local matching, it's a fresh Strava API call on every ride open (§9) — opening a ride offline shows no segment list until connectivity returns, even if it was fetched moments ago (the cache is a display convenience, not an offline fallback for a *different* app session).
+- **Undoing a ride delete doesn't restore its GPS track or cascaded rows.** `Ride` objects read back from `RideRepository` never carry a track, so `RestoreRideUseCase` can't put one back; its segment attempts and cached Strava effort data are gone for good. Currently harmless in practice since Garmin-imported rides (the only reachable source) never had a track to lose.
 - **FIT elevation isn't guaranteed even when a track exists** — confirmed on a real file where `RecordMesg.altitude` was never populated by the recording device.
 - **Offline-first tension:** the route map needs network for OSM tiles and renders blank offline — accepted for now, same spirit as import already needing network.
 - **Duplicate rides on re-import:** FIT/GPX imports have no external id to dedupe against, so re-importing the same file creates a second row.
