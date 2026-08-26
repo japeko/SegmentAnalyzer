@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,10 @@ import androidx.compose.ui.unit.sp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.theme.NumericFontFamily
 import com.segmentanalyzer.feature.segments.detail.AttemptItem
+
+/** Medal colors for 2nd/3rd place — fixed rather than theme-derived, same reasoning as a real medal's color not changing with its surroundings. */
+private val SilverMedal = Color(0xFFA8A9AD)
+private val BronzeMedal = Color(0xFFB5622B)
 
 @Composable
 fun AttemptRow(
@@ -55,7 +60,9 @@ fun AttemptRow(
 
     val borderColor = when {
         isHovered || isSelected -> MaterialTheme.colorScheme.primary
-        item.isPersonalBest -> MaterialTheme.colorScheme.tertiary
+        item.rank == 1 -> MaterialTheme.colorScheme.tertiary
+        item.rank == 2 -> SilverMedal
+        item.rank == 3 -> BronzeMedal
         else -> MaterialTheme.colorScheme.outline
     }
     // Composited to a fully opaque color rather than left translucent — this row can be the
@@ -66,7 +73,9 @@ fun AttemptRow(
     val containerColor = when {
         isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f).compositeOver(surface)
         isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f).compositeOver(surface)
-        item.isPersonalBest -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f).compositeOver(surface)
+        item.rank == 1 -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f).compositeOver(surface)
+        item.rank == 2 -> SilverMedal.copy(alpha = 0.18f).compositeOver(surface)
+        item.rank == 3 -> BronzeMedal.copy(alpha = 0.16f).compositeOver(surface)
         else -> surface
     }
 
@@ -85,12 +94,26 @@ fun AttemptRow(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = item.dateLabel, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
-                    if (item.isPersonalBest) {
-                        Text(
+                    when (item.rank) {
+                        1 -> Text(
                             text = "PR",
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                        2 -> Text(
+                            text = "2ND",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            color = SilverMedal,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                        3 -> Text(
+                            text = "3RD",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            color = BronzeMedal,
                             modifier = Modifier.padding(start = 6.dp),
                         )
                     }
@@ -114,7 +137,7 @@ fun AttemptRow(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(text = item.durationLabel, fontFamily = NumericFontFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                if (!item.isPersonalBest) {
+                if (item.rank != 1) {
                     Text(
                         text = "+%ds".format(item.deltaVsPrSeconds),
                         fontFamily = NumericFontFamily,

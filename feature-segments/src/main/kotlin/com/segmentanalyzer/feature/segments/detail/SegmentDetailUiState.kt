@@ -35,7 +35,8 @@ data class AttemptItem(
     val lapLabel: String,
     val durationLabel: String,
     val deltaVsPrSeconds: Long,
-    val isPersonalBest: Boolean,
+    /** 1/2/3 for the segment's three fastest (non-excluded) attempts, else null. 1 is the personal best. */
+    val rank: Int?,
     /** True if this attempt's stats/track came from a Strava segment effort, not local GPS matching. */
     val isFromStrava: Boolean,
 )

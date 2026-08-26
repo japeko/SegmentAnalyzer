@@ -92,6 +92,9 @@ class SegmentDetailViewModel @Inject constructor(
         } else {
             null
         }
+        // 1st/2nd/3rd fastest non-excluded attempts — an excluded attempt can't hold any of these,
+        // same reasoning as it can't hold the personal best.
+        val rankByAttemptId = sortedByDuration.take(3).mapIndexed { index, attempt -> attempt.id to index + 1 }.toMap()
 
         val minSeconds = visible.minOfOrNull { it.duration.seconds }
         val maxSeconds = visible.maxOfOrNull { it.duration.seconds }
@@ -107,14 +110,14 @@ class SegmentDetailViewModel @Inject constructor(
             isLoading = false,
             segment = segment,
             routePoints = segment?.routePoints().orEmpty(),
-            personalBest = personalBest?.toItem(personalBest.duration.seconds, personalBest.id, lapLabels.getValue(personalBest.id)),
+            personalBest = personalBest?.toItem(personalBest.duration.seconds, lapLabels.getValue(personalBest.id), rankByAttemptId[personalBest.id]),
             personalBestDeltaSeconds = personalBestDeltaSeconds,
             progressPoints = progressPoints,
             attempts = visible.map {
-                it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
+                it.toItem(personalBest?.duration?.seconds ?: 0, lapLabels.getValue(it.id), rankByAttemptId[it.id])
             }.let { if (reversed) it.asReversed() else it },
             excludedAttempts = excluded.map {
-                it.toItem(personalBest?.duration?.seconds ?: 0, personalBest?.id, lapLabels.getValue(it.id))
+                it.toItem(personalBest?.duration?.seconds ?: 0, lapLabels.getValue(it.id), rankByAttemptId[it.id])
             }.let { if (reversed) it.asReversed() else it },
             starPrompt = starPrompt,
             selectedAttemptId = selectedId,
@@ -166,7 +169,7 @@ private fun normalizedSpeed(seconds: Long, min: Long?, max: Long?): Float {
     return 1f - (seconds - min).toFloat() / (max - min).toFloat()
 }
 
-private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Long?, lapLabel: String): AttemptItem = AttemptItem(
+private fun SegmentAttempt.toItem(personalBestSeconds: Long, lapLabel: String, rank: Int?): AttemptItem = AttemptItem(
     id = id,
     rideId = rideId,
     rideName = rideName,
@@ -174,6 +177,6 @@ private fun SegmentAttempt.toItem(personalBestSeconds: Long, personalBestId: Lon
     lapLabel = lapLabel,
     durationLabel = duration.toRideClock(),
     deltaVsPrSeconds = duration.seconds - personalBestSeconds,
-    isPersonalBest = id == personalBestId,
+    rank = rank,
     isFromStrava = isFromStrava,
 )

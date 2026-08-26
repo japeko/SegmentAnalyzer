@@ -93,7 +93,38 @@ class SegmentDetailViewModelTest {
         assertEquals(listOf(1L, 3L, 2L), state.attempts.map { it.id }) // chronological
         assertEquals(0L, state.attempts.first { it.id == 2L }.deltaVsPrSeconds)
         assertEquals(3L, state.attempts.first { it.id == 3L }.deltaVsPrSeconds)
+        assertEquals(1, state.attempts.first { it.id == 2L }.rank) // fastest: 192s
+        assertEquals(2, state.attempts.first { it.id == 3L }.rank) // 2nd fastest: 195s
+        assertEquals(3, state.attempts.first { it.id == 1L }.rank) // 3rd fastest (slowest of 3): 200s
         collectJob.cancel()
+    }
+
+    @Test
+    fun `only the fastest three attempts get a rank, and an excluded attempt can't hold one`() = runTest(dispatcher) {
+        val attempts = listOf(
+            attempt(1, "Ride A", seconds = 200, startTime = Instant.parse("2026-06-01T00:00:00Z")),
+            attempt(2, "Ride B", seconds = 190, startTime = Instant.parse("2026-06-02T00:00:00Z")),
+            attempt(3, "Ride C", seconds = 195, startTime = Instant.parse("2026-06-03T00:00:00Z")),
+            attempt(4, "Ride D", seconds = 210, startTime = Instant.parse("2026-06-04T00:00:00Z")),
+        )
+        val viewModel = viewModel(attempts)
+
+        viewModel.uiState.test {
+            skipItems(1)
+            val initial = awaitItem()
+            assertEquals(1, initial.attempts.first { it.id == 2L }.rank) // 190s
+            assertEquals(2, initial.attempts.first { it.id == 3L }.rank) // 195s
+            assertEquals(3, initial.attempts.first { it.id == 1L }.rank) // 200s
+            assertEquals(null, initial.attempts.first { it.id == 4L }.rank) // 210s — 4th, unranked
+
+            // Excluding the fastest attempt should shift everyone else up a rank.
+            viewModel.onAttemptExcluded(2)
+            val afterExclude = awaitItem()
+            assertEquals(null, afterExclude.excludedAttempts.first { it.id == 2L }.rank)
+            assertEquals(1, afterExclude.attempts.first { it.id == 3L }.rank)
+            assertEquals(2, afterExclude.attempts.first { it.id == 1L }.rank)
+            assertEquals(3, afterExclude.attempts.first { it.id == 4L }.rank)
+        }
     }
 
     @Test
