@@ -49,6 +49,7 @@ import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.ui.ElevationSparkline
 import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.core.ui.StatCard
+import com.segmentanalyzer.core.ui.label
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortDetailPanel
 import com.segmentanalyzer.feature.history.detail.components.StravaSegmentEffortRow
@@ -345,14 +346,4 @@ private fun EmptyMessage(text: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
         Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-}
-
-private fun ActivityType.label(): String = when (this) {
-    ActivityType.MTB -> "MTB"
-    ActivityType.EMTB -> "E-MTB"
-    ActivityType.GRAVEL -> "Gravel"
-    ActivityType.EGRAVEL -> "E-Gravel"
-    ActivityType.ROAD -> "Road"
-    ActivityType.EROAD -> "E-Road"
-    ActivityType.OTHER -> "Other"
 }

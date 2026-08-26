@@ -42,6 +42,7 @@ import com.segmentanalyzer.core.theme.NumericFontFamily
 import com.segmentanalyzer.core.ui.ElevationSparkline
 import com.segmentanalyzer.core.ui.PbBadge
 import com.segmentanalyzer.core.ui.SourceTag
+import com.segmentanalyzer.core.ui.label
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.history.RideListItem
 import kotlin.math.roundToInt
@@ -232,14 +233,4 @@ private fun RideCardContent(
             }
         }
     }
-}
-
-private fun ActivityType.label(): String = when (this) {
-    ActivityType.MTB -> "MTB"
-    ActivityType.EMTB -> "E-MTB"
-    ActivityType.GRAVEL -> "Gravel"
-    ActivityType.EGRAVEL -> "E-Gravel"
-    ActivityType.ROAD -> "Road"
-    ActivityType.EROAD -> "E-Road"
-    ActivityType.OTHER -> "Other"
 }

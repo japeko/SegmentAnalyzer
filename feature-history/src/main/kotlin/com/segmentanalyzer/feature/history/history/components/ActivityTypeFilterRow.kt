@@ -10,20 +10,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.segmentanalyzer.core.ui.label
 import com.segmentanalyzer.domain.model.ActivityType
 
 private val filters: List<ActivityType?> = listOf(null) + ActivityType.entries
 
-private fun ActivityType?.label(): String = when (this) {
-    null -> "All"
-    ActivityType.MTB -> "MTB"
-    ActivityType.EMTB -> "E-MTB"
-    ActivityType.GRAVEL -> "Gravel"
-    ActivityType.EGRAVEL -> "E-Gravel"
-    ActivityType.ROAD -> "Road"
-    ActivityType.EROAD -> "E-Road"
-    ActivityType.OTHER -> "Other"
-}
+private fun ActivityType?.filterLabel(): String = this?.label() ?: "All"
 
 @Composable
 fun ActivityTypeFilterRow(
@@ -40,7 +32,7 @@ fun ActivityTypeFilterRow(
             FilterChip(
                 selected = filter == selected,
                 onClick = { onFilterSelected(filter) },
-                label = { Text(filter.label()) },
+                label = { Text(filter.filterLabel()) },
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }

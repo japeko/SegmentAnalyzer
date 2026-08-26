@@ -15,6 +15,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.segmentanalyzer.core.ui.label
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.history.BulkActivityTypeDialogState
 
@@ -57,14 +58,4 @@ fun BulkActivityTypeDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
-}
-
-private fun ActivityType.label(): String = when (this) {
-    ActivityType.MTB -> "MTB"
-    ActivityType.EMTB -> "E-MTB"
-    ActivityType.GRAVEL -> "Gravel"
-    ActivityType.EGRAVEL -> "E-Gravel"
-    ActivityType.ROAD -> "Road"
-    ActivityType.EROAD -> "E-Road"
-    ActivityType.OTHER -> "Other"
 }
