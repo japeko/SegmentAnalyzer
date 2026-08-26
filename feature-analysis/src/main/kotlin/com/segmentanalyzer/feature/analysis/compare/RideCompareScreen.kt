@@ -21,11 +21,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.ui.RoutePreviewCard
 import com.segmentanalyzer.feature.analysis.compare.components.AttemptChipRow
 import com.segmentanalyzer.feature.analysis.compare.components.CompareStatsCard
+import com.segmentanalyzer.feature.analysis.compare.components.DistanceAxisRow
+import com.segmentanalyzer.feature.analysis.compare.components.SlopeChart
+import com.segmentanalyzer.feature.analysis.compare.components.SpeedChart
 import com.segmentanalyzer.feature.analysis.compare.components.TimeGapChart
 import com.segmentanalyzer.feature.analysis.compare.picker.ComparePickerSheet
 
@@ -77,16 +81,42 @@ fun RideCompareScreen(
                 }
             }
 
-            if (uiState.timeGapSeries.isNotEmpty()) {
+            val hasDistanceCharts = uiState.slopePoints.isNotEmpty() || uiState.speedSeries.isNotEmpty() || uiState.timeGapSeries.isNotEmpty()
+            if (hasDistanceCharts) {
                 item {
-                    Text(
-                        text = "Time Gap vs Current Ride",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialThemeExtras.textTertiary,
-                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp),
+                    DistanceAxisRow(
+                        segmentDistanceMeters = uiState.segmentDistanceMeters,
+                        modifier = Modifier.padding(top = 18.dp),
                     )
                 }
+            }
+
+            if (uiState.slopePoints.isNotEmpty()) {
+                item { ChartSectionHeader("Slope") }
+                item {
+                    SlopeChart(
+                        points = uiState.slopePoints,
+                        selectedFraction = scrubFraction,
+                        onFractionSelected = { scrubFraction = it },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+
+            if (uiState.speedSeries.isNotEmpty()) {
+                item { ChartSectionHeader("Speed") }
+                item {
+                    SpeedChart(
+                        series = uiState.speedSeries,
+                        selectedFraction = scrubFraction,
+                        onFractionSelected = { scrubFraction = it },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+
+            if (uiState.timeGapSeries.isNotEmpty()) {
+                item { ChartSectionHeader("Time Gap vs Current Ride") }
                 item {
                     val currentColorIndex = uiState.chips.find { it.role == AttemptRole.CURRENT }?.colorIndex ?: 0
                     TimeGapChart(
@@ -100,15 +130,7 @@ fun RideCompareScreen(
             }
 
             if (uiState.statRows.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Stats",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialThemeExtras.textTertiary,
-                        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
-                    )
-                }
+                item { ChartSectionHeader("Stats", topPadding = 16.dp) }
                 item {
                     CompareStatsCard(
                         rows = uiState.statRows,
@@ -130,4 +152,16 @@ fun RideCompareScreen(
             }
         }
     }
+}
+
+/** Compact label above a stacked chart/card — kept small so several charts fit on one phone screen. */
+@Composable
+private fun ChartSectionHeader(title: String, topPadding: Dp = 12.dp) {
+    Text(
+        text = title,
+        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialThemeExtras.textTertiary,
+        modifier = Modifier.padding(start = 16.dp, top = topPadding, bottom = 4.dp),
+    )
 }

@@ -46,4 +46,35 @@ class GradientPercentTest {
         assertEquals(emptyList<Double>(), gradientPercentSegments(listOf(point(0.0, 0f, 0.0))))
         assertEquals(emptyList<Double>(), gradientPercentSegments(emptyList()))
     }
+
+    @Test
+    fun `slopeProfile resamples a constant grade across the requested distance range`() {
+        val points = listOf(point(0.0, 0f, 0.0), point(0.0009009, 10f, 100.0))
+
+        val profile = slopeProfile(points, sampleCount = 5)
+
+        assertEquals(listOf(0.0, 25.0, 50.0, 75.0, 100.0), profile.map { it.distanceMeters })
+        profile.forEach { assertEquals(10.0, it.gradePercent, 0.5) }
+    }
+
+    @Test
+    fun `slopeProfile reflects a grade change partway through`() {
+        // Flat first half, then a steep climb in the second half.
+        val points = listOf(
+            point(0.0, 0f, 0.0),
+            point(0.0, 0f, 50.0),
+            point(0.0009009, 10f, 100.0),
+        )
+
+        val profile = slopeProfile(points, sampleCount = 5)
+
+        assertEquals(0.0, profile.first().gradePercent, 0.5)
+        assertEquals(10.0, profile.last().gradePercent, 0.5)
+    }
+
+    @Test
+    fun `slopeProfile is empty for fewer than two points`() {
+        assertEquals(emptyList<SlopePoint>(), slopeProfile(listOf(point(0.0, 0f, 0.0))))
+        assertEquals(emptyList<SlopePoint>(), slopeProfile(emptyList()))
+    }
 }

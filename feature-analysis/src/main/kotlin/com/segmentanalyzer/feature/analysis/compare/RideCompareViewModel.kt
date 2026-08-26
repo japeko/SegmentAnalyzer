@@ -8,6 +8,7 @@ import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.LatLng
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.usecase.BuildSpeedSeriesUseCase
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
 import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
@@ -15,6 +16,7 @@ import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import com.segmentanalyzer.domain.util.gradientPercentSegments
 import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
 import com.segmentanalyzer.domain.util.routePoints
+import com.segmentanalyzer.domain.util.slopeProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +35,7 @@ class RideCompareViewModel @Inject constructor(
     observeSegments: ObserveSegmentsUseCase,
     observeSegmentAttempts: ObserveSegmentAttemptsUseCase,
     private val buildTimeGapSeries: BuildTimeGapSeriesUseCase,
+    private val buildSpeedSeries: BuildSpeedSeriesUseCase,
     private val getAttemptTrack: GetAttemptTrackUseCase,
 ) : ViewModel() {
 
@@ -114,6 +117,22 @@ class RideCompareViewModel @Inject constructor(
             emptyList()
         }
 
+        val allChipIds = chips.map { it.attemptId }
+        val speedSeries = if (allChipIds.isNotEmpty()) {
+            val colorByAttemptId = chips.associate { it.attemptId to it.colorIndex }
+            buildSpeedSeries(allChipIds, segment.distanceMeters).map { series ->
+                SpeedSeriesUi(
+                    attemptId = series.attemptId,
+                    colorIndex = colorByAttemptId[series.attemptId] ?: 0,
+                    points = series.points,
+                )
+            }
+        } else {
+            emptyList()
+        }
+
+        val slopePoints = slopeProfile(track)
+
         val addable = attempts.map { attempt ->
             AddableAttemptItem(
                 id = attempt.id,
@@ -135,6 +154,9 @@ class RideCompareViewModel @Inject constructor(
             gradientPercents = if (track.isNotEmpty()) gradientPercentSegments(track) else null,
             chips = chips,
             timeGapSeries = timeGapSeries,
+            speedSeries = speedSeries,
+            slopePoints = slopePoints,
+            segmentDistanceMeters = segment.distanceMeters,
             statRows = buildStatRows(chips, attempts),
             isAddSheetVisible = sheet.isVisible,
             addableAttempts = addable,

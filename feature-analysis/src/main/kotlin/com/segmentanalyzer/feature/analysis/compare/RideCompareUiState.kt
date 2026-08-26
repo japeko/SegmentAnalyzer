@@ -1,7 +1,9 @@
 package com.segmentanalyzer.feature.analysis.compare
 
 import com.segmentanalyzer.domain.model.LatLng
+import com.segmentanalyzer.domain.usecase.SpeedPoint
 import com.segmentanalyzer.domain.usecase.TimeGapPoint
+import com.segmentanalyzer.domain.util.SlopePoint
 
 enum class AttemptRole { CURRENT, PERSONAL_BEST, PREVIOUS, SELECTED }
 
@@ -15,6 +17,8 @@ data class AttemptChip(
 )
 
 data class TimeGapSeriesUi(val attemptId: Long, val colorIndex: Int, val points: List<TimeGapPoint>)
+
+data class SpeedSeriesUi(val attemptId: Long, val colorIndex: Int, val points: List<SpeedPoint>)
 
 data class CompareStatValue(val attemptId: Long, val colorIndex: Int, val label: String, val fraction: Float, val isBest: Boolean)
 
@@ -38,6 +42,11 @@ data class RideCompareUiState(
     val gradientPercents: List<Double>? = null,
     val chips: List<AttemptChip> = emptyList(),
     val timeGapSeries: List<TimeGapSeriesUi> = emptyList(),
+    val speedSeries: List<SpeedSeriesUi> = emptyList(),
+    /** One line, not per-attempt — slope is a property of the route, not of any one ride's pace along it. */
+    val slopePoints: List<SlopePoint> = emptyList(),
+    /** True once distance-based charts (Slope/Speed/Time Gap) have real data — drives the shared distance-axis row. */
+    val segmentDistanceMeters: Double = 0.0,
     val statRows: List<CompareStatRow> = emptyList(),
     val isAddSheetVisible: Boolean = false,
     val addableAttempts: List<AddableAttemptItem> = emptyList(),

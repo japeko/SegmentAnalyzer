@@ -7,6 +7,7 @@ import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
+import com.segmentanalyzer.domain.usecase.BuildSpeedSeriesUseCase
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
 import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
@@ -286,6 +287,7 @@ class RideCompareViewModelTest {
             ObserveSegmentsUseCase(FakeCompareSegmentRepository()),
             ObserveSegmentAttemptsUseCase(attemptRepository),
             BuildTimeGapSeriesUseCase(attemptRepository),
+            BuildSpeedSeriesUseCase(attemptRepository),
             GetAttemptTrackUseCase(attemptRepository),
         )
     }
