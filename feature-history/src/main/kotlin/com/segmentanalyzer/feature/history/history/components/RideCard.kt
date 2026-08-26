@@ -5,9 +5,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,14 +17,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,9 +46,80 @@ import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.feature.history.history.RideListItem
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * A [RideListItem] card. Outside selection mode, swiping it left reveals "Delete" — swiping past
+ * the threshold requests confirmation via [onDeleteRequested] rather than deleting immediately;
+ * the card always snaps back into place, since the actual removal (if confirmed) happens through
+ * the rest of the list re-rendering once the ride is gone, not through this swipe settling into a
+ * dismissed state.
+ */
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun RideCard(
+    item: RideListItem,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onClick: (Long) -> Unit,
+    onLongClick: (Long) -> Unit,
+    onDeleteRequested: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (isSelectionMode) {
+        RideCardContent(
+            item = item,
+            isSelectionMode = true,
+            isSelected = isSelected,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            modifier = modifier,
+        )
+        return
+    }
+
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) onDeleteRequested(item.id)
+            false
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.85f))
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onError,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+        },
+    ) {
+        RideCardContent(
+            item = item,
+            isSelectionMode = false,
+            isSelected = isSelected,
+            onClick = onClick,
+            onLongClick = onLongClick,
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RideCardContent(
     item: RideListItem,
     isSelectionMode: Boolean,
     isSelected: Boolean,

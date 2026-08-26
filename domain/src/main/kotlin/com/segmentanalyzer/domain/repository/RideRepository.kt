@@ -37,6 +37,9 @@ interface RideRepository {
     /** Sets the same activity type on every ride in [rideIds] at once. */
     suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType)
 
+    /** Deletes [rideId] and, via cascade, its segment attempts and any cached Strava effort data. */
+    suspend fun deleteRide(rideId: Long)
+
     /** Every distinct, non-blank tag currently in use, for autocomplete when editing a ride. */
     fun observeAllTags(): Flow<List<String>>
 }

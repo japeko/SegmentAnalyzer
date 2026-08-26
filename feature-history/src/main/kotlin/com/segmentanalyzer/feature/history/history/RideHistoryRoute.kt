@@ -37,6 +37,11 @@ fun RideHistoryRoute(
         onSearchClick = onSearchClick,
         onImportClick = onImportClick,
         onNewPBsClick = onNewPBsClick,
+        onDeleteRideRequested = viewModel::onDeleteRideRequested,
+        onDismissDeleteRide = viewModel::onDismissDeleteRide,
+        onConfirmDeleteRide = viewModel::onConfirmDeleteRide,
+        onUndoDeleteRideClick = viewModel::onUndoDeleteRideClick,
+        onUndoDeleteRideSnackbarDismissed = viewModel::onUndoDeleteRideSnackbarDismissed,
         modifier = modifier,
     )
 }

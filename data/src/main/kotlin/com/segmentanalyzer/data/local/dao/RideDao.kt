@@ -44,6 +44,10 @@ interface RideDao {
     @Query("UPDATE rides SET activityType = :activityType WHERE id IN (:rideIds)")
     suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType)
 
+    /** Cascades to that ride's segment_attempts and strava_segment_efforts (both have an ON DELETE CASCADE foreign key on rideId). */
+    @Query("DELETE FROM rides WHERE id = :rideId")
+    suspend fun deleteById(rideId: Long)
+
     @Query("SELECT DISTINCT tag FROM rides WHERE tag IS NOT NULL AND tag != '' ORDER BY tag ASC")
     fun observeDistinctTags(): Flow<List<String>>
 }

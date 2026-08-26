@@ -53,6 +53,8 @@ class RideRepositoryImpl @Inject constructor(
     override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) =
         rideDao.setActivityTypeForRides(rideIds, activityType)
 
+    override suspend fun deleteRide(rideId: Long) = rideDao.deleteById(rideId)
+
     override fun observeAllTags(): Flow<List<String>> = rideDao.observeDistinctTags()
 }
 

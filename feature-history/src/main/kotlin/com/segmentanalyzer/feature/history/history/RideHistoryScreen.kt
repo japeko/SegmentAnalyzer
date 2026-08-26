@@ -5,10 +5,18 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -49,12 +57,29 @@ fun RideHistoryScreen(
     onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
     onNewPBsClick: () -> Unit,
+    onDeleteRideRequested: (Long) -> Unit,
+    onDismissDeleteRide: () -> Unit,
+    onConfirmDeleteRide: () -> Unit,
+    onUndoDeleteRideClick: () -> Unit,
+    onUndoDeleteRideSnackbarDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isSelectionMode = uiState.selectedRideIds.isNotEmpty()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.undoDeleteRide) {
+        val undo = uiState.undoDeleteRide ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Deleted \"${undo.rideName}\"",
+            actionLabel = "Undo",
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) onUndoDeleteRideClick() else onUndoDeleteRideSnackbarDismissed()
+    }
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (isSelectionMode) {
                 RideSelectionTopBar(
@@ -112,6 +137,7 @@ fun RideHistoryScreen(
                     isSelected = ride.id in uiState.selectedRideIds,
                     onClick = { id -> if (isSelectionMode) onRideSelectionToggled(id) else onRideClick(id) },
                     onLongClick = onRideLongPress,
+                    onDeleteRequested = onDeleteRideRequested,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
                 )
             }
@@ -134,6 +160,20 @@ fun RideHistoryScreen(
             onTypeSelected = onActivityTypeDialogSelected,
             onDismiss = onDismissActivityTypeDialog,
             onSaveClick = onConfirmSetActivityType,
+        )
+    }
+
+    uiState.pendingDeleteRide?.let { ride ->
+        AlertDialog(
+            onDismissRequest = onDismissDeleteRide,
+            title = { Text("Delete this ride?") },
+            text = { Text("\"${ride.name}\" and its segment data will be removed. You can undo this right after.") },
+            confirmButton = {
+                TextButton(onClick = onConfirmDeleteRide) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissDeleteRide) { Text("Cancel") }
+            },
         )
     }
 }
@@ -206,6 +246,11 @@ private fun RideHistoryScreenLightPreview() {
             onSearchClick = {},
             onImportClick  = {},
             onNewPBsClick = {},
+            onDeleteRideRequested = {},
+            onDismissDeleteRide = {},
+            onConfirmDeleteRide = {},
+            onUndoDeleteRideClick = {},
+            onUndoDeleteRideSnackbarDismissed = {},
         )
     }
 }
@@ -234,6 +279,11 @@ private fun RideHistoryScreenDarkPreview() {
             onSearchClick = {},
             onImportClick = {},
             onNewPBsClick = {},
+            onDeleteRideRequested = {},
+            onDismissDeleteRide = {},
+            onConfirmDeleteRide = {},
+            onUndoDeleteRideClick = {},
+            onUndoDeleteRideSnackbarDismissed = {},
         )
     }
 }

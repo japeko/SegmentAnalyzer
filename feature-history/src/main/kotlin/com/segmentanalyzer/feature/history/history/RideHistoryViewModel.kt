@@ -7,10 +7,12 @@ import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.SummaryPeriod
+import com.segmentanalyzer.domain.usecase.DeleteRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveViewedRideIdsUseCase
+import com.segmentanalyzer.domain.usecase.RestoreRideUseCase
 import com.segmentanalyzer.domain.usecase.RideSummary
 import com.segmentanalyzer.domain.usecase.SetActivityTypeForRidesUseCase
 import com.segmentanalyzer.domain.usecase.SetTagForRidesUseCase
@@ -34,6 +36,8 @@ class RideHistoryViewModel @Inject constructor(
     observeViewedRideIds: ObserveViewedRideIdsUseCase,
     private val setTagForRides: SetTagForRidesUseCase,
     private val setActivityTypeForRides: SetActivityTypeForRidesUseCase,
+    private val deleteRide: DeleteRideUseCase,
+    private val restoreRide: RestoreRideUseCase,
 ) : ViewModel() {
 
     private val selectedFilter = MutableStateFlow<ActivityType?>(null)
@@ -49,19 +53,35 @@ class RideHistoryViewModel @Inject constructor(
     private val activityTypeDialogOpen = MutableStateFlow(false)
     private val activityTypeDialogSelection = MutableStateFlow<ActivityType?>(null)
 
+    /** Non-null while the "delete this ride?" confirmation dialog (from a swipe) is open. */
+    private val pendingDeleteRideId = MutableStateFlow<Long?>(null)
+
+    /** The just-deleted ride, kept around so the "Undo" snackbar action can restore it. */
+    private val pendingUndoRide = MutableStateFlow<Ride?>(null)
+
+    /** The most recent ride list, so a delete/undo can look up a full [Ride] by id without a second subscription. */
+    private var latestRides: List<Ride> = emptyList()
+
     private val coreState = combine(
         combine(selectedFilter, selectedPeriod) { filter, period -> filter to period }
             .flatMapLatest { (filter, period) -> observeRideHistory(filter, period) },
         selectedPeriod.flatMapLatest { observeRideSummary(it) },
         selectedFilter,
         selectedPeriod,
-    ) { rides, summary, filter, period -> CoreHistory(rides, summary, filter, period) }
+    ) { rides, summary, filter, period ->
+        latestRides = rides
+        CoreHistory(rides, summary, filter, period)
+    }
 
     private val dialogsState = combine(
         tagDialogText,
         activityTypeDialogOpen,
         activityTypeDialogSelection,
-    ) { tagText, typeDialogOpen, typeSelection -> DialogsState(tagText, typeDialogOpen, typeSelection) }
+        pendingDeleteRideId,
+        pendingUndoRide,
+    ) { tagText, typeDialogOpen, typeSelection, deleteRideId, undoRide ->
+        DialogsState(tagText, typeDialogOpen, typeSelection, deleteRideId, undoRide)
+    }
 
     val uiState: StateFlow<RideHistoryUiState> = combine(
         coreState,
@@ -91,6 +111,9 @@ class RideHistoryViewModel @Inject constructor(
             } else {
                 null
             },
+            pendingDeleteRide = dialogs.deleteRideId?.let { id -> core.rides.find { it.id == id } }
+                ?.toListItem(isViewed = false),
+            undoDeleteRide = dialogs.undoRide?.let { UndoDeleteRideState(rideId = it.id, rideName = it.name) },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -173,6 +196,37 @@ class RideHistoryViewModel @Inject constructor(
             selectedRideIds.value = emptySet()
         }
     }
+
+    /** Swiped a ride left — asks for confirmation before actually deleting anything. */
+    fun onDeleteRideRequested(rideId: Long) {
+        pendingDeleteRideId.value = rideId
+    }
+
+    fun onDismissDeleteRide() {
+        pendingDeleteRideId.value = null
+    }
+
+    fun onConfirmDeleteRide() {
+        val rideId = pendingDeleteRideId.value ?: return
+        val ride = latestRides.find { it.id == rideId } ?: return
+        viewModelScope.launch {
+            deleteRide(rideId)
+            pendingDeleteRideId.value = null
+            pendingUndoRide.value = ride
+        }
+    }
+
+    /** The "Undo" snackbar action was tapped — restores the ride that was just deleted. */
+    fun onUndoDeleteRideClick() {
+        val ride = pendingUndoRide.value ?: return
+        viewModelScope.launch { restoreRide(ride) }
+        pendingUndoRide.value = null
+    }
+
+    /** The undo snackbar timed out or was swiped away without tapping "Undo" — the delete stands. */
+    fun onUndoDeleteRideSnackbarDismissed() {
+        pendingUndoRide.value = null
+    }
 }
 
 private data class CoreHistory(
@@ -186,6 +240,8 @@ private data class DialogsState(
     val tagText: String?,
     val activityTypeDialogOpen: Boolean,
     val activityTypeSelection: ActivityType?,
+    val deleteRideId: Long?,
+    val undoRide: Ride?,
 )
 
 private fun Ride.toListItem(isViewed: Boolean): RideListItem = RideListItem(

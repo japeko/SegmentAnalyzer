@@ -7,11 +7,13 @@ import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.ViewedRidesRepository
+import com.segmentanalyzer.domain.usecase.DeleteRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideHistoryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideSummaryUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentRecordsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveViewedRideIdsUseCase
+import com.segmentanalyzer.domain.usecase.RestoreRideUseCase
 import com.segmentanalyzer.domain.usecase.SetActivityTypeForRidesUseCase
 import com.segmentanalyzer.domain.usecase.SetTagForRidesUseCase
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +84,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         // `onFilterSelected` changes both the direct selectedFilter flow and (via flatMapLatest)
@@ -116,6 +120,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(viewedRidesRepository),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -142,6 +148,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -176,6 +184,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -202,6 +212,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -237,6 +249,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -280,6 +294,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -319,6 +335,8 @@ class RideHistoryViewModelTest {
             ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
             SetTagForRidesUseCase(repository),
             SetActivityTypeForRidesUseCase(repository),
+            DeleteRideUseCase(repository),
+            RestoreRideUseCase(repository),
         )
 
         val collectJob = launch { viewModel.uiState.collect {} }
@@ -334,6 +352,124 @@ class RideHistoryViewModelTest {
         assertEquals(1, viewModel.uiState.value.activityTypeDialog?.selectedCount) // dialog still open
         collectJob.cancel()
     }
+
+    @Test
+    fun `requesting delete shows a confirmation dialog without deleting yet`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB))
+        val repository = FakeRideRepository(rides)
+        val viewModel = viewModel(repository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onDeleteRideRequested(1)
+        advanceUntilIdle()
+
+        assertEquals("Skyline Ridge Loop", viewModel.uiState.value.pendingDeleteRide?.name)
+        assertTrue(repository.deleteCalls.isEmpty())
+        assertEquals(1, viewModel.uiState.value.rides.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `dismissing the delete confirmation deletes nothing`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB))
+        val repository = FakeRideRepository(rides)
+        val viewModel = viewModel(repository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onDeleteRideRequested(1)
+        viewModel.onDismissDeleteRide()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.pendingDeleteRide)
+        assertTrue(repository.deleteCalls.isEmpty())
+        assertEquals(1, viewModel.uiState.value.rides.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `confirming delete removes the ride and shows the undo snackbar state`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(
+            ride(1, "Skyline Ridge Loop", ActivityType.MTB),
+            ride(2, "Sunday Club Ride", ActivityType.ROAD),
+        )
+        val repository = FakeRideRepository(rides)
+        val viewModel = viewModel(repository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onDeleteRideRequested(1)
+        viewModel.onConfirmDeleteRide()
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L), repository.deleteCalls)
+        assertEquals(null, viewModel.uiState.value.pendingDeleteRide)
+        assertEquals(listOf(2L), viewModel.uiState.value.rides.map { it.id })
+        assertEquals(1L, viewModel.uiState.value.undoDeleteRide?.rideId)
+        assertEquals("Skyline Ridge Loop", viewModel.uiState.value.undoDeleteRide?.rideName)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `undo after a delete restores the ride`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB))
+        val repository = FakeRideRepository(rides)
+        val viewModel = viewModel(repository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onDeleteRideRequested(1)
+        viewModel.onConfirmDeleteRide()
+        advanceUntilIdle()
+        assertEquals(0, viewModel.uiState.value.rides.size)
+
+        viewModel.onUndoDeleteRideClick()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.savedRides.size)
+        assertEquals("Skyline Ridge Loop", repository.savedRides.single().name)
+        assertEquals(null, viewModel.uiState.value.undoDeleteRide)
+        assertEquals(1, viewModel.uiState.value.rides.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `dismissing the undo snackbar without tapping undo leaves the delete in place`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(ride(1, "Skyline Ridge Loop", ActivityType.MTB))
+        val repository = FakeRideRepository(rides)
+        val viewModel = viewModel(repository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onDeleteRideRequested(1)
+        viewModel.onConfirmDeleteRide()
+        advanceUntilIdle()
+
+        viewModel.onUndoDeleteRideSnackbarDismissed()
+        advanceUntilIdle()
+
+        assertTrue(repository.savedRides.isEmpty())
+        assertEquals(null, viewModel.uiState.value.undoDeleteRide)
+        assertEquals(0, viewModel.uiState.value.rides.size)
+        collectJob.cancel()
+    }
+
+    private fun viewModel(repository: FakeRideRepository) = RideHistoryViewModel(
+        ObserveRideHistoryUseCase(repository),
+        ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),
+        ObserveRideTagsUseCase(repository),
+        ObserveViewedRideIdsUseCase(FakeRideHistoryViewedRidesRepository()),
+        SetTagForRidesUseCase(repository),
+        SetActivityTypeForRidesUseCase(repository),
+        DeleteRideUseCase(repository),
+        RestoreRideUseCase(repository),
+    )
 }
 
 private class FakeRideRepository(rides: List<Ride>, tags: List<String> = emptyList()) : RideRepository {
@@ -346,11 +482,22 @@ private class FakeRideRepository(rides: List<Ride>, tags: List<String> = emptyLi
     data class SetActivityTypeCall(val rideIds: List<Long>, val activityType: ActivityType)
     val setActivityTypeCalls = mutableListOf<SetActivityTypeCall>()
 
+    val deleteCalls = mutableListOf<Long>()
+    val savedRides = mutableListOf<Ride>()
+    private var nextId = (rides.maxOfOrNull { it.id } ?: 0L) + 1
+
     override fun observeRides() = flow
     override fun observeRide(rideId: Long): Flow<Ride?> = MutableStateFlow(null)
     override fun observeHasTrack(rideId: Long): Flow<Boolean> = MutableStateFlow(false)
     override suspend fun saveRides(rides: List<Ride>): Int = 0
-    override suspend fun saveRide(ride: Ride): Long? = null
+
+    override suspend fun saveRide(ride: Ride): Long? {
+        savedRides += ride
+        val id = nextId++
+        flow.value = flow.value + ride.copy(id = id)
+        return id
+    }
+
     override suspend fun updateRide(rideId: Long, name: String, tag: String?, activityType: ActivityType) = Unit
 
     override suspend fun setTagForRides(rideIds: List<Long>, tag: String?) {
@@ -359,6 +506,11 @@ private class FakeRideRepository(rides: List<Ride>, tags: List<String> = emptyLi
 
     override suspend fun setActivityTypeForRides(rideIds: List<Long>, activityType: ActivityType) {
         setActivityTypeCalls += SetActivityTypeCall(rideIds, activityType)
+    }
+
+    override suspend fun deleteRide(rideId: Long) {
+        deleteCalls += rideId
+        flow.value = flow.value.filterNot { it.id == rideId }
     }
 
     override fun observeAllTags(): Flow<List<String>> = tagsFlow

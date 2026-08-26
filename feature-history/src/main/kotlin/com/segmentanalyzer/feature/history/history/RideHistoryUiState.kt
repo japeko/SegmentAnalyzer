@@ -17,7 +17,14 @@ data class RideHistoryUiState(
     val tagDialog: BulkTagDialogState? = null,
     /** Non-null while the "set activity type for selected rides" dialog is open. */
     val activityTypeDialog: BulkActivityTypeDialogState? = null,
+    /** Non-null while the "delete this ride?" confirmation dialog (from a swipe) is open. */
+    val pendingDeleteRide: RideListItem? = null,
+    /** Non-null right after a delete is confirmed — drives the "Ride deleted — Undo" snackbar. */
+    val undoDeleteRide: UndoDeleteRideState? = null,
 )
+
+/** [rideId]/[rideName] of the just-deleted ride, for the undo snackbar's message and its Compose key. */
+data class UndoDeleteRideState(val rideId: Long, val rideName: String)
 
 /** Live state of the bulk tag dialog — [tagSuggestions] narrows as [tag] is typed. */
 data class BulkTagDialogState(
