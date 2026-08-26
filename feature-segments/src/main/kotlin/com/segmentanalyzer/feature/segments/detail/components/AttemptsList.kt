@@ -43,8 +43,8 @@ import com.segmentanalyzer.core.theme.NumericFontFamily
 import com.segmentanalyzer.feature.segments.detail.AttemptItem
 
 /** Medal colors for 2nd/3rd place — fixed rather than theme-derived, same reasoning as a real medal's color not changing with its surroundings. */
-private val SilverMedal = Color(0xFFA8A9AD)
-private val BronzeMedal = Color(0xFFB5622B)
+internal val SilverMedal = Color(0xFFA8A9AD)
+internal val BronzeMedal = Color(0xFFB5622B)
 
 @Composable
 fun AttemptRow(

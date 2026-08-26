@@ -102,7 +102,7 @@ class SegmentDetailViewModel @Inject constructor(
             ProgressPoint(
                 attemptId = attempt.id,
                 normalizedY = normalizedSpeed(attempt.duration.seconds, minSeconds, maxSeconds),
-                isPersonalBest = attempt.id == personalBest?.id,
+                rank = rankByAttemptId[attempt.id],
             )
         }
 

@@ -61,7 +61,9 @@ fun ProgressChart(points: List<ProgressPoint>, highlightedAttemptId: Long? = nul
                     drawCircle(color = highlightColor.copy(alpha = 0.25f), radius = 9.dp.toPx(), center = offset)
                     drawCircle(color = highlightColor, radius = 6.dp.toPx(), center = offset)
                 }
-                point.isPersonalBest -> drawCircle(color = prColor, radius = 5.dp.toPx(), center = offset)
+                point.rank == 1 -> drawCircle(color = prColor, radius = 5.dp.toPx(), center = offset)
+                point.rank == 2 -> drawCircle(color = SilverMedal, radius = 5.dp.toPx(), center = offset)
+                point.rank == 3 -> drawCircle(color = BronzeMedal, radius = 5.dp.toPx(), center = offset)
                 else -> drawCircle(color = lineColor, radius = 3.dp.toPx(), center = offset)
             }
         }

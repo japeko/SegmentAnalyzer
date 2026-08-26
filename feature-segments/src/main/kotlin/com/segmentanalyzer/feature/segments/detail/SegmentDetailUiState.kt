@@ -41,4 +41,5 @@ data class AttemptItem(
     val isFromStrava: Boolean,
 )
 
-data class ProgressPoint(val attemptId: Long, val normalizedY: Float, val isPersonalBest: Boolean)
+/** [rank] is 1/2/3 for the segment's three fastest (non-excluded) attempts, else null — same as [AttemptItem.rank]. */
+data class ProgressPoint(val attemptId: Long, val normalizedY: Float, val rank: Int?)
