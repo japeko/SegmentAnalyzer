@@ -7,6 +7,7 @@ import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.ActivityType
 import com.segmentanalyzer.domain.model.Ride
+import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
@@ -14,6 +15,7 @@ import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.MarkRideViewedUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
+import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase
 import com.segmentanalyzer.domain.usecase.UpdateRideUseCase
@@ -32,6 +34,7 @@ class RideDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeRide: ObserveRideUseCase,
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
+    observeStravaConnectionState: ObserveStravaConnectionStateUseCase,
     observeRideTags: ObserveRideTagsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEffortDetail: FetchStravaSegmentEffortDetailUseCase,
@@ -45,10 +48,14 @@ class RideDetailViewModel @Inject constructor(
     init {
         viewModelScope.launch { markRideViewed(rideId) }
         // No local segment-matching cache on this branch — go straight to Strava's live API as
-        // soon as the ride is known, instead of waiting for a manual "fetch" tap.
+        // soon as the ride is known, instead of waiting for a manual "fetch" tap. Skips the call
+        // entirely (and reactively retries) while Strava isn't connected, rather than firing a
+        // network call doomed to fail with an auth error every time.
         viewModelScope.launch {
             val ride = observeRide(rideId).filterNotNull().first()
-            fetchSegments(ride)
+            observeStravaConnectionState().collect { state ->
+                if (state is StravaConnectionState.Connected) fetchSegments(ride)
+            }
         }
     }
 
@@ -75,12 +82,16 @@ class RideDetailViewModel @Inject constructor(
         observeRide(rideId),
         observeStravaSegmentEfforts(rideId),
         stravaEffortsOverride,
-    ) { ride, cachedEfforts, override ->
+        observeStravaConnectionState(),
+    ) { ride, cachedEfforts, override, connectionState ->
         latestRide = ride
         latestEfforts = cachedEfforts
         CoreRideDetail(
             ride = ride?.toInfo(),
-            stravaSegmentEfforts = override ?: cachedEfforts.toUiState(),
+            stravaSegmentEfforts = when {
+                connectionState !is StravaConnectionState.Connected -> StravaEffortsUiState.NotConnected
+                else -> override ?: cachedEfforts.toUiState()
+            },
         )
     }
 

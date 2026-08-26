@@ -132,6 +132,48 @@ class RideDetailViewModelTest {
     }
 
     @Test
+    fun `when Strava isn't connected, no fetch is attempted and the state says so`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            ride = ride,
+            stravaAccountRepository = FakeRideDetailStravaAccountRepository(connected = false),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(StravaEffortsUiState.NotConnected, viewModel.uiState.value.stravaSegmentEfforts)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `connecting Strava while the screen is open triggers the fetch that was skipped`() = runTest(dispatcher) {
+        val stravaAccountRepository = FakeRideDetailStravaAccountRepository(connected = false)
+        val efforts = listOf(
+            StravaSegmentEffort(
+                effortExternalId = "effort-1",
+                segmentExternalId = "seg-1",
+                segmentName = "Skyline Climb",
+                elapsedTime = Duration.ofMinutes(4),
+                distanceMeters = 1_200.0,
+                komRank = null,
+                prRank = 2,
+            ),
+        )
+        val viewModel = viewModel(ride = ride, stravaResult = Result.success(efforts), stravaAccountRepository = stravaAccountRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(StravaEffortsUiState.NotConnected, viewModel.uiState.value.stravaSegmentEfforts)
+
+        stravaAccountRepository.setConnected()
+        advanceUntilIdle()
+
+        val loaded = viewModel.uiState.value.stravaSegmentEfforts as StravaEffortsUiState.Loaded
+        assertEquals("Skyline Climb", loaded.efforts.first().segmentName)
+        collectJob.cancel()
+    }
+
+    @Test
     fun `a failed automatic Strava fetch shows the error message, retryable via onFetchStravaSegmentsClick`() = runTest(dispatcher) {
         val viewModel = viewModel(ride = ride, stravaResult = Result.failure(IllegalStateException("Strava session expired")))
 
@@ -365,6 +407,7 @@ class RideDetailViewModelTest {
         detailResult: Result<StravaSegmentEffortDetail> = Result.failure(UnsupportedOperationException("not used")),
         rideRepository: FakeRideDetailRideRepository = FakeRideDetailRideRepository(ride),
         viewedRidesRepository: FakeRideDetailViewedRidesRepository = FakeRideDetailViewedRidesRepository(),
+        stravaAccountRepository: FakeRideDetailStravaAccountRepository = FakeRideDetailStravaAccountRepository(),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
         val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository()
@@ -374,6 +417,7 @@ class RideDetailViewModelTest {
             savedStateHandle,
             ObserveRideUseCase(rideRepository),
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
+            com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase(stravaAccountRepository),
             com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase(rideRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
             FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository, stravaEffortRepository),
@@ -439,6 +483,28 @@ private class FakeRideDetailSegmentAttemptRepository : SegmentAttemptRepository 
     }
 
     override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
+}
+
+private class FakeRideDetailStravaAccountRepository(
+    connected: Boolean = true,
+) : com.segmentanalyzer.domain.repository.StravaAccountRepository {
+    private val state = MutableStateFlow<com.segmentanalyzer.domain.model.StravaConnectionState>(
+        if (connected) {
+            com.segmentanalyzer.domain.model.StravaConnectionState.Connected("Rider", java.time.Instant.EPOCH)
+        } else {
+            com.segmentanalyzer.domain.model.StravaConnectionState.Disconnected
+        },
+    )
+
+    override fun observeConnectionState(): Flow<com.segmentanalyzer.domain.model.StravaConnectionState> = state
+    override fun authorizationUrl(): String = "https://www.strava.com/oauth/authorize?fake=true"
+    override suspend fun exchangeAuthorizationCode(code: String): Result<Unit> = Result.success(Unit)
+    override suspend fun disconnect() {
+        state.value = com.segmentanalyzer.domain.model.StravaConnectionState.Disconnected
+    }
+    fun setConnected() {
+        state.value = com.segmentanalyzer.domain.model.StravaConnectionState.Connected("Rider", java.time.Instant.EPOCH)
+    }
 }
 
 private class FakeRideDetailViewedRidesRepository : com.segmentanalyzer.domain.repository.ViewedRidesRepository {

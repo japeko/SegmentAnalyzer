@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -60,6 +61,7 @@ fun SegmentDetailScreen(
     onToggleAttemptsOrder: () -> Unit,
     onStarSegmentClick: () -> Unit,
     onDismissStarPrompt: () -> Unit,
+    onGoToSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var hoveredAttemptId by remember { mutableStateOf<Long?>(null) }
@@ -102,6 +104,23 @@ fun SegmentDetailScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
+            if (uiState.stravaNotConnected) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Connect Strava in Settings to see this segment's star status.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(onClick = onGoToSettingsClick) { Text("Go to Settings") }
+                    }
+                }
+            }
             if (segment != null) {
                 item {
                     val place = listOfNotNull(segment.city, segment.state).joinToString(", ")

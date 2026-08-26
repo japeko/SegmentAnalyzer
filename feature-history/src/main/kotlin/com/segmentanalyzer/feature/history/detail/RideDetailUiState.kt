@@ -27,6 +27,8 @@ sealed interface StravaEffortsUiState {
     data object Loading : StravaEffortsUiState
     data class Loaded(val efforts: List<StravaSegmentEffortItem>) : StravaEffortsUiState
     data class Error(val message: String) : StravaEffortsUiState
+    /** Strava isn't connected, so no fetch was even attempted — offers a way to Settings instead of a doomed Retry. */
+    data object NotConnected : StravaEffortsUiState
 }
 
 /** One Strava segment effort, pre-formatted for display. */

@@ -60,6 +60,7 @@ fun RideDetailScreen(
     onBackClick: () -> Unit,
     onFetchStravaSegmentsClick: () -> Unit,
     onStravaSegmentEffortClick: (Int, String) -> Unit,
+    onGoToSettingsClick: () -> Unit,
     onEditClick: () -> Unit,
     onDismissEdit: () -> Unit,
     onEditNameChange: (String) -> Unit,
@@ -167,6 +168,7 @@ fun RideDetailScreen(
                 expandedDetail = uiState.expandedSegmentEffortDetail,
                 onFetchClick = onFetchStravaSegmentsClick,
                 onEffortClick = onStravaSegmentEffortClick,
+                onGoToSettingsClick = onGoToSettingsClick,
             )
         }
     }
@@ -256,8 +258,25 @@ private fun LazyListScope.stravaEffortsSection(
     expandedDetail: ExpandedSegmentEffortDetail?,
     onFetchClick: () -> Unit,
     onEffortClick: (Int, String) -> Unit,
+    onGoToSettingsClick: () -> Unit,
 ) {
     when (state) {
+        StravaEffortsUiState.NotConnected -> item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Connect Strava in Settings to see this ride's segments.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(onClick = onGoToSettingsClick) { Text("Go to Settings") }
+            }
+        }
+
         StravaEffortsUiState.Idle -> item {
             OutlinedButton(onClick = onFetchClick, modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text("Get Strava segment data")

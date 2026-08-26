@@ -6,10 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
 import com.segmentanalyzer.domain.usecase.ObserveExcludedAttemptIdsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.SetAttemptExcludedUseCase
 import com.segmentanalyzer.domain.usecase.SetSegmentStarredUseCase
 import com.segmentanalyzer.domain.util.lapLabelsByAttemptId
@@ -18,6 +20,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -30,6 +33,7 @@ class SegmentDetailViewModel @Inject constructor(
     observeSegments: ObserveSegmentsUseCase,
     observeSegmentAttempts: ObserveSegmentAttemptsUseCase,
     observeExcludedAttemptIds: ObserveExcludedAttemptIdsUseCase,
+    observeStravaConnectionState: ObserveStravaConnectionStateUseCase,
     private val checkSegmentStarred: CheckSegmentStarredUseCase,
     private val setSegmentStarred: SetSegmentStarredUseCase,
     private val setAttemptExcluded: SetAttemptExcludedUseCase,
@@ -58,11 +62,18 @@ class SegmentDetailViewModel @Inject constructor(
     private var latestSegmentExternalId: String? = null
 
     init {
+        // Skips the star-status check entirely (and reactively retries) while Strava isn't
+        // connected, rather than firing a network call doomed to fail with an auth error every
+        // time — same reasoning as RideDetailViewModel's Strava-effort fetch.
         viewModelScope.launch {
             val segment = observeSegments().map { segments -> segments.find { it.id == segmentId } }.first { it != null }
             checkNotNull(segment)
-            checkSegmentStarred(segment.externalId).onSuccess { starred ->
-                if (!starred) starPromptState.value = StarPromptState()
+            observeStravaConnectionState().collect { state ->
+                if (state is StravaConnectionState.Connected) {
+                    checkSegmentStarred(segment.externalId).onSuccess { starred ->
+                        if (!starred) starPromptState.value = StarPromptState()
+                    }
+                }
             }
         }
     }
@@ -72,8 +83,10 @@ class SegmentDetailViewModel @Inject constructor(
         observeSegmentAttempts(segmentId),
         starPromptState,
         selectedAttemptId,
-        combine(observeExcludedAttemptIds(), attemptsReversed) { excludedIds, reversed -> excludedIds to reversed },
-    ) { segment, attempts, starPrompt, selectedId, (excludedIds, reversed) ->
+        combine(observeExcludedAttemptIds(), attemptsReversed, observeStravaConnectionState()) { excludedIds, reversed, connectionState ->
+            Triple(excludedIds, reversed, connectionState)
+        },
+    ) { segment, attempts, starPrompt, selectedId, (excludedIds, reversed, connectionState) ->
         latestSegmentExternalId = segment?.externalId
 
         // Lap numbering ("Ride 1", "Ride 2", ...) stays stable regardless of exclusion — it's
@@ -122,6 +135,7 @@ class SegmentDetailViewModel @Inject constructor(
             starPrompt = starPrompt,
             selectedAttemptId = selectedId,
             attemptsReversed = reversed,
+            stravaNotConnected = connectionState !is StravaConnectionState.Connected,
         )
     }.stateIn(
         scope = viewModelScope,

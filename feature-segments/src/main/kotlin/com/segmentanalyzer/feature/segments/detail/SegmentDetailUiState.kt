@@ -21,6 +21,8 @@ data class SegmentDetailUiState(
     val selectedAttemptId: Long? = null,
     /** True when [attempts]/[excludedAttempts] are shown newest-first instead of the default oldest-first. */
     val attemptsReversed: Boolean = false,
+    /** True while Strava isn't connected — this segment's star-status check was skipped rather than doomed to fail. */
+    val stravaNotConnected: Boolean = false,
 )
 
 /** Live state of the "star this segment?" prompt. */

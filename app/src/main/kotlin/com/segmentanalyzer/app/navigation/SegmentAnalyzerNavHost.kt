@@ -21,10 +21,12 @@ import com.segmentanalyzer.feature.importer.garmin.GarminImportRoute
 import com.segmentanalyzer.feature.segments.SegmentsRoute
 import com.segmentanalyzer.feature.segments.detail.SegmentDetailRoute
 import com.segmentanalyzer.feature.settings.AboutScreen
+import com.segmentanalyzer.feature.settings.HowToUseScreen
 import com.segmentanalyzer.feature.settings.SettingsRoute
 
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
 private const val ABOUT_ROUTE = "about"
+private const val HOW_TO_USE_ROUTE = "how_to_use"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
 private const val SEGMENT_DETAIL_ROUTE = "segment_detail"
 private const val RIDE_COMPARE_ROUTE = "ride_compare"
@@ -45,6 +47,22 @@ fun stravaCallbackRoute(code: String?, error: String?): String {
 @Composable
 fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+
+    // Navigating to a top-level destination from a non-top-level screen (e.g. a "Go to Settings"
+    // prompt on Ride/Segment Detail) must use the same saveState/restoreState options as the
+    // bottom nav's own tab switches. A bare navigate() here was confirmed live to leave the
+    // NavController's saved-state registry inconsistent with what the bottom nav expects,
+    // silently breaking the Rides tab after connecting Strava — same root cause as the
+    // STRAVA_CALLBACK_ROUTE gotcha documented below.
+    val goToSettings: () -> Unit = {
+        navController.navigate(TopLevelDestination.Settings.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -69,7 +87,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         }
         composable(TopLevelDestination.Segments.route) {
             SegmentsRoute(
-                onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) },
+                onGoToSettingsClick = goToSettings,
                 onSegmentClick = { segmentId -> navController.navigate("$SEGMENT_DETAIL_ROUTE/$segmentId") },
             )
         }
@@ -84,11 +102,15 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onConnectStravaClick = { authorizationUrl ->
                     CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(authorizationUrl))
                 },
+                onHowToUseClick = { navController.navigate(HOW_TO_USE_ROUTE) },
                 onAboutClick = { navController.navigate(ABOUT_ROUTE) },
             )
         }
         composable(ABOUT_ROUTE) {
             AboutScreen(onBackClick = { navController.popBackStack() })
+        }
+        composable(HOW_TO_USE_ROUTE) {
+            HowToUseScreen(onBackClick = { navController.popBackStack() })
         }
         composable(GARMIN_LOGIN_ROUTE) {
             GarminLoginRoute(
@@ -98,7 +120,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         }
         composable(GARMIN_IMPORT_ROUTE) {
             GarminImportRoute(
-                onGoToSettingsClick = { navController.navigate(TopLevelDestination.Settings.route) },
+                onGoToSettingsClick = goToSettings,
                 onBackClick = { navController.popBackStack() },
             )
         }
@@ -111,6 +133,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 onAttemptClick = { segmentId, attemptId ->
                     navController.navigate("$RIDE_COMPARE_ROUTE/$segmentId?anchorAttemptId=$attemptId")
                 },
+                onGoToSettingsClick = goToSettings,
             )
         }
         composable(
@@ -119,6 +142,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         ) {
             RideDetailRoute(
                 onBackClick = { navController.popBackStack() },
+                onGoToSettingsClick = goToSettings,
             )
         }
         composable(

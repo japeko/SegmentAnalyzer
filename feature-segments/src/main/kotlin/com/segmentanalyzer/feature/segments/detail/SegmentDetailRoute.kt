@@ -10,6 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun SegmentDetailRoute(
     onBackClick: () -> Unit,
     onAttemptClick: (segmentId: Long, attemptId: Long) -> Unit,
+    onGoToSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SegmentDetailViewModel = hiltViewModel(),
 ) {
@@ -25,6 +26,7 @@ fun SegmentDetailRoute(
         onToggleAttemptsOrder = viewModel::onToggleAttemptsOrder,
         onStarSegmentClick = viewModel::onStarSegmentClick,
         onDismissStarPrompt = viewModel::onDismissStarPrompt,
+        onGoToSettingsClick = onGoToSettingsClick,
         modifier = modifier,
     )
 }

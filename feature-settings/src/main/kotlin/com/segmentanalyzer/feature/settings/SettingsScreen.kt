@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Spa
@@ -35,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +61,7 @@ fun SettingsScreen(
     onDismissDisconnectStrava: () -> Unit,
     stravaAuthorizationUrl: String,
     onThemeSelected: (ThemePreference) -> Unit,
+    onHowToUseClick: () -> Unit,
     onAboutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -114,7 +117,8 @@ fun SettingsScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 8.dp),
             )
-            AboutRow(onClick = onAboutClick)
+            AppLinkRow(icon = Icons.Filled.HelpOutline, label = "How to Use", onClick = onHowToUseClick)
+            AppLinkRow(icon = Icons.Filled.Info, label = "About Segment Analyzer", onClick = onAboutClick)
         }
     }
 
@@ -245,7 +249,7 @@ private fun ThemePreference.label(): String = when (this) {
 }
 
 @Composable
-private fun AboutRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun AppLinkRow(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -254,12 +258,12 @@ private fun AboutRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Filled.Info,
+                    icon,
                     contentDescription = null,
                     tint = MaterialThemeExtras.textTertiary,
                     modifier = Modifier.padding(end = 12.dp),
                 )
-                Text(text = "About Segment Analyzer", style = MaterialTheme.typography.bodyMedium)
+                Text(text = label, style = MaterialTheme.typography.bodyMedium)
             }
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,

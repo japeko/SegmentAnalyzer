@@ -5,14 +5,17 @@ import app.cash.turbine.test
 import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
+import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.repository.ExcludedAttemptsRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
+import com.segmentanalyzer.domain.repository.StravaAccountRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
 import com.segmentanalyzer.domain.usecase.ObserveExcludedAttemptIdsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.SetAttemptExcludedUseCase
 import com.segmentanalyzer.domain.usecase.SetSegmentStarredUseCase
 import kotlinx.coroutines.Dispatchers
@@ -308,10 +311,53 @@ class SegmentDetailViewModelTest {
         assertEquals(true, stravaSegmentRepository.setStarredCalls.isEmpty())
     }
 
+    @Test
+    fun `when Strava isn't connected, the star check is skipped and the state says so`() = runTest(dispatcher) {
+        val stravaSegmentRepository = FakeDetailStravaSegmentRepository(starredResult = Result.success(false))
+        val stravaAccountRepository = FakeDetailStravaAccountRepository(connected = false)
+        val viewModel = viewModel(
+            emptyList(),
+            stravaSegmentRepository = stravaSegmentRepository,
+            stravaAccountRepository = stravaAccountRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(true, state.stravaNotConnected)
+        assertEquals(null, state.starPrompt)
+        assertEquals(true, stravaSegmentRepository.isStarredCalls.isEmpty())
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `connecting Strava while the screen is open triggers the star check that was skipped`() = runTest(dispatcher) {
+        val stravaSegmentRepository = FakeDetailStravaSegmentRepository(starredResult = Result.success(false))
+        val stravaAccountRepository = FakeDetailStravaAccountRepository(connected = false)
+        val viewModel = viewModel(
+            emptyList(),
+            stravaSegmentRepository = stravaSegmentRepository,
+            stravaAccountRepository = stravaAccountRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.stravaNotConnected)
+
+        stravaAccountRepository.setConnected()
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.stravaNotConnected)
+        assertEquals(false, viewModel.uiState.value.starPrompt?.isSaving)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         attempts: List<SegmentAttempt>,
         stravaSegmentRepository: FakeDetailStravaSegmentRepository = FakeDetailStravaSegmentRepository(),
         excludedAttemptsRepository: FakeExcludedAttemptsRepository = FakeExcludedAttemptsRepository(),
+        stravaAccountRepository: FakeDetailStravaAccountRepository = FakeDetailStravaAccountRepository(),
     ): SegmentDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L))
         return SegmentDetailViewModel(
@@ -319,6 +365,7 @@ class SegmentDetailViewModelTest {
             ObserveSegmentsUseCase(FakeDetailSegmentRepository()),
             ObserveSegmentAttemptsUseCase(FakeDetailSegmentAttemptRepository(attempts)),
             ObserveExcludedAttemptIdsUseCase(excludedAttemptsRepository),
+            ObserveStravaConnectionStateUseCase(stravaAccountRepository),
             CheckSegmentStarredUseCase(stravaSegmentRepository),
             SetSegmentStarredUseCase(stravaSegmentRepository),
             SetAttemptExcludedUseCase(excludedAttemptsRepository),
@@ -362,14 +409,36 @@ private class FakeDetailStravaSegmentRepository(
     private val setStarredResult: Result<Unit> = Result.success(Unit),
 ) : StravaSegmentRepository {
     val setStarredCalls = mutableListOf<Pair<String, Boolean>>()
+    val isStarredCalls = mutableListOf<String>()
 
     override suspend fun fetchStarredSegments(): Result<List<Segment>> =
         Result.failure(UnsupportedOperationException("not used in this test"))
     override suspend fun fetchSegment(segmentExternalId: String): Result<Segment> =
         Result.failure(UnsupportedOperationException("not used in this test"))
-    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> = starredResult
+    override suspend fun isSegmentStarred(segmentExternalId: String): Result<Boolean> {
+        isStarredCalls += segmentExternalId
+        return starredResult
+    }
     override suspend fun setSegmentStarred(segmentExternalId: String, starred: Boolean): Result<Unit> {
         setStarredCalls += segmentExternalId to starred
         return setStarredResult
+    }
+}
+
+private class FakeDetailStravaAccountRepository(
+    connected: Boolean = true,
+) : StravaAccountRepository {
+    private val state = MutableStateFlow<StravaConnectionState>(
+        if (connected) StravaConnectionState.Connected("Rider", Instant.EPOCH) else StravaConnectionState.Disconnected,
+    )
+
+    override fun observeConnectionState(): Flow<StravaConnectionState> = state
+    override fun authorizationUrl(): String = "https://www.strava.com/oauth/authorize?fake=true"
+    override suspend fun exchangeAuthorizationCode(code: String): Result<Unit> = Result.success(Unit)
+    override suspend fun disconnect() {
+        state.value = StravaConnectionState.Disconnected
+    }
+    fun setConnected() {
+        state.value = StravaConnectionState.Connected("Rider", Instant.EPOCH)
     }
 }
