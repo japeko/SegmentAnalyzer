@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -63,6 +64,7 @@ fun SettingsScreen(
     onThemeSelected: (ThemePreference) -> Unit,
     onHowToUseClick: () -> Unit,
     onAboutClick: () -> Unit,
+    onUpcomingFeaturesClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -118,6 +120,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 8.dp),
             )
             AppLinkRow(icon = Icons.Filled.HelpOutline, label = "How to Use", onClick = onHowToUseClick)
+            AppLinkRow(icon = Icons.Filled.NewReleases, label = "Coming Soon", onClick = onUpcomingFeaturesClick)
             AppLinkRow(icon = Icons.Filled.Info, label = "About Segment Analyzer", onClick = onAboutClick)
         }
     }

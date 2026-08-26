@@ -12,6 +12,7 @@ fun SettingsRoute(
     onConnectStravaClick: (authorizationUrl: String) -> Unit,
     onHowToUseClick: () -> Unit,
     onAboutClick: () -> Unit,
+    onUpcomingFeaturesClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -31,6 +32,7 @@ fun SettingsRoute(
         onThemeSelected = viewModel::onThemeSelected,
         onHowToUseClick = onHowToUseClick,
         onAboutClick = onAboutClick,
+        onUpcomingFeaturesClick = onUpcomingFeaturesClick,
         modifier = modifier,
     )
 }

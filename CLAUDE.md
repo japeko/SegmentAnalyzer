@@ -334,6 +334,10 @@ Possible future enhancements
 * Tire pressure notes
 * Suspension setup notes
 * Wear OS companion
+* Polar Connect import (alongside Garmin)
+* Importing another rider's exported FIT file, to compare against your own attempts
+* Leaderboards — comparing segment times against other Segment Analyzer users who've shared their attempts
+* Exporting selected rides to FIT files
 
 ---
 

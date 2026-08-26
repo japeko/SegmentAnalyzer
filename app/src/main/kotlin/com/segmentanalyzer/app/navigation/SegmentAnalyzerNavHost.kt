@@ -23,10 +23,12 @@ import com.segmentanalyzer.feature.segments.detail.SegmentDetailRoute
 import com.segmentanalyzer.feature.settings.AboutScreen
 import com.segmentanalyzer.feature.settings.HowToUseScreen
 import com.segmentanalyzer.feature.settings.SettingsRoute
+import com.segmentanalyzer.feature.settings.UpcomingFeaturesScreen
 
 private const val GARMIN_LOGIN_ROUTE = "garmin_login"
 private const val ABOUT_ROUTE = "about"
 private const val HOW_TO_USE_ROUTE = "how_to_use"
+private const val UPCOMING_FEATURES_ROUTE = "upcoming_features"
 private const val GARMIN_IMPORT_ROUTE = "garmin_import"
 private const val SEGMENT_DETAIL_ROUTE = "segment_detail"
 private const val RIDE_COMPARE_ROUTE = "ride_compare"
@@ -104,6 +106,7 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
                 },
                 onHowToUseClick = { navController.navigate(HOW_TO_USE_ROUTE) },
                 onAboutClick = { navController.navigate(ABOUT_ROUTE) },
+                onUpcomingFeaturesClick = { navController.navigate(UPCOMING_FEATURES_ROUTE) },
             )
         }
         composable(ABOUT_ROUTE) {
@@ -111,6 +114,9 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         }
         composable(HOW_TO_USE_ROUTE) {
             HowToUseScreen(onBackClick = { navController.popBackStack() })
+        }
+        composable(UPCOMING_FEATURES_ROUTE) {
+            UpcomingFeaturesScreen(onBackClick = { navController.popBackStack() })
         }
         composable(GARMIN_LOGIN_ROUTE) {
             GarminLoginRoute(

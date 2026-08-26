@@ -33,8 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.segmentanalyzer.core.R
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.theme.NumericFontFamily
+import com.segmentanalyzer.core.ui.FeatureRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -160,29 +159,6 @@ private fun WhatItDoes(modifier: Modifier = Modifier) {
             title = "Offline-first",
             description = "Ride history and stats work with no network — import, map tiles, and a ride's live Strava segment list need one.",
         )
-    }
-}
-
-@Composable
-private fun FeatureRow(icon: ImageVector, accent: Color, title: String, description: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 
