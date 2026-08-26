@@ -72,7 +72,7 @@ fun RideHistoryScreen(
         val result = snackbarHostState.showSnackbar(
             message = "Deleted \"${undo.rideName}\"",
             actionLabel = "Undo",
-            duration = SnackbarDuration.Long,
+            duration = SnackbarDuration.Short,
         )
         if (result == SnackbarResult.ActionPerformed) onUndoDeleteRideClick() else onUndoDeleteRideSnackbarDismissed()
     }
