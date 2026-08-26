@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
@@ -49,7 +50,13 @@ fun RideCompareScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Compare Rides") },
+                title = {
+                    Text(
+                        text = if (uiState.segmentName.isNotBlank()) "Compare Rides: ${uiState.segmentName}" else "Compare Rides",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
