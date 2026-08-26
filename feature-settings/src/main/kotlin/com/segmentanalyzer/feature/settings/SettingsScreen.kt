@@ -14,10 +14,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bloodtype
-import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -213,8 +213,8 @@ private fun ThemeSelectorCard(
                         label = {
                             Icon(
                                 imageVector = when (preference) {
-                                    ThemePreference.SYSTEM -> Icons.Filled.Brightness6
                                     ThemePreference.LIGHT -> Icons.Filled.LightMode
+                                    ThemePreference.LAVENDER -> Icons.Filled.Spa
                                     ThemePreference.DARK -> Icons.Filled.DarkMode
                                     ThemePreference.DRACULA -> Icons.Filled.Bloodtype
                                     ThemePreference.TRAILHEAD -> Icons.Filled.Timer
@@ -237,8 +237,8 @@ private fun ThemeSelectorCard(
 }
 
 private fun ThemePreference.label(): String = when (this) {
-    ThemePreference.SYSTEM -> "System"
     ThemePreference.LIGHT -> "Light"
+    ThemePreference.LAVENDER -> "Lavender"
     ThemePreference.DARK -> "Dark"
     ThemePreference.DRACULA -> "Dracula"
     ThemePreference.TRAILHEAD -> "Trailhead"

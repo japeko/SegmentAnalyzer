@@ -25,8 +25,8 @@ internal class ThemePreferenceStore @Inject constructor(
     }
 
     private fun readPreference(): ThemePreference {
-        val name = prefs.getString(KEY_THEME, null) ?: return ThemePreference.SYSTEM
-        return runCatching { ThemePreference.valueOf(name) }.getOrDefault(ThemePreference.SYSTEM)
+        val name = prefs.getString(KEY_THEME, null) ?: return ThemePreference.LIGHT
+        return runCatching { ThemePreference.valueOf(name) }.getOrDefault(ThemePreference.LIGHT)
     }
 
     private companion object {

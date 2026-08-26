@@ -129,10 +129,10 @@ class SettingsViewModelTest {
         val viewModel = viewModel(settingsRepository = settingsRepository)
 
         viewModel.uiState.test {
-            // stateIn's initialValue and the first real combine emission are both SYSTEM/Disconnected
+            // stateIn's initialValue and the first real combine emission are both LIGHT/Disconnected
             // here, so StateFlow collapses them into one item — only skip, don't also await it.
             skipItems(1)
-            assertEquals(ThemePreference.SYSTEM, viewModel.uiState.value.themePreference)
+            assertEquals(ThemePreference.LIGHT, viewModel.uiState.value.themePreference)
 
             viewModel.onThemeSelected(ThemePreference.DARK)
             assertEquals(ThemePreference.DARK, awaitItem().themePreference)
@@ -192,7 +192,7 @@ private class FakeStravaAccountRepository(
 }
 
 private class FakeSettingsRepository(
-    initialPreference: ThemePreference = ThemePreference.SYSTEM,
+    initialPreference: ThemePreference = ThemePreference.LIGHT,
 ) : SettingsRepository {
     private val preference = MutableStateFlow(initialPreference)
     var savedPreference: ThemePreference = initialPreference

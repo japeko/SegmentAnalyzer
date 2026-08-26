@@ -9,5 +9,5 @@ data class SettingsUiState(
     val showDisconnectGarminConfirmation: Boolean = false,
     val stravaConnectionState: StravaConnectionState = StravaConnectionState.Disconnected,
     val showDisconnectStravaConfirmation: Boolean = false,
-    val themePreference: ThemePreference = ThemePreference.SYSTEM,
+    val themePreference: ThemePreference = ThemePreference.LIGHT,
 )

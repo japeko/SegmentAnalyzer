@@ -47,6 +47,26 @@ private val LightColors = lightColorScheme(
     onError = LightOnError,
 )
 
+private val LavenderColors = lightColorScheme(
+    background = LavenderBackground,
+    surface = LavenderSurface,
+    surfaceVariant = LavenderSurfaceVariant,
+    outline = LavenderOutline,
+    onBackground = LavenderOnSurface,
+    onSurface = LavenderOnSurface,
+    onSurfaceVariant = LavenderOnSurfaceSecondary,
+    primary = LavenderPrimary,
+    onPrimary = LavenderOnPrimary,
+    primaryContainer = LavenderPrimary,
+    onPrimaryContainer = LavenderOnPrimary,
+    tertiary = LavenderTertiary,
+    onTertiary = LavenderOnTertiary,
+    tertiaryContainer = LavenderTertiary,
+    onTertiaryContainer = LavenderOnTertiary,
+    error = LavenderError,
+    onError = LavenderOnError,
+)
+
 private val DraculaColors = darkColorScheme(
     background = DraculaBackground,
     surface = DraculaSurface,
@@ -87,8 +107,8 @@ private val TrailheadColors = darkColorScheme(
     onError = TrailheadOnError,
 )
 
-/** Which fixed palette [SegmentAnalyzerTheme] renders — [ThemePreference.SYSTEM] resolves to [LIGHT]/[DARK] before reaching here. */
-internal enum class AppThemeVariant { LIGHT, DARK, DRACULA, TRAILHEAD }
+/** Which fixed palette [SegmentAnalyzerTheme] renders. */
+internal enum class AppThemeVariant { LIGHT, LAVENDER, DARK, DRACULA, TRAILHEAD }
 
 /** The tertiary color role doubles as this app's "personal best" accent throughout. */
 @Composable
@@ -103,8 +123,8 @@ fun SegmentAnalyzerTheme(
 @Composable
 fun SegmentAnalyzerTheme(themePreference: ThemePreference, content: @Composable () -> Unit) {
     val variant = when (themePreference) {
-        ThemePreference.SYSTEM -> if (isSystemInDarkTheme()) AppThemeVariant.DARK else AppThemeVariant.LIGHT
         ThemePreference.LIGHT -> AppThemeVariant.LIGHT
+        ThemePreference.LAVENDER -> AppThemeVariant.LAVENDER
         ThemePreference.DARK -> AppThemeVariant.DARK
         ThemePreference.DRACULA -> AppThemeVariant.DRACULA
         ThemePreference.TRAILHEAD -> AppThemeVariant.TRAILHEAD
@@ -117,6 +137,7 @@ private fun SegmentAnalyzerTheme(variant: AppThemeVariant, content: @Composable 
     val colorScheme = when (variant) {
         AppThemeVariant.DARK -> DarkColors
         AppThemeVariant.LIGHT -> LightColors
+        AppThemeVariant.LAVENDER -> LavenderColors
         AppThemeVariant.DRACULA -> DraculaColors
         AppThemeVariant.TRAILHEAD -> TrailheadColors
     }

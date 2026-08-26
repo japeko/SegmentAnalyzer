@@ -43,6 +43,13 @@ internal fun ProvideExtendedColors(variant: AppThemeVariant, content: @Composabl
             ExtendedColors(textTertiary = DarkOnSurfaceTertiary, faster = DarkFaster, slower = DarkSlower, compareC = DarkCompareC)
         AppThemeVariant.LIGHT ->
             ExtendedColors(textTertiary = LightOnSurfaceTertiary, faster = LightFaster, slower = LightSlower, compareC = LightCompareC)
+        AppThemeVariant.LAVENDER ->
+            ExtendedColors(
+                textTertiary = LavenderOnSurfaceTertiary,
+                faster = LavenderFaster,
+                slower = LavenderSlower,
+                compareC = LavenderCompareC,
+            )
         AppThemeVariant.DRACULA ->
             ExtendedColors(
                 textTertiary = DraculaOnSurfaceTertiary,

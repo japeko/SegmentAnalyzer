@@ -76,3 +76,24 @@ val LightOnError = Color(0xFFFFFFFF)
 val LightFaster = Color(0xFF3B7FC4) // ahead-of-reference delta
 val LightSlower = Color(0xFFC4622E) // behind-reference delta
 val LightCompareC = Color(0xFF2E9184) // third ride-comparison slot (teal)
+
+// Lavender theme — Light's palette with a visible tint of the brand violet on
+// background/surfaceVariant instead of neutral white, so it doesn't read as a generic default
+// light theme. Surface itself stays pure white so cards still pop against the tinted background;
+// every other role is identical to Light.
+val LavenderBackground = Color(0xFFE3DCF5)
+val LavenderSurface = Color(0xFFFFFFFF)
+val LavenderSurfaceVariant = Color(0xFFCFC2EA)
+val LavenderOutline = Color(0xFFB3A1DC)
+val LavenderOnSurface = LightOnSurface
+val LavenderOnSurfaceSecondary = LightOnSurfaceSecondary
+val LavenderOnSurfaceTertiary = LightOnSurfaceTertiary
+val LavenderPrimary = LightPrimary
+val LavenderOnPrimary = LightOnPrimary
+val LavenderTertiary = LightTertiary
+val LavenderOnTertiary = LightOnTertiary
+val LavenderError = LightError
+val LavenderOnError = LightOnError
+val LavenderFaster = LightFaster
+val LavenderSlower = LightSlower
+val LavenderCompareC = LightCompareC

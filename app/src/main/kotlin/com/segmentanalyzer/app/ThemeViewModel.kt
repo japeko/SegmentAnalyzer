@@ -18,6 +18,6 @@ class ThemeViewModel @Inject constructor(
     val themePreference: StateFlow<ThemePreference> = observeThemePreference().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ThemePreference.SYSTEM,
+        initialValue = ThemePreference.LIGHT,
     )
 }
