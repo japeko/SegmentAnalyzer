@@ -48,6 +48,7 @@ internal class StravaSegmentEffortRepositoryImpl @Inject constructor(
                     distanceMeters = point.distanceMeters,
                     latitude = point.latitude,
                     longitude = point.longitude,
+                    elevationMeters = point.elevationMeters,
                 )
             },
         )
@@ -60,6 +61,7 @@ internal class StravaSegmentEffortRepositoryImpl @Inject constructor(
                 distanceMeters = it.distanceMeters,
                 latitude = it.latitude,
                 longitude = it.longitude,
+                elevationMeters = it.elevationMeters,
             )
         }
 }

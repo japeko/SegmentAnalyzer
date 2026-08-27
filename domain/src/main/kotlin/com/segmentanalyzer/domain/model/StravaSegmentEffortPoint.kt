@@ -11,4 +11,6 @@ data class StravaSegmentEffortPoint(
     val distanceMeters: Double,
     val latitude: Double,
     val longitude: Double,
+    /** Null if Strava's `altitude` stream was missing for this effort (rare, but not guaranteed). */
+    val elevationMeters: Double? = null,
 )

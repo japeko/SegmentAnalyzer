@@ -158,7 +158,7 @@ private fun RidePointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = T
 )
 
 /**
- * Strava doesn't give us elevation/HR/cadence/power per-point here (only time/distance/latlng —
+ * Strava doesn't give us HR/cadence/power per-point here (only time/distance/latlng/altitude —
  * see [com.segmentanalyzer.domain.model.StravaSegmentEffortPoint]), and no real wall-clock time
  * for the effort itself, only elapsed seconds — [elapsedSecondsCurve] in
  * [com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase] only needs deltas between
@@ -174,7 +174,7 @@ private fun RidePointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = T
 private fun StravaSegmentEffortPointEntity.toDomain(baseDistanceMeters: Double): TrackPoint = TrackPoint(
     latitude = latitude,
     longitude = longitude,
-    elevationMeters = null,
+    elevationMeters = elevationMeters?.toFloat(),
     timestamp = Instant.EPOCH.plusSeconds(timeSeconds.toLong()),
     cumulativeDistanceMeters = distanceMeters - baseDistanceMeters,
 )

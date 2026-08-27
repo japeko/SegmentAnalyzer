@@ -102,7 +102,7 @@ private fun List<StravaStreamDto>.toDetail(): StravaSegmentEffortDetail {
         avgWatts = streamOrNull("watts")?.average(),
         avgHeartRateBpm = streamOrNull("heartrate")?.average(),
         avgCadenceRpm = streamOrNull("cadence")?.average(),
-        track = toTrack(rawStream("time"), rawStream("distance"), rawStream("latlng")),
+        track = toTrack(rawStream("time"), rawStream("distance"), rawStream("latlng"), rawStream("altitude")),
     )
 }
 
@@ -110,6 +110,7 @@ private fun toTrack(
     time: List<JsonElement>?,
     distance: List<JsonElement>?,
     latlng: List<JsonElement>?,
+    altitude: List<JsonElement>?,
 ): List<StravaSegmentEffortPoint> {
     if (time == null || distance == null || latlng == null) return emptyList()
     val count = minOf(time.size, distance.size, latlng.size)
@@ -120,6 +121,7 @@ private fun toTrack(
             distanceMeters = distance[i].jsonPrimitive.double,
             latitude = point[0].jsonPrimitive.double,
             longitude = point[1].jsonPrimitive.double,
+            elevationMeters = altitude?.getOrNull(i)?.jsonPrimitive?.double,
         )
     }
 }
