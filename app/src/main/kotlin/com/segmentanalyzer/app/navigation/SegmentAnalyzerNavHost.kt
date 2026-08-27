@@ -74,7 +74,6 @@ fun SegmentAnalyzerNavHost(navController: NavHostController, modifier: Modifier 
         composable(TopLevelDestination.Rides.route) {
             RideHistoryRoute(
                 onRideClick = { rideId -> navController.navigate("$RIDE_DETAIL_ROUTE/$rideId") },
-                onSearchClick = { /* Search isn't implemented yet. */ },
                 // No FIT/GPX import on this branch — Garmin is the only import source, so skip
                 // straight past the (now unreachable) source picker.
                 onImportClick = { navController.navigate(GARMIN_IMPORT_ROUTE) },

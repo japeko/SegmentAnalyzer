@@ -1,7 +1,9 @@
 package com.segmentanalyzer.feature.history.history
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +36,7 @@ import com.segmentanalyzer.feature.history.history.components.ImportFab
 import com.segmentanalyzer.feature.history.history.components.QuickStatsRow
 import com.segmentanalyzer.feature.history.history.components.RideCard
 import com.segmentanalyzer.feature.history.history.components.RideHistoryTopBar
+import com.segmentanalyzer.feature.history.history.components.RideSearchTopBar
 import com.segmentanalyzer.feature.history.history.components.RideSelectionTopBar
 import com.segmentanalyzer.feature.history.history.components.SummaryPeriodRow
 
@@ -55,6 +59,8 @@ fun RideHistoryScreen(
     onDismissActivityTypeDialog: () -> Unit,
     onConfirmSetActivityType: () -> Unit,
     onSearchClick: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onCloseSearchClick: () -> Unit,
     onImportClick: () -> Unit,
     onNewPBsClick: () -> Unit,
     onDeleteRideRequested: (Long) -> Unit,
@@ -81,15 +87,19 @@ fun RideHistoryScreen(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            if (isSelectionMode) {
-                RideSelectionTopBar(
+            when {
+                isSelectionMode -> RideSelectionTopBar(
                     selectedCount = uiState.selectedRideIds.size,
                     onExitSelectionMode = onExitSelectionMode,
                     onSetTagClick = onSetTagClick,
                     onSetActivityTypeClick = onSetActivityTypeClick,
                 )
-            } else {
-                RideHistoryTopBar(onSearchClick = onSearchClick)
+                uiState.isSearchActive -> RideSearchTopBar(
+                    query = uiState.searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    onCloseClick = onCloseSearchClick,
+                )
+                else -> RideHistoryTopBar(onSearchClick = onSearchClick)
             }
         },
         floatingActionButton = { if (!isSelectionMode) ImportFab(onClick = onImportClick) },
@@ -129,6 +139,17 @@ fun RideHistoryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp),
                 )
+            }
+            if (uiState.searchQuery.isNotBlank() && uiState.rides.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "No rides match \"${uiState.searchQuery}\".",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             items(uiState.rides, key = { it.id }) { ride ->
                 RideCard(
@@ -244,6 +265,8 @@ private fun RideHistoryScreenLightPreview() {
             onDismissActivityTypeDialog = {},
             onConfirmSetActivityType = {},
             onSearchClick = {},
+            onSearchQueryChange = {},
+            onCloseSearchClick = {},
             onImportClick  = {},
             onNewPBsClick = {},
             onDeleteRideRequested = {},
@@ -277,6 +300,8 @@ private fun RideHistoryScreenDarkPreview() {
             onDismissActivityTypeDialog = {},
             onConfirmSetActivityType = {},
             onSearchClick = {},
+            onSearchQueryChange = {},
+            onCloseSearchClick = {},
             onImportClick = {},
             onNewPBsClick = {},
             onDeleteRideRequested = {},

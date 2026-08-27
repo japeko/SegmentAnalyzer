@@ -43,6 +43,12 @@ class RideHistoryViewModel @Inject constructor(
     private val selectedFilter = MutableStateFlow<ActivityType?>(null)
     private val selectedPeriod = MutableStateFlow(SummaryPeriod.THIS_MONTH)
 
+    /** True while the search field is showing in place of the normal top bar title. */
+    private val isSearchActive = MutableStateFlow(false)
+
+    /** Current search text — matched against a ride's name or tag. */
+    private val searchQuery = MutableStateFlow("")
+
     /** Non-empty means selection mode is active. */
     private val selectedRideIds = MutableStateFlow<Set<Long>>(emptySet())
 
@@ -63,14 +69,15 @@ class RideHistoryViewModel @Inject constructor(
     private var latestRides: List<Ride> = emptyList()
 
     private val coreState = combine(
-        combine(selectedFilter, selectedPeriod) { filter, period -> filter to period }
-            .flatMapLatest { (filter, period) -> observeRideHistory(filter, period) },
+        combine(selectedFilter, selectedPeriod, searchQuery) { filter, period, query -> Triple(filter, period, query) }
+            .flatMapLatest { (filter, period, query) -> observeRideHistory(filter, period, query) },
         selectedPeriod.flatMapLatest { observeRideSummary(it) },
         selectedFilter,
         selectedPeriod,
-    ) { rides, summary, filter, period ->
+        combine(isSearchActive, searchQuery) { active, query -> active to query },
+    ) { rides, summary, filter, period, (searchActive, query) ->
         latestRides = rides
-        CoreHistory(rides, summary, filter, period)
+        CoreHistory(rides, summary, filter, period, searchActive, query)
     }
 
     private val dialogsState = combine(
@@ -96,6 +103,8 @@ class RideHistoryViewModel @Inject constructor(
             summaryPeriod = core.period,
             selectedFilter = core.filter,
             rides = core.rides.map { it.toListItem(isViewed = it.id in viewedIds) },
+            isSearchActive = core.isSearchActive,
+            searchQuery = core.searchQuery,
             selectedRideIds = selectedIds,
             tagDialog = dialogs.tagText?.let { text ->
                 BulkTagDialogState(
@@ -127,6 +136,20 @@ class RideHistoryViewModel @Inject constructor(
 
     fun onPeriodSelected(period: SummaryPeriod) {
         selectedPeriod.value = period
+    }
+
+    fun onSearchClick() {
+        isSearchActive.value = true
+    }
+
+    fun onSearchQueryChange(query: String) {
+        searchQuery.value = query
+    }
+
+    /** Closed the search field (the X button) — also clears the query so it doesn't linger for next time. */
+    fun onCloseSearchClick() {
+        isSearchActive.value = false
+        searchQuery.value = ""
     }
 
     fun onRideLongPress(rideId: Long) {
@@ -234,6 +257,8 @@ private data class CoreHistory(
     val summary: RideSummary,
     val filter: ActivityType?,
     val period: SummaryPeriod,
+    val isSearchActive: Boolean,
+    val searchQuery: String,
 )
 
 private data class DialogsState(

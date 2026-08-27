@@ -460,6 +460,58 @@ class RideHistoryViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `search filters the ride list by name and clears when search is closed`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(
+            ride(1, "Skyline Ridge Loop", ActivityType.MTB),
+            ride(2, "Sunday Club Ride", ActivityType.ROAD),
+        )
+        val viewModel = viewModel(FakeRideRepository(rides))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.isSearchActive)
+
+        viewModel.onSearchClick()
+        viewModel.onSearchQueryChange("skyline")
+        advanceUntilIdle()
+
+        val searched = viewModel.uiState.value
+        assertEquals(true, searched.isSearchActive)
+        assertEquals(1, searched.rides.size)
+        assertEquals("Skyline Ridge Loop", searched.rides.first().name)
+
+        viewModel.onCloseSearchClick()
+        advanceUntilIdle()
+
+        val closed = viewModel.uiState.value
+        assertEquals(false, closed.isSearchActive)
+        assertEquals("", closed.searchQuery)
+        assertEquals(2, closed.rides.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `search combines with the activity type filter`() = kotlinx.coroutines.test.runTest(dispatcher) {
+        val rides = listOf(
+            ride(1, "Morning Loop", ActivityType.MTB),
+            ride(2, "Morning Gravel Grind", ActivityType.GRAVEL),
+        )
+        val viewModel = viewModel(FakeRideRepository(rides))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onFilterSelected(ActivityType.GRAVEL)
+        viewModel.onSearchQueryChange("morning")
+        advanceUntilIdle()
+
+        val filtered = viewModel.uiState.value
+        assertEquals(1, filtered.rides.size)
+        assertEquals("Morning Gravel Grind", filtered.rides.first().name)
+        collectJob.cancel()
+    }
+
     private fun viewModel(repository: FakeRideRepository) = RideHistoryViewModel(
         ObserveRideHistoryUseCase(repository),
         ObserveRideSummaryUseCase(repository, fakeSegmentRecordsUseCase()),

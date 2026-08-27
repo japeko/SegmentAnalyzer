@@ -9,7 +9,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun RideHistoryRoute(
     onRideClick: (Long) -> Unit,
-    onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
     onNewPBsClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -34,7 +33,9 @@ fun RideHistoryRoute(
         onActivityTypeDialogSelected = viewModel::onActivityTypeDialogSelected,
         onDismissActivityTypeDialog = viewModel::onDismissActivityTypeDialog,
         onConfirmSetActivityType = viewModel::onConfirmSetActivityType,
-        onSearchClick = onSearchClick,
+        onSearchClick = viewModel::onSearchClick,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onCloseSearchClick = viewModel::onCloseSearchClick,
         onImportClick = onImportClick,
         onNewPBsClick = onNewPBsClick,
         onDeleteRideRequested = viewModel::onDeleteRideRequested,

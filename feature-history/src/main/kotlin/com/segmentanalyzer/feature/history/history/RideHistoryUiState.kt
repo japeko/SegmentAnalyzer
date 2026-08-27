@@ -11,6 +11,10 @@ data class RideHistoryUiState(
     val summaryPeriod: SummaryPeriod = SummaryPeriod.THIS_MONTH,
     val selectedFilter: ActivityType? = null,
     val rides: List<RideListItem> = emptyList(),
+    /** True while the search field is showing in place of the normal top bar title. */
+    val isSearchActive: Boolean = false,
+    /** Current search text — matched against a ride's name or tag. */
+    val searchQuery: String = "",
     /** Non-empty means selection mode is active — tapping a ride toggles it instead of opening it. */
     val selectedRideIds: Set<Long> = emptySet(),
     /** Non-null while the "set tag for selected rides" dialog is open. */
