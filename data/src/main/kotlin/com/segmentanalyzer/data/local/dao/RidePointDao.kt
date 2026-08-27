@@ -15,7 +15,7 @@ interface RidePointDao {
     @Query("SELECT * FROM ride_points WHERE rideId = :rideId ORDER BY sequence ASC")
     suspend fun pointsForRide(rideId: Long): List<RidePointEntity>
 
-    /** Every ride id that has at least one stored track point (Garmin/Strava rides have none). */
+    /** Every ride id that has at least one stored track point. */
     @Query("SELECT DISTINCT rideId FROM ride_points")
     suspend fun rideIdsWithTracks(): List<Long>
 

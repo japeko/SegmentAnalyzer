@@ -307,5 +307,4 @@ private class FakeSegmentAttemptRepository : SegmentAttemptRepository {
         effortExternalId: String,
     ) = Unit
 
-    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long): Boolean = false
 }

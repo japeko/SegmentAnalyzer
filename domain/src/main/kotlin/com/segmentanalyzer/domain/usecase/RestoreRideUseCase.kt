@@ -7,9 +7,9 @@ import javax.inject.Inject
 /**
  * Re-inserts a just-deleted [Ride], for the "Undo" action after [DeleteRideUseCase]. Its GPS
  * track isn't restored — [Ride]s read back from the repository never carry one (see
- * [com.segmentanalyzer.domain.repository.RideRepository.observeRide]) — nor are the segment
- * attempts/Strava effort cache that were cascade-deleted with it, since Garmin-imported rides
- * (the only import source) have no track to re-match against segments from.
+ * [com.segmentanalyzer.domain.repository.RideRepository.observeRide]) — so the segment
+ * attempts/Strava effort cache that were cascade-deleted with it aren't re-created either; the
+ * ride needs a fresh sync/re-match pass (or another Strava effort fetch) to get them back.
  */
 class RestoreRideUseCase @Inject constructor(
     private val rideRepository: RideRepository,

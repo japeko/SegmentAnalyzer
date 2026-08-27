@@ -564,7 +564,6 @@ private class FakeRideDetailSegmentAttemptRepository : SegmentAttemptRepository 
         savedStravaEffortAttempts += effortExternalId
     }
 
-    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
 }
 
 private class FakeRideDetailStravaAccountRepository(

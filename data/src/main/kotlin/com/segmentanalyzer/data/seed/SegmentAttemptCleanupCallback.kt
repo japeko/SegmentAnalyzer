@@ -10,10 +10,10 @@ import javax.inject.Inject
 import javax.inject.Provider
 
 /**
- * Self-heals Strava-derived pseudo-attempts saved before a real GPS-matched attempt existed for
- * the same (segmentId, rideId) — see [SegmentAttemptDao.deleteRedundantStravaAttempts]. Runs on
- * every open (not just [RoomDatabase.Callback.onCreate]) since the bad rows could already be on
- * disk from before this cleanup existed.
+ * Self-heals real GPS-matched attempts left over from before Strava data existed for the same
+ * (segmentId, rideId) — see [SegmentAttemptDao.deleteRedundantLocalAttempts]. Runs on every open
+ * (not just [RoomDatabase.Callback.onCreate]) since the bad rows could already be on disk from
+ * before this cleanup existed.
  */
 class SegmentAttemptCleanupCallback @Inject constructor(
     private val segmentAttemptDaoProvider: Provider<SegmentAttemptDao>,
@@ -23,7 +23,7 @@ class SegmentAttemptCleanupCallback @Inject constructor(
     override fun onOpen(db: SupportSQLiteDatabase) {
         super.onOpen(db)
         applicationScope.launch(Dispatchers.IO) {
-            segmentAttemptDaoProvider.get().deleteRedundantStravaAttempts()
+            segmentAttemptDaoProvider.get().deleteRedundantLocalAttempts()
         }
     }
 }

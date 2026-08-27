@@ -149,22 +149,6 @@ class SaveStravaSegmentEffortAttemptUseCaseTest {
     }
 
     @Test
-    fun `is a no-op when the ride already has a real GPS-matched attempt for this segment`() = runTest {
-        val attemptRepository = FakeSaveAttemptSegmentAttemptRepository(hasLocal = true)
-        val useCase = SaveStravaSegmentEffortAttemptUseCase(
-            FakeSaveAttemptSegmentRepository(listOf(segment)),
-            FakeSaveAttemptStravaSegmentRepository(),
-            FakeSaveAttemptRideRepository(ride),
-            attemptRepository,
-            MatchNewSegmentsToRidesUseCase(attemptRepository),
-        )
-
-        useCase(ride.id, effort, detail)
-
-        assertTrue(attemptRepository.saved.isEmpty())
-    }
-
-    @Test
     fun `is a no-op when the detail has no track`() = runTest {
         val attemptRepository = FakeSaveAttemptSegmentAttemptRepository()
         val useCase = SaveStravaSegmentEffortAttemptUseCase(
@@ -236,7 +220,7 @@ private class FakeSaveAttemptRideRepository(private val ride: Ride?) : RideRepos
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(emptyList())
 }
 
-private class FakeSaveAttemptSegmentAttemptRepository(private val hasLocal: Boolean = false) : SegmentAttemptRepository {
+private class FakeSaveAttemptSegmentAttemptRepository : SegmentAttemptRepository {
     val saved = mutableListOf<SavedStravaAttempt>()
     val matchedSegmentIds = mutableListOf<Long>()
 
@@ -263,6 +247,4 @@ private class FakeSaveAttemptSegmentAttemptRepository(private val hasLocal: Bool
     ) {
         saved += SavedStravaAttempt(segmentId, rideId, startTime, duration, avgSpeedKmh, elevationGainMeters, avgPowerWatts, effortExternalId)
     }
-
-    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long): Boolean = hasLocal
 }

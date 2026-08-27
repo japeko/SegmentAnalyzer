@@ -183,5 +183,4 @@ private class FakeSummarySegmentAttemptRepository(private val records: List<Segm
         segmentId: Long, rideId: Long, startTime: Instant, duration: Duration,
         avgSpeedKmh: Double, elevationGainMeters: Double, avgPowerWatts: Double?, effortExternalId: String,
     ) = Unit
-    override suspend fun hasLocalAttempt(segmentId: Long, rideId: Long) = false
 }

@@ -91,41 +91,48 @@ interface SegmentAttemptDao {
     @Query("DELETE FROM segment_attempts WHERE stravaEffortExternalId = :effortExternalId")
     suspend fun deleteForStravaEffort(effortExternalId: String)
 
-    /** Atomically replaces the pseudo-attempt for [attempt]'s `stravaEffortExternalId` with [attempt]. */
+    /**
+     * Atomically replaces the pseudo-attempt for [attempt]'s `stravaEffortExternalId` with
+     * [attempt], and clears out any real GPS-matched attempts for the same (segmentId, rideId) —
+     * Strava's own effort detection is the more trustworthy source once it exists for a ride's
+     * pass through a segment: naive point-matching against a locally-stored GPS track can miss a
+     * lap entirely or mistime a crossing by a few seconds, in a way Strava's own effort data does
+     * not.
+     */
     @Transaction
     suspend fun replaceStravaEffortAttempt(attempt: SegmentAttemptEntity) {
         deleteForStravaEffort(checkNotNull(attempt.stravaEffortExternalId))
+        deleteLocalAttemptsForRideSegment(attempt.segmentId, attempt.rideId)
         insert(attempt)
     }
 
     /**
-     * True if [rideId] already has a real GPS-matched attempt (not Strava-derived) for
-     * [segmentId] — see [com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase],
-     * which skips creating a pseudo-attempt in that case: a Strava-derived row for the same ride's
-     * pass through the same segment is a near-duplicate of the real one (same lap, very similar
-     * time/track), which just confuses the comparison rather than adding anything.
+     * True if [rideId] already has a Strava-derived attempt for [segmentId] — see
+     * [com.segmentanalyzer.data.repository.SegmentAttemptRepositoryImpl.matchRideAgainstAllSegments]/
+     * [com.segmentanalyzer.data.repository.SegmentAttemptRepositoryImpl.matchSegmentAgainstAllRides],
+     * which skip inserting a real GPS-matched attempt in that case: see [replaceStravaEffortAttempt].
      */
     @Query(
-        "SELECT EXISTS(SELECT 1 FROM segment_attempts WHERE segmentId = :segmentId AND rideId = :rideId AND stravaEffortExternalId IS NULL)",
+        "SELECT EXISTS(SELECT 1 FROM segment_attempts WHERE segmentId = :segmentId AND rideId = :rideId AND stravaEffortExternalId IS NOT NULL)",
     )
-    suspend fun hasLocalAttempt(segmentId: Long, rideId: Long): Boolean
+    suspend fun hasStravaAttempt(segmentId: Long, rideId: Long): Boolean
 
-    /** Removes Strava-derived pseudo-attempts for (segmentId, rideId) now that a real one exists — see [hasLocalAttempt]. */
-    @Query("DELETE FROM segment_attempts WHERE segmentId = :segmentId AND rideId = :rideId AND stravaEffortExternalId IS NOT NULL")
-    suspend fun deleteStravaAttemptsForRideSegment(segmentId: Long, rideId: Long)
+    /** Removes real GPS-matched attempts for (segmentId, rideId) now that Strava data exists for it — see [replaceStravaEffortAttempt]. */
+    @Query("DELETE FROM segment_attempts WHERE segmentId = :segmentId AND rideId = :rideId AND stravaEffortExternalId IS NULL")
+    suspend fun deleteLocalAttemptsForRideSegment(segmentId: Long, rideId: Long)
 
     /**
-     * Self-heals rows saved before [hasLocalAttempt] existed to guard against them: any
-     * Strava-derived attempt sharing a (segmentId, rideId) with a real GPS-matched one is a
-     * near-duplicate of it and gets removed, same as [deleteStravaAttemptsForRideSegment].
+     * Self-heals rows saved before this Strava-wins precedence existed: any real GPS-matched
+     * attempt sharing a (segmentId, rideId) with a Strava-derived one is superseded by it and
+     * gets removed, same as [deleteLocalAttemptsForRideSegment].
      */
     @Query(
         """
-        DELETE FROM segment_attempts WHERE stravaEffortExternalId IS NOT NULL AND EXISTS (
+        DELETE FROM segment_attempts WHERE stravaEffortExternalId IS NULL AND EXISTS (
             SELECT 1 FROM segment_attempts b
-            WHERE b.segmentId = segment_attempts.segmentId AND b.rideId = segment_attempts.rideId AND b.stravaEffortExternalId IS NULL
+            WHERE b.segmentId = segment_attempts.segmentId AND b.rideId = segment_attempts.rideId AND b.stravaEffortExternalId IS NOT NULL
         )
         """,
     )
-    suspend fun deleteRedundantStravaAttempts()
+    suspend fun deleteRedundantLocalAttempts()
 }
