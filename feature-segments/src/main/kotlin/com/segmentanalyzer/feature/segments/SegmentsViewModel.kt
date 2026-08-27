@@ -9,6 +9,7 @@ import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
 import com.segmentanalyzer.domain.usecase.SyncStravaSegmentsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -86,10 +87,18 @@ class SegmentsViewModel @Inject constructor(
     fun onSyncClick() {
         syncOverride.value = StravaSyncStatus.Syncing
         viewModelScope.launch {
-            syncOverride.value = syncStravaSegments().fold(
+            val result = syncStravaSegments().fold(
                 onSuccess = { summary -> StravaSyncStatus.Result(summary.fetchedCount, summary.syncedCount) },
                 onFailure = { throwable -> StravaSyncStatus.Error(throwable.message ?: "Sync failed.") },
             )
+            syncOverride.value = result
+            // Auto-dismiss back to the normal Idle/NotConnected button rather than leaving the
+            // result/error message on screen forever — but only if nothing newer (e.g. another
+            // sync tapped in the meantime) has already replaced it. Reference equality on
+            // purpose: a second sync producing an equal-by-value Result shouldn't be clipped
+            // short by the first sync's own timer.
+            delay(10_000)
+            if (syncOverride.value === result) syncOverride.value = null
         }
     }
 

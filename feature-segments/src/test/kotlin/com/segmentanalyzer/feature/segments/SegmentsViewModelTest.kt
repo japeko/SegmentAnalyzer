@@ -23,8 +23,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -99,6 +101,55 @@ class SegmentsViewModelTest {
             assertEquals(StravaSyncStatus.Syncing, awaitItem().syncStatus)
             assertEquals(StravaSyncStatus.Error("session expired"), awaitItem().syncStatus)
         }
+    }
+
+    @Test
+    fun `sync result auto-dismisses back to Idle after 10 seconds`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            connected = true,
+            segmentRepository = FakeSegmentRepository(),
+            stravaSegmentRepository = FakeStravaSegmentRepository(Result.success(listOf(segment("1")))),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        // runCurrent(), not advanceUntilIdle(): the latter fast-forwards through the 10s delay
+        // too, since it keeps advancing the virtual clock until nothing at all is scheduled.
+        viewModel.onSyncClick()
+        runCurrent()
+        assertEquals(StravaSyncStatus.Result(fetchedCount = 1, syncedCount = 1), viewModel.uiState.value.syncStatus)
+
+        advanceTimeBy(10_001)
+        runCurrent()
+        assertEquals(StravaSyncStatus.Idle, viewModel.uiState.value.syncStatus)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a second sync's equal-valued result isn't clipped early by the first sync's own timer`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            connected = true,
+            segmentRepository = FakeSegmentRepository(),
+            stravaSegmentRepository = FakeStravaSegmentRepository(Result.success(listOf(segment("1")))),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onSyncClick()
+        runCurrent()
+        assertEquals(StravaSyncStatus.Result(fetchedCount = 1, syncedCount = 1), viewModel.uiState.value.syncStatus)
+
+        advanceTimeBy(9_000)
+        viewModel.onSyncClick() // a second sync, producing an equal-by-value Result, before the first's 10s timer fires
+        runCurrent()
+
+        // Past the first sync's original 10s mark (9_000 + 1_500), but well short of the second's own.
+        advanceTimeBy(1_500)
+        runCurrent()
+        assertEquals(StravaSyncStatus.Result(fetchedCount = 1, syncedCount = 1), viewModel.uiState.value.syncStatus)
+        collectJob.cancel()
     }
 
     @Test
