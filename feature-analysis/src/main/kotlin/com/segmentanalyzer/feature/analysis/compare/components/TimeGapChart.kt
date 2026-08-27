@@ -175,7 +175,21 @@ private fun interpolatedGapAt(points: List<TimeGapPoint>, targetDistance: Double
     return points.last().gapSeconds
 }
 
+/**
+ * One decimal place, not a whole-second round — the underlying gap is already sub-second precise
+ * (linear interpolation over GPS-timestamped points, see BuildTimeGapSeriesUseCase), and rounding
+ * to whole seconds made two genuinely different attempts both show "0s" for most of a segment,
+ * since a sub-half-second gap is extremely common on a short climb/descent.
+ */
 private fun formatGapSeconds(gapSeconds: Double): String {
-    val rounded = gapSeconds.roundToInt()
-    return if (rounded > 0) "+${rounded}s" else "${rounded}s"
+    val absSeconds = abs(gapSeconds)
+    // Locale.ROOT: a comma-decimal locale (this app's own Finnish users included, e.g. "18,9 km"
+    // elsewhere) would otherwise produce "0,4" here — fine to display, but a real crash risk if
+    // that string is ever re-parsed with something like toDouble(), which requires a dot.
+    val magnitude = "%.1f".format(java.util.Locale.ROOT, absSeconds)
+    return when {
+        absSeconds < 0.05 -> "0.0s"
+        gapSeconds > 0 -> "+${magnitude}s"
+        else -> "-${magnitude}s"
+    }
 }
