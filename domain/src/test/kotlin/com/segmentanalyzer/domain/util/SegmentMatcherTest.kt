@@ -225,6 +225,42 @@ class SegmentMatcherTest {
     }
 
     @Test
+    fun `endpoint-only matching rejects an exit reached only after retracing back near the start`() {
+        // Descends toward "end" but turns back ~100m short of it, climbs back to "start", then
+        // descends again and finishes near "end" the second time — total ground covered is far
+        // more than the segment's own length, even though the whole thing finishes well within
+        // the plausible-duration bound. Regression test for a real bug: a 535m segment (best real
+        // laps ~1.6x its length) matched two ~2x/2.7x-length "attempts" this exact way (a
+        // shuttle-less rider descending, climbing back up the same trail, then lapping it).
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(60.005, 24.000, 30, 500.0),
+            point(60.0091, 24.000, 55, 910.0), // ~100m short of "end", turns back here
+            point(60.005, 24.000, 90, 1_320.0),
+            point(START_LAT, START_LON, 120, 1_730.0), // back at "start"
+            point(60.005, 24.000, 150, 2_230.0),
+            point(END_LAT, END_LON, 180, 2_730.0), // finally reaches "end", ~2.7x the segment's length in
+        )
+
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS))
+    }
+
+    @Test
+    fun `polyline-aware matching also rejects an exit reached only after retracing back near the start`() {
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(60.005, 24.000, 30, 500.0),
+            point(60.0091, 24.000, 55, 910.0),
+            point(60.005, 24.000, 90, 1_320.0),
+            point(START_LAT, START_LON, 120, 1_730.0),
+            point(60.005, 24.000, 150, 2_230.0),
+            point(END_LAT, END_LON, 180, 2_730.0),
+        )
+
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE))
+    }
+
+    @Test
     fun `a slow but still-plausible pass is not rejected by the duration guard`() {
         // Much slower than the typical case (a stop to sort out a mechanical, say), but well
         // within what's physically plausible for the segment's length — must still match.

@@ -39,6 +39,23 @@ private fun maxPlausibleDuration(segmentDistanceMeters: Double): Duration =
         (segmentDistanceMeters / MIN_PLAUSIBLE_SPEED_METERS_PER_SECOND).toLong().coerceAtLeast(MIN_PLAUSIBLE_DURATION_SECONDS),
     )
 
+/**
+ * Bounds how much real GPS ground a single pass may plausibly cover, relative to the segment's
+ * own mapped length — used the same way as [maxPlausibleDuration], but for the shuttle-less
+ * riding pattern the time bound alone doesn't catch: descend a trail, climb back up the *same*
+ * trail to lap it, then descend again. That retrace still hugs the segment's polyline in reverse
+ * (passing the on-route-fraction check) and still finishes within a plausible time, but the exit
+ * search's first proximity hit near the end coordinate can land on the *second* descent's finish
+ * rather than the first — confirmed live: a 535m segment (best real laps 520-855m of ground
+ * covered, ~1.6x) matched two ~1050m/~1470m "attempts" (~2x/~2.7x) crossing 6+ minutes, once for
+ * an out-and-back-then-down pattern. 1.75x leaves headroom for a technical, indirect line while
+ * still rejecting a full down-up-down cycle.
+ */
+private const val MAX_PLAUSIBLE_DISTANCE_RATIO = 1.75
+
+private fun maxPlausibleDistanceMeters(segmentDistanceMeters: Double): Double =
+    segmentDistanceMeters * MAX_PLAUSIBLE_DISTANCE_RATIO
+
 data class SegmentMatchResult(
     val entryIndex: Int,
     val exitIndex: Int,
@@ -147,9 +164,12 @@ private fun findEntryExitViaEndpoints(
     } ?: return null
 
     val latestPlausibleExit = track[firstNearStart].timestamp.plus(maxPlausibleDuration(segmentDistanceMeters))
+    val furthestPlausibleDistance = track[firstNearStart].cumulativeDistanceMeters + maxPlausibleDistanceMeters(segmentDistanceMeters)
     val exitIndex = ((firstNearStart + 1) until track.size)
         .asSequence()
-        .takeWhile { index -> !track[index].timestamp.isAfter(latestPlausibleExit) }
+        .takeWhile { index ->
+            !track[index].timestamp.isAfter(latestPlausibleExit) && track[index].cumulativeDistanceMeters <= furthestPlausibleDistance
+        }
         .firstOrNull { index ->
             haversineMeters(track[index].latitude, track[index].longitude, endLat, endLon) <= proximityMeters
         } ?: return null
@@ -179,9 +199,12 @@ private fun findEntryExitViaPolyline(
         haversineMeters(track[index].latitude, track[index].longitude, start.latitude, start.longitude) <= proximityMeters
     } ?: return null
     val latestPlausibleExit = track[roughEntry].timestamp.plus(maxPlausibleDuration(segmentDistanceMeters))
+    val furthestPlausibleDistance = track[roughEntry].cumulativeDistanceMeters + maxPlausibleDistanceMeters(segmentDistanceMeters)
     val roughExit = ((roughEntry + 1) until track.size)
         .asSequence()
-        .takeWhile { index -> !track[index].timestamp.isAfter(latestPlausibleExit) }
+        .takeWhile { index ->
+            !track[index].timestamp.isAfter(latestPlausibleExit) && track[index].cumulativeDistanceMeters <= furthestPlausibleDistance
+        }
         .firstOrNull { index ->
             haversineMeters(track[index].latitude, track[index].longitude, end.latitude, end.longitude) <= proximityMeters
         } ?: return null
