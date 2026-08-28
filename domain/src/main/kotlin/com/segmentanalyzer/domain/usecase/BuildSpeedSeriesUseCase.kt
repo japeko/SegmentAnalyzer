@@ -1,7 +1,6 @@
 package com.segmentanalyzer.domain.usecase
 
 import com.segmentanalyzer.domain.model.TrackPoint
-import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import java.time.Duration
 import javax.inject.Inject
 
@@ -9,22 +8,23 @@ data class SpeedPoint(val distanceMeters: Double, val speedKmh: Double)
 data class SpeedSeries(val attemptId: Long, val points: List<SpeedPoint>)
 
 /**
- * Builds, for each of [attemptIds], a speed-vs-distance curve at evenly-spaced distances along
+ * Builds, for each entry in [tracks], a speed-vs-distance curve at evenly-spaced distances along
  * the segment — the same sampling shape as [BuildTimeGapSeriesUseCase], so both charts plot on an
  * identical x-axis.
+ *
+ * Takes already-fetched tracks rather than ids + a repository — see [BuildTimeGapSeriesUseCase]'s
+ * doc for why.
  */
-class BuildSpeedSeriesUseCase @Inject constructor(
-    private val segmentAttemptRepository: SegmentAttemptRepository,
-) {
-    suspend operator fun invoke(
-        attemptIds: List<Long>,
+class BuildSpeedSeriesUseCase @Inject constructor() {
+    operator fun invoke(
+        tracks: Map<Long, List<TrackPoint>>,
         segmentDistanceMeters: Double,
         sampleCount: Int = 40,
     ): List<SpeedSeries> {
         val distances = (0 until sampleCount).map { index -> index * segmentDistanceMeters / (sampleCount - 1) }
 
-        return attemptIds.map { attemptId ->
-            val curve = speedCurve(segmentAttemptRepository.trackPointsForAttempt(attemptId))
+        return tracks.map { (attemptId, track) ->
+            val curve = speedCurve(track)
             val points = distances.map { distance -> SpeedPoint(distance, speedAt(curve, distance)) }
             SpeedSeries(attemptId = attemptId, points = points)
         }

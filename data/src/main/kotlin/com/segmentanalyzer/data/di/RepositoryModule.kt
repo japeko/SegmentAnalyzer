@@ -6,6 +6,7 @@ import com.segmentanalyzer.data.repository.FitFileRepositoryImpl
 import com.segmentanalyzer.data.repository.GarminAccountRepositoryImpl
 import com.segmentanalyzer.data.repository.GarminImportRepositoryImpl
 import com.segmentanalyzer.data.repository.GpxFileRepositoryImpl
+import com.segmentanalyzer.data.repository.GuestAttemptRepositoryImpl
 import com.segmentanalyzer.data.repository.RideComparisonInsightRepositoryImpl
 import com.segmentanalyzer.data.repository.RideRepositoryImpl
 import com.segmentanalyzer.data.repository.SegmentAttemptRepositoryImpl
@@ -22,6 +23,7 @@ import com.segmentanalyzer.domain.repository.FitFileRepository
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.repository.GarminImportRepository
 import com.segmentanalyzer.domain.repository.GpxFileRepository
+import com.segmentanalyzer.domain.repository.GuestAttemptRepository
 import com.segmentanalyzer.domain.repository.RideComparisonInsightRepository
 import com.segmentanalyzer.domain.repository.RideRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
@@ -109,4 +111,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     internal abstract fun bindFitExportRepository(impl: FitExportRepositoryImpl): FitExportRepository
+
+    @Binds
+    @Singleton
+    internal abstract fun bindGuestAttemptRepository(impl: GuestAttemptRepositoryImpl): GuestAttemptRepository
 }

@@ -5,10 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
+import com.segmentanalyzer.domain.model.GuestAttempt
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
+import com.segmentanalyzer.domain.usecase.DeleteGuestAttemptUseCase
+import com.segmentanalyzer.domain.usecase.ImportGuestFitFileUseCase
 import com.segmentanalyzer.domain.usecase.ObserveExcludedAttemptIdsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveGuestAttemptsForSegmentUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
@@ -27,6 +31,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private data class DetailExtras(
+    val excludedIds: Set<Long>,
+    val reversed: Boolean,
+    val connectionState: StravaConnectionState,
+    val guestAttempts: List<GuestAttempt>,
+    val guestImportSheet: GuestImportSheetState?,
+)
+
 @HiltViewModel
 class SegmentDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -34,9 +46,12 @@ class SegmentDetailViewModel @Inject constructor(
     observeSegmentAttempts: ObserveSegmentAttemptsUseCase,
     observeExcludedAttemptIds: ObserveExcludedAttemptIdsUseCase,
     observeStravaConnectionState: ObserveStravaConnectionStateUseCase,
+    observeGuestAttempts: ObserveGuestAttemptsForSegmentUseCase,
     private val checkSegmentStarred: CheckSegmentStarredUseCase,
     private val setSegmentStarred: SetSegmentStarredUseCase,
     private val setAttemptExcluded: SetAttemptExcludedUseCase,
+    private val importGuestFitFile: ImportGuestFitFileUseCase,
+    private val deleteGuestAttempt: DeleteGuestAttemptUseCase,
 ) : ViewModel() {
 
     private val segmentId: Long = checkNotNull(savedStateHandle["segmentId"])
@@ -61,6 +76,9 @@ class SegmentDetailViewModel @Inject constructor(
     /** The segment's external id, once resolved, so the star actions don't need a second lookup. */
     private var latestSegmentExternalId: String? = null
 
+    /** Non-null while the "Import Guest Ride" sheet is open. */
+    private val guestImportSheetState = MutableStateFlow<GuestImportSheetState?>(null)
+
     init {
         // Skips the star-status check entirely (and reactively retries) while Strava isn't
         // connected, rather than firing a network call doomed to fail with an auth error every
@@ -83,10 +101,16 @@ class SegmentDetailViewModel @Inject constructor(
         observeSegmentAttempts(segmentId),
         starPromptState,
         selectedAttemptId,
-        combine(observeExcludedAttemptIds(), attemptsReversed, observeStravaConnectionState()) { excludedIds, reversed, connectionState ->
-            Triple(excludedIds, reversed, connectionState)
+        combine(
+            observeExcludedAttemptIds(),
+            attemptsReversed,
+            observeStravaConnectionState(),
+            observeGuestAttempts(segmentId),
+            guestImportSheetState,
+        ) { excludedIds, reversed, connectionState, guestAttempts, guestImportSheet ->
+            DetailExtras(excludedIds, reversed, connectionState, guestAttempts, guestImportSheet)
         },
-    ) { segment, attempts, starPrompt, selectedId, (excludedIds, reversed, connectionState) ->
+    ) { segment, attempts, starPrompt, selectedId, (excludedIds, reversed, connectionState, guestAttempts, guestImportSheet) ->
         latestSegmentExternalId = segment?.externalId
 
         // Lap numbering ("Ride 1", "Ride 2", ...) stays stable regardless of exclusion — it's
@@ -136,6 +160,8 @@ class SegmentDetailViewModel @Inject constructor(
             selectedAttemptId = selectedId,
             attemptsReversed = reversed,
             stravaNotConnected = connectionState !is StravaConnectionState.Connected,
+            guestAttempts = guestAttempts.sortedByDescending { it.importedAt }.map { it.toItem() },
+            guestImportSheet = guestImportSheet,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -175,6 +201,50 @@ class SegmentDetailViewModel @Inject constructor(
             )
         }
     }
+
+    fun onImportGuestRideClick() {
+        guestImportSheetState.value = GuestImportSheetState()
+    }
+
+    fun onDismissGuestImportSheet() {
+        guestImportSheetState.value = null
+    }
+
+    fun onGuestFileSelected(uri: String, fileName: String?) {
+        val current = guestImportSheetState.value ?: return
+        guestImportSheetState.value = current.copy(pickedFileUri = uri, pickedFileName = fileName, errorMessage = null)
+    }
+
+    fun onGuestRiderNameChange(name: String) {
+        val current = guestImportSheetState.value ?: return
+        guestImportSheetState.value = current.copy(riderName = name)
+    }
+
+    fun onConfirmGuestImport() {
+        val current = guestImportSheetState.value ?: return
+        val uri = current.pickedFileUri ?: return
+        val riderName = current.riderName.trim()
+        if (riderName.isEmpty()) {
+            guestImportSheetState.value = current.copy(errorMessage = "Enter a name for this rider.")
+            return
+        }
+
+        guestImportSheetState.value = current.copy(isImporting = true, errorMessage = null)
+        viewModelScope.launch {
+            importGuestFitFile(uri, riderName).fold(
+                // The sheet just closes — the new guest attempt(s) appear in the list on their
+                // own, since it's already reactively observing observeGuestAttempts.
+                onSuccess = { guestImportSheetState.value = null },
+                onFailure = { throwable ->
+                    guestImportSheetState.value = current.copy(isImporting = false, errorMessage = throwable.message ?: "Couldn't import this file.")
+                },
+            )
+        }
+    }
+
+    fun onGuestAttemptDeleteClick(guestAttemptId: Long) {
+        viewModelScope.launch { deleteGuestAttempt(guestAttemptId) }
+    }
 }
 
 /** Faster (lower seconds) plots higher on the chart — the intuitive "improving" reading. */
@@ -182,6 +252,14 @@ private fun normalizedSpeed(seconds: Long, min: Long?, max: Long?): Float {
     if (min == null || max == null || max == min) return 1f
     return 1f - (seconds - min).toFloat() / (max - min).toFloat()
 }
+
+private fun GuestAttempt.toItem(): GuestAttemptItem = GuestAttemptItem(
+    id = id,
+    riderName = riderName,
+    dateLabel = startTime.toRideCardDate(),
+    durationLabel = duration.toRideClock(),
+    avgSpeedKmh = avgSpeedKmh,
+)
 
 private fun SegmentAttempt.toItem(personalBestSeconds: Long, lapLabel: String, rank: Int?): AttemptItem = AttemptItem(
     id = id,

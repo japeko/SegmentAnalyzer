@@ -2,17 +2,21 @@ package com.segmentanalyzer.feature.analysis.compare
 
 import androidx.lifecycle.SavedStateHandle
 import com.segmentanalyzer.domain.model.ActivitySource
+import com.segmentanalyzer.domain.model.GuestAttempt
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.repository.GuestAttemptRepository
 import com.segmentanalyzer.domain.repository.RideComparisonInsightRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.usecase.BuildSpeedSeriesUseCase
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
 import com.segmentanalyzer.domain.usecase.GenerateRideComparisonInsightUseCase
-import com.segmentanalyzer.domain.usecase.ObserveRideComparisonInsightAvailabilityUseCase
 import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
+import com.segmentanalyzer.domain.usecase.GetGuestAttemptTrackUseCase
+import com.segmentanalyzer.domain.usecase.ObserveGuestAttemptsForSegmentUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideComparisonInsightAvailabilityUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +61,25 @@ private fun attempt(id: Long, seconds: Long, startTime: Instant, avgSpeedKmh: Do
     avgSpeedKmh = avgSpeedKmh,
     elevationGainMeters = 300.0,
     avgPowerWatts = null,
+)
+
+private fun point(secondsFromStart: Long, distanceMeters: Double) = TrackPoint(
+    latitude = 0.001 * distanceMeters,
+    longitude = 0.0,
+    elevationMeters = null,
+    timestamp = Instant.EPOCH.plusSeconds(secondsFromStart),
+    cumulativeDistanceMeters = distanceMeters,
+)
+
+private fun guestAttempt(id: Long, riderName: String, seconds: Long, startTime: Instant, avgSpeedKmh: Double = 18.0) = GuestAttempt(
+    id = id,
+    segmentId = 1,
+    riderName = riderName,
+    importedAt = Instant.parse("2026-08-28T00:00:00Z"),
+    startTime = startTime,
+    duration = Duration.ofSeconds(seconds),
+    avgSpeedKmh = avgSpeedKmh,
+    elevationGainMeters = 300.0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -491,11 +514,96 @@ class RideCompareViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `a guest ride shows up in the Add sheet's Guest Rides section, never as a default chip`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        // Faster than "current" — if guests were eligible for Personal Best/Previous, this would
+        // wrongly become one of those instead of staying opt-in-only.
+        val guest = guestAttempt(id = 5, riderName = "Alex", seconds = 2000, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val guestAttemptRepository = FakeCompareGuestAttemptRepository(listOf(guest))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current), guestAttemptRepository = guestAttemptRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.chips.size) // Only "Current" — the guest never auto-joined.
+        val guestAddable = state.addableAttempts.single { it.isGuest }
+        assertEquals("Alex", guestAddable.lapLabel)
+        assertEquals(-5L, guestAddable.id)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `adding a guest ride shows it as a GUEST-role chip labeled with the rider's name`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val guest = guestAttempt(id = 5, riderName = "Alex", seconds = 2600, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val guestAttemptRepository = FakeCompareGuestAttemptRepository(
+            guestAttempts = listOf(guest),
+            tracksByGuestAttemptId = mapOf(5L to listOf(point(0, 0.0), point(10, 100.0))),
+        )
+        val viewModel = viewModel(
+            currentAttemptId = 1L,
+            attempts = listOf(current),
+            tracksByAttemptId = mapOf(1L to listOf(point(0, 0.0), point(12, 100.0))),
+            guestAttemptRepository = guestAttemptRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onAddClick()
+        viewModel.onAddableAttemptSelected(-5L)
+        viewModel.onConfirmAdd()
+        advanceUntilIdle()
+
+        val guestChip = viewModel.uiState.value.chips.first { it.attemptId == -5L }
+        assertEquals(AttemptRole.GUEST, guestChip.role)
+        assertEquals("Alex", guestChip.lapLabel)
+        // The Time Gap chart also picked up the guest's track via GetGuestAttemptTrackUseCase,
+        // dispatched by the chip's negative id.
+        assertEquals(1, viewModel.uiState.value.timeGapSeries.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a guest ride can become the reference line, same as the rider's own`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val guest = guestAttempt(id = 5, riderName = "Alex", seconds = 2600, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val guestAttemptRepository = FakeCompareGuestAttemptRepository(
+            guestAttempts = listOf(guest),
+            tracksByGuestAttemptId = mapOf(5L to listOf(point(0, 0.0), point(10, 100.0))),
+        )
+        val viewModel = viewModel(
+            currentAttemptId = 1L,
+            attempts = listOf(current),
+            tracksByAttemptId = mapOf(1L to listOf(point(0, 0.0), point(12, 100.0))),
+            guestAttemptRepository = guestAttemptRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        viewModel.onAddClick()
+        viewModel.onAddableAttemptSelected(-5L)
+        viewModel.onConfirmAdd()
+        advanceUntilIdle()
+
+        viewModel.onSetReferenceClick(-5L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(true, state.chips.first { it.attemptId == -5L }.isReference)
+        // The route map/slope chart now reads from the guest's own track.
+        assertEquals(2, state.routePoints.size)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         currentAttemptId: Long,
         attempts: List<SegmentAttempt>,
         tracksByAttemptId: Map<Long, List<TrackPoint>> = emptyMap(),
         insightRepository: FakeRideComparisonInsightRepository = FakeRideComparisonInsightRepository(),
+        guestAttemptRepository: FakeCompareGuestAttemptRepository = FakeCompareGuestAttemptRepository(),
     ): RideCompareViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L, "anchorAttemptId" to currentAttemptId))
         val attemptRepository = FakeCompareSegmentAttemptRepository(attempts, tracksByAttemptId)
@@ -503,12 +611,33 @@ class RideCompareViewModelTest {
             savedStateHandle,
             ObserveSegmentsUseCase(FakeCompareSegmentRepository()),
             ObserveSegmentAttemptsUseCase(attemptRepository),
-            BuildTimeGapSeriesUseCase(attemptRepository),
-            BuildSpeedSeriesUseCase(attemptRepository),
+            ObserveGuestAttemptsForSegmentUseCase(guestAttemptRepository),
+            BuildTimeGapSeriesUseCase(),
+            BuildSpeedSeriesUseCase(),
             GetAttemptTrackUseCase(attemptRepository),
+            GetGuestAttemptTrackUseCase(guestAttemptRepository),
             ObserveRideComparisonInsightAvailabilityUseCase(insightRepository),
             GenerateRideComparisonInsightUseCase(insightRepository),
         )
+    }
+}
+
+private class FakeCompareGuestAttemptRepository(
+    guestAttempts: List<GuestAttempt> = emptyList(),
+    private val tracksByGuestAttemptId: Map<Long, List<TrackPoint>> = emptyMap(),
+) : GuestAttemptRepository {
+    private val attemptsFlow = MutableStateFlow(guestAttempts)
+    val deleteCalls = mutableListOf<Long>()
+
+    override suspend fun importFitFile(uri: String, riderName: String): Result<List<GuestAttempt>> =
+        throw UnsupportedOperationException("not used in this test")
+
+    override fun observeForSegment(segmentId: Long): Flow<List<GuestAttempt>> = attemptsFlow
+    override suspend fun trackPointsForGuestAttempt(guestAttemptId: Long): List<TrackPoint> =
+        tracksByGuestAttemptId[guestAttemptId].orEmpty()
+
+    override suspend fun deleteGuestAttempt(id: Long) {
+        deleteCalls += id
     }
 }
 

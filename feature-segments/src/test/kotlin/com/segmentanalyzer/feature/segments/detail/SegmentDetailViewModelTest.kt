@@ -2,17 +2,23 @@ package com.segmentanalyzer.feature.segments.detail
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.ActivitySource
+import com.segmentanalyzer.domain.model.GuestAttempt
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.StravaConnectionState
 import com.segmentanalyzer.domain.repository.ExcludedAttemptsRepository
+import com.segmentanalyzer.domain.repository.GuestAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.repository.StravaAccountRepository
 import com.segmentanalyzer.domain.repository.StravaSegmentRepository
 import com.segmentanalyzer.domain.usecase.CheckSegmentStarredUseCase
+import com.segmentanalyzer.domain.usecase.DeleteGuestAttemptUseCase
+import com.segmentanalyzer.domain.usecase.ImportGuestFitFileUseCase
 import com.segmentanalyzer.domain.usecase.ObserveExcludedAttemptIdsUseCase
+import com.segmentanalyzer.domain.usecase.ObserveGuestAttemptsForSegmentUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
@@ -59,6 +65,17 @@ private fun attempt(id: Long, rideName: String, seconds: Long, startTime: Instan
     avgSpeedKmh = 20.0,
     elevationGainMeters = 0.0,
     avgPowerWatts = null,
+)
+
+private fun guestAttempt(id: Long, riderName: String, seconds: Long) = GuestAttempt(
+    id = id,
+    segmentId = 1,
+    riderName = riderName,
+    importedAt = Instant.parse("2026-08-28T00:00:00Z"),
+    startTime = Instant.parse("2026-08-01T00:00:00Z"),
+    duration = Duration.ofSeconds(seconds),
+    avgSpeedKmh = 20.0,
+    elevationGainMeters = 0.0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -353,11 +370,103 @@ class SegmentDetailViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `importing a guest ride closes the sheet and shows the new attempt, without touching Personal Best`() = runTest(dispatcher) {
+        val pr = attempt(1, "My Ride", seconds = 300, startTime = Instant.parse("2026-08-01T00:00:00Z"))
+        val imported = guestAttempt(id = 10, riderName = "Alex", seconds = 250)
+        val guestAttemptRepository = FakeGuestAttemptRepository(importResult = Result.success(listOf(imported)))
+        val viewModel = viewModel(listOf(pr), guestAttemptRepository = guestAttemptRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onImportGuestRideClick()
+        advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.guestImportSheet != null)
+
+        viewModel.onGuestFileSelected("content://fake/ride.fit", "ride.fit")
+        viewModel.onGuestRiderNameChange("Alex")
+        viewModel.onConfirmGuestImport()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(null, state.guestImportSheet)
+        assertEquals(listOf("Alex"), state.guestAttempts.map { it.riderName })
+        assertEquals(listOf("content://fake/ride.fit" to "Alex"), guestAttemptRepository.importCalls)
+        // The guest's 250s beats the PR's 300s, but it must never become — or affect — the
+        // Personal Best, which is computed purely from real SegmentAttempts.
+        assertEquals(pr.duration.toRideClock(), state.personalBest?.durationLabel)
+        assertEquals(1, state.personalBest?.rank)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a failed guest import keeps the sheet open with an error message`() = runTest(dispatcher) {
+        val guestAttemptRepository = FakeGuestAttemptRepository(importResult = Result.failure(IllegalStateException("no GPS track")))
+        val viewModel = viewModel(emptyList(), guestAttemptRepository = guestAttemptRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onImportGuestRideClick()
+        viewModel.onGuestFileSelected("content://fake/ride.fit", "ride.fit")
+        viewModel.onGuestRiderNameChange("Alex")
+        viewModel.onConfirmGuestImport()
+        advanceUntilIdle()
+
+        val sheet = viewModel.uiState.value.guestImportSheet
+        assertEquals("no GPS track", sheet?.errorMessage)
+        assertEquals(false, sheet?.isImporting)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `confirming import with a blank rider name shows a validation error instead of importing`() = runTest(dispatcher) {
+        val guestAttemptRepository = FakeGuestAttemptRepository()
+        val viewModel = viewModel(emptyList(), guestAttemptRepository = guestAttemptRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onImportGuestRideClick()
+        viewModel.onGuestFileSelected("content://fake/ride.fit", "ride.fit")
+        viewModel.onConfirmGuestImport()
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value.guestImportSheet?.errorMessage?.isNotEmpty())
+        assertEquals(true, guestAttemptRepository.importCalls.isEmpty())
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `deleting a guest attempt removes it from the list`() = runTest(dispatcher) {
+        val imported = guestAttempt(id = 10, riderName = "Alex", seconds = 250)
+        val guestAttemptRepository = FakeGuestAttemptRepository(importResult = Result.success(listOf(imported)))
+        val viewModel = viewModel(emptyList(), guestAttemptRepository = guestAttemptRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        viewModel.onImportGuestRideClick()
+        viewModel.onGuestFileSelected("content://fake/ride.fit", "ride.fit")
+        viewModel.onGuestRiderNameChange("Alex")
+        viewModel.onConfirmGuestImport()
+        advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.guestAttempts.size)
+
+        viewModel.onGuestAttemptDeleteClick(10)
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value.guestAttempts.isEmpty())
+        assertEquals(listOf(10L), guestAttemptRepository.deleteCalls)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         attempts: List<SegmentAttempt>,
         stravaSegmentRepository: FakeDetailStravaSegmentRepository = FakeDetailStravaSegmentRepository(),
         excludedAttemptsRepository: FakeExcludedAttemptsRepository = FakeExcludedAttemptsRepository(),
         stravaAccountRepository: FakeDetailStravaAccountRepository = FakeDetailStravaAccountRepository(),
+        guestAttemptRepository: FakeGuestAttemptRepository = FakeGuestAttemptRepository(),
     ): SegmentDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L))
         return SegmentDetailViewModel(
@@ -366,10 +475,34 @@ class SegmentDetailViewModelTest {
             ObserveSegmentAttemptsUseCase(FakeDetailSegmentAttemptRepository(attempts)),
             ObserveExcludedAttemptIdsUseCase(excludedAttemptsRepository),
             ObserveStravaConnectionStateUseCase(stravaAccountRepository),
+            ObserveGuestAttemptsForSegmentUseCase(guestAttemptRepository),
             CheckSegmentStarredUseCase(stravaSegmentRepository),
             SetSegmentStarredUseCase(stravaSegmentRepository),
             SetAttemptExcludedUseCase(excludedAttemptsRepository),
+            ImportGuestFitFileUseCase(guestAttemptRepository),
+            DeleteGuestAttemptUseCase(guestAttemptRepository),
         )
+    }
+}
+
+private class FakeGuestAttemptRepository(
+    private val importResult: Result<List<GuestAttempt>> = Result.success(emptyList()),
+) : GuestAttemptRepository {
+    private val guestAttempts = MutableStateFlow<List<GuestAttempt>>(emptyList())
+    val importCalls = mutableListOf<Pair<String, String>>()
+    val deleteCalls = mutableListOf<Long>()
+
+    override suspend fun importFitFile(uri: String, riderName: String): Result<List<GuestAttempt>> {
+        importCalls += uri to riderName
+        importResult.onSuccess { guestAttempts.value = guestAttempts.value + it }
+        return importResult
+    }
+
+    override fun observeForSegment(segmentId: Long): Flow<List<GuestAttempt>> = guestAttempts
+    override suspend fun trackPointsForGuestAttempt(guestAttemptId: Long) = emptyList<com.segmentanalyzer.domain.model.TrackPoint>()
+    override suspend fun deleteGuestAttempt(id: Long) {
+        deleteCalls += id
+        guestAttempts.value = guestAttempts.value.filterNot { it.id == id }
     }
 }
 

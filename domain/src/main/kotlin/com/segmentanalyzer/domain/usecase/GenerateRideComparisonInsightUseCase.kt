@@ -72,10 +72,24 @@ private fun RideComparisonSummary.toPrompt(): String {
             )
         }
         appendLine()
+        // "Speak to the rider as you" only makes sense when every attempt is the app's own user.
+        // Once a guest's FIT import is in the mix (identified by their real name, not a role label),
+        // "you" is ambiguous — it could misattribute the guest's own performance to the viewer, as
+        // seen in testing (e.g. "Ville was faster because you maintained a strong pace"). Since the
+        // guest's gender is unknown, the fix isn't a pronoun — it's requiring every rider to always
+        // be referred to by the exact name/label already used above, never "you", "he", or "she".
+        val anyGuestInvolved = attempts.any { it.isGuest }
         append(
-            "In 2-3 short sentences, explain why ${fastest.label} was faster than the others on this " +
-                "segment, referencing where along the segment time was gained or lost. Speak directly " +
-                "to the rider as \"you\". Do not repeat the raw numbers back verbatim.",
+            if (anyGuestInvolved) {
+                "In 2-3 short sentences, explain why ${fastest.label} was faster than the others on this " +
+                    "segment, referencing where along the segment time was gained or lost. Refer to each " +
+                    "rider only by the exact name shown above (e.g. \"$referenceLabel\", \"${fastest.label}\") " +
+                    "— never say \"you\", \"he\", or \"she\". Do not repeat the raw numbers back verbatim."
+            } else {
+                "In 2-3 short sentences, explain why ${fastest.label} was faster than the others on this " +
+                    "segment, referencing where along the segment time was gained or lost. Speak directly " +
+                    "to the rider as \"you\". Do not repeat the raw numbers back verbatim."
+            },
         )
     }
 }

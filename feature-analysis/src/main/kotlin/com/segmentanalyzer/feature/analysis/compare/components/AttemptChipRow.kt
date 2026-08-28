@@ -117,4 +117,5 @@ private fun AttemptRole.label(): String = when (this) {
     AttemptRole.PERSONAL_BEST -> "Personal Best"
     AttemptRole.PREVIOUS -> "Previous"
     AttemptRole.SELECTED -> "Selected"
+    AttemptRole.GUEST -> "Guest"
 }

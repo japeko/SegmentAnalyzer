@@ -23,6 +23,26 @@ data class SegmentDetailUiState(
     val attemptsReversed: Boolean = false,
     /** True while Strava isn't connected — this segment's star-status check was skipped rather than doomed to fail. */
     val stravaNotConnected: Boolean = false,
+    /** Imported from someone else's FIT file — never counted toward Personal Best/rank/the chart above. */
+    val guestAttempts: List<GuestAttemptItem> = emptyList(),
+    /** Non-null while the "Import Guest Ride" sheet is open. */
+    val guestImportSheet: GuestImportSheetState? = null,
+)
+
+data class GuestAttemptItem(
+    val id: Long,
+    val riderName: String,
+    val dateLabel: String,
+    val durationLabel: String,
+    val avgSpeedKmh: Double,
+)
+
+data class GuestImportSheetState(
+    val pickedFileUri: String? = null,
+    val pickedFileName: String? = null,
+    val riderName: String = "",
+    val isImporting: Boolean = false,
+    val errorMessage: String? = null,
 )
 
 /** Live state of the "star this segment?" prompt. */

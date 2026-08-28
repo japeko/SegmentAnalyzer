@@ -21,6 +21,8 @@ data class RideComparisonAttemptSummary(
     val worstPoint: RideComparisonGapPoint?,
     /** The single furthest-ahead point along the segment (null if never ahead, or this is the reference itself). */
     val bestPoint: RideComparisonGapPoint?,
+    /** True if [label] names a guest rider rather than the app's own user — the prompt must never address a guest as "you". */
+    val isGuest: Boolean = false,
 )
 
 /** Everything an AI insight prompt needs to explain why one ride was faster than another on this segment. */

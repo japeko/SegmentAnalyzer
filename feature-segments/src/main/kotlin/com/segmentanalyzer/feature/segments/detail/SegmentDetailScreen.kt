@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,10 +27,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +49,8 @@ import com.segmentanalyzer.core.ui.RoutePreviewCard
 import com.segmentanalyzer.core.ui.StatCard
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.feature.segments.detail.components.ExcludableAttemptRow
+import com.segmentanalyzer.feature.segments.detail.components.GuestAttemptRow
+import com.segmentanalyzer.feature.segments.detail.components.GuestImportSheet
 import com.segmentanalyzer.feature.segments.detail.components.IncludableAttemptRow
 import com.segmentanalyzer.feature.segments.detail.components.ProgressChart
 
@@ -62,6 +67,12 @@ fun SegmentDetailScreen(
     onStarSegmentClick: () -> Unit,
     onDismissStarPrompt: () -> Unit,
     onGoToSettingsClick: () -> Unit,
+    onImportGuestRideClick: () -> Unit,
+    onDismissGuestImportSheet: () -> Unit,
+    onChooseGuestFileClick: () -> Unit,
+    onGuestRiderNameChange: (String) -> Unit,
+    onConfirmGuestImport: () -> Unit,
+    onGuestAttemptDeleteClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var hoveredAttemptId by remember { mutableStateOf<Long?>(null) }
@@ -80,6 +91,9 @@ fun SegmentDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onImportGuestRideClick) {
+                        Icon(Icons.Filled.PersonAdd, contentDescription = "Import a guest ride")
+                    }
                     if (uiState.attempts.isNotEmpty()) {
                         Icon(
                             imageVector = Icons.Filled.EmojiEvents,
@@ -241,6 +255,36 @@ fun SegmentDetailScreen(
                     }
                 }
             }
+
+            if (uiState.guestAttempts.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Guest Rides",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialThemeExtras.textTertiary,
+                        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
+                    )
+                }
+                items(uiState.guestAttempts, key = { it.id }) { guestAttempt ->
+                    GuestAttemptRow(
+                        item = guestAttempt,
+                        onDelete = onGuestAttemptDeleteClick,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    uiState.guestImportSheet?.let { sheetState ->
+        ModalBottomSheet(onDismissRequest = onDismissGuestImportSheet, sheetState = rememberModalBottomSheetState()) {
+            GuestImportSheet(
+                state = sheetState,
+                onChooseFileClick = onChooseGuestFileClick,
+                onRiderNameChange = onGuestRiderNameChange,
+                onConfirmClick = onConfirmGuestImport,
+            )
         }
     }
 

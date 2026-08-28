@@ -3,6 +3,7 @@ package com.segmentanalyzer.data.di
 import android.content.Context
 import androidx.room.Room
 import com.segmentanalyzer.data.local.SegmentAnalyzerDatabase
+import com.segmentanalyzer.data.local.dao.GuestAttemptDao
 import com.segmentanalyzer.data.local.dao.RideDao
 import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptDao
@@ -62,4 +63,7 @@ object DatabaseModule {
     @Provides
     fun provideStravaSegmentEffortPointDao(database: SegmentAnalyzerDatabase): StravaSegmentEffortPointDao =
         database.stravaSegmentEffortPointDao()
+
+    @Provides
+    fun provideGuestAttemptDao(database: SegmentAnalyzerDatabase): GuestAttemptDao = database.guestAttemptDao()
 }

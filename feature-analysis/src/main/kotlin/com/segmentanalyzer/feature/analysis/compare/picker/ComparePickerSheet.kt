@@ -59,6 +59,7 @@ fun ComparePickerSheet(
         )
 
         val (unavailable, selectable) = attempts.partition { it.statusLabel != null }
+        val (ownSelectable, guestSelectable) = selectable.partition { !it.isGuest }
 
         // Scrollable and capped to the remaining space (fill = false) rather than fillMaxHeight,
         // so a short list doesn't force the sheet to full height — but a long one scrolls here
@@ -70,11 +71,23 @@ fun ComparePickerSheet(
                 .padding(top = 12.dp),
         ) {
             unavailable.forEach { item -> UnavailableRow(item) }
-            if (unavailable.isNotEmpty() && selectable.isNotEmpty()) {
+            if (unavailable.isNotEmpty() && ownSelectable.isNotEmpty()) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
             }
-            selectable.forEach { item ->
+            ownSelectable.forEach { item ->
                 SelectableRow(item = item, isSelected = item.id == selectedId, onSelect = { onSelect(item.id) })
+            }
+            if (guestSelectable.isNotEmpty()) {
+                Text(
+                    text = "Guest Rides",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialThemeExtras.textTertiary,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp, start = 4.dp),
+                )
+                guestSelectable.forEach { item ->
+                    SelectableRow(item = item, isSelected = item.id == selectedId, onSelect = { onSelect(item.id) })
+                }
             }
         }
 

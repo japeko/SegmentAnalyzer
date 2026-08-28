@@ -4,12 +4,15 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.segmentanalyzer.data.local.converter.RideTypeConverters
+import com.segmentanalyzer.data.local.dao.GuestAttemptDao
 import com.segmentanalyzer.data.local.dao.RideDao
 import com.segmentanalyzer.data.local.dao.RidePointDao
 import com.segmentanalyzer.data.local.dao.SegmentAttemptDao
 import com.segmentanalyzer.data.local.dao.SegmentDao
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortDao
 import com.segmentanalyzer.data.local.dao.StravaSegmentEffortPointDao
+import com.segmentanalyzer.data.local.entity.GuestAttemptEntity
+import com.segmentanalyzer.data.local.entity.GuestAttemptPointEntity
 import com.segmentanalyzer.data.local.entity.RideEntity
 import com.segmentanalyzer.data.local.entity.RidePointEntity
 import com.segmentanalyzer.data.local.entity.SegmentAttemptEntity
@@ -25,8 +28,10 @@ import com.segmentanalyzer.data.local.entity.StravaSegmentEffortPointEntity
         SegmentAttemptEntity::class,
         StravaSegmentEffortEntity::class,
         StravaSegmentEffortPointEntity::class,
+        GuestAttemptEntity::class,
+        GuestAttemptPointEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(RideTypeConverters::class)
@@ -37,6 +42,7 @@ abstract class SegmentAnalyzerDatabase : RoomDatabase() {
     abstract fun segmentAttemptDao(): SegmentAttemptDao
     abstract fun stravaSegmentEffortDao(): StravaSegmentEffortDao
     abstract fun stravaSegmentEffortPointDao(): StravaSegmentEffortPointDao
+    abstract fun guestAttemptDao(): GuestAttemptDao
 
     companion object {
         const val DATABASE_NAME = "segment_analyzer.db"

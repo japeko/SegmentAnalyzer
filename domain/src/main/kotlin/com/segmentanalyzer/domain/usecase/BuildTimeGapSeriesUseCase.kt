@@ -1,7 +1,6 @@
 package com.segmentanalyzer.domain.usecase
 
 import com.segmentanalyzer.domain.model.TrackPoint
-import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import java.time.Duration
 import javax.inject.Inject
 
@@ -9,23 +8,26 @@ data class TimeGapPoint(val distanceMeters: Double, val gapSeconds: Double)
 data class TimeGapSeries(val attemptId: Long, val points: List<TimeGapPoint>)
 
 /**
- * Builds, for each of [otherAttemptIds], a series of how many seconds ahead (negative) or behind
- * (positive) [referenceAttemptId] it was at evenly-spaced distances along the segment.
+ * Builds, for each entry in [otherTracks], a series of how many seconds ahead (negative) or
+ * behind (positive) [referenceTrack] it was at evenly-spaced distances along the segment.
+ *
+ * Takes already-fetched tracks rather than ids + a repository — the caller may need to resolve
+ * ids from more than one source (e.g. Compare Rides mixing a rider's own [SegmentAttempt]s with
+ * imported [com.segmentanalyzer.domain.model.GuestAttempt]s), which this has no business knowing
+ * about; it only does the distance-sampling math.
  */
-class BuildTimeGapSeriesUseCase @Inject constructor(
-    private val segmentAttemptRepository: SegmentAttemptRepository,
-) {
-    suspend operator fun invoke(
-        referenceAttemptId: Long,
-        otherAttemptIds: List<Long>,
+class BuildTimeGapSeriesUseCase @Inject constructor() {
+    operator fun invoke(
+        referenceTrack: List<TrackPoint>,
+        otherTracks: Map<Long, List<TrackPoint>>,
         segmentDistanceMeters: Double,
         sampleCount: Int = 40,
     ): List<TimeGapSeries> {
-        val referenceCurve = elapsedSecondsCurve(segmentAttemptRepository.trackPointsForAttempt(referenceAttemptId))
+        val referenceCurve = elapsedSecondsCurve(referenceTrack)
         val distances = (0 until sampleCount).map { index -> index * segmentDistanceMeters / (sampleCount - 1) }
 
-        return otherAttemptIds.map { attemptId ->
-            val curve = elapsedSecondsCurve(segmentAttemptRepository.trackPointsForAttempt(attemptId))
+        return otherTracks.map { (attemptId, track) ->
+            val curve = elapsedSecondsCurve(track)
             val points = distances.map { distance ->
                 TimeGapPoint(
                     distanceMeters = distance,
