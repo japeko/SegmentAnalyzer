@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Place
@@ -152,6 +153,12 @@ private fun WhatItDoes(modifier: Modifier = Modifier) {
             accent = MaterialTheme.colorScheme.primary,
             title = "Compare rides side by side",
             description = "A distance-aligned time-gap chart and gradient-colored map, synced as you scrub.",
+        )
+        FeatureRow(
+            icon = Icons.Filled.AutoAwesome,
+            accent = MaterialTheme.colorScheme.primary,
+            title = "On-device AI insight",
+            description = "Ask why one ride was faster — powered by Gemini Nano, running entirely on your phone, nothing sent anywhere. Needs a newer, high-end phone; not available on all devices.",
         )
         FeatureRow(
             icon = Icons.Filled.CloudOff,

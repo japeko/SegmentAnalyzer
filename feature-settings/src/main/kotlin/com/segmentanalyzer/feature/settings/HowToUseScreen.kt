@@ -108,6 +108,8 @@ fun HowToUseScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
                         "Use + Add to bring in another attempt, or dismiss a chip to drop it from the comparison.",
                     "Scrub the charts" to
                         "Drag a finger across the Slope, Speed, or Time Gap chart — the position stays in sync across all three plus the route map.",
+                    "AI Insight" to
+                        "Tap it for a short explanation of why one ride was faster, generated entirely on-device — no internet needed, nothing leaves your phone. Only newer, high-end phones support the on-device AI model (Gemini Nano) this needs; on a phone that does, the button appears on its own once it's ready, with nothing to set up. On other phones it just doesn't appear.",
                 ),
             )
 

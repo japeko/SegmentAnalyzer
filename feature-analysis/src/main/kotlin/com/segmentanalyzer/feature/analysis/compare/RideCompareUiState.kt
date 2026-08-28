@@ -38,6 +38,14 @@ data class AddableAttemptItem(
     val statusLabel: String?,
 )
 
+/** On-device (Gemini Nano) AI explanation of the current comparison. */
+sealed interface AiInsightState {
+    data object Idle : AiInsightState
+    data object Loading : AiInsightState
+    data class Loaded(val text: String) : AiInsightState
+    data class Error(val message: String) : AiInsightState
+}
+
 data class RideCompareUiState(
     val isLoading: Boolean = true,
     val segmentName: String = "",
@@ -55,4 +63,7 @@ data class RideCompareUiState(
     val isAddSheetVisible: Boolean = false,
     val addableAttempts: List<AddableAttemptItem> = emptyList(),
     val selectedAddableId: Long? = null,
+    /** Whether this phone's on-device model is ready — the AI Insight button is hidden entirely when false, never shown disabled. */
+    val isAiInsightAvailable: Boolean = false,
+    val aiInsight: AiInsightState = AiInsightState.Idle,
 )

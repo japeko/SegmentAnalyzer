@@ -6,11 +6,16 @@ import androidx.lifecycle.viewModelScope
 import com.segmentanalyzer.common.format.toRideCardDate
 import com.segmentanalyzer.common.format.toRideClock
 import com.segmentanalyzer.domain.model.LatLng
+import com.segmentanalyzer.domain.model.RideComparisonAttemptSummary
+import com.segmentanalyzer.domain.model.RideComparisonGapPoint
+import com.segmentanalyzer.domain.model.RideComparisonSummary
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
 import com.segmentanalyzer.domain.usecase.BuildSpeedSeriesUseCase
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
+import com.segmentanalyzer.domain.usecase.GenerateRideComparisonInsightUseCase
 import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideComparisonInsightAvailabilityUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
 import com.segmentanalyzer.domain.util.gradientPercentSegments
@@ -29,6 +34,14 @@ import javax.inject.Inject
 
 private data class AddSheetState(val isVisible: Boolean = false, val selectedAddableId: Long? = null)
 
+private data class PickerAndAiState(
+    val sheet: AddSheetState,
+    val track: List<TrackPoint>,
+    val referenceId: Long,
+    val aiAvailable: Boolean,
+    val aiInsight: AiInsightState,
+)
+
 @HiltViewModel
 class RideCompareViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -37,6 +50,8 @@ class RideCompareViewModel @Inject constructor(
     private val buildTimeGapSeries: BuildTimeGapSeriesUseCase,
     private val buildSpeedSeries: BuildSpeedSeriesUseCase,
     private val getAttemptTrack: GetAttemptTrackUseCase,
+    observeAiInsightAvailability: ObserveRideComparisonInsightAvailabilityUseCase,
+    private val generateRideComparisonInsight: GenerateRideComparisonInsightUseCase,
 ) : ViewModel() {
 
     private val segmentId: Long = checkNotNull(savedStateHandle["segmentId"])
@@ -55,6 +70,14 @@ class RideCompareViewModel @Inject constructor(
     // (e.g. a Garmin- or Strava-sourced ride, which has no stored track in V1).
     private val currentTrack = MutableStateFlow<List<TrackPoint>>(emptyList())
 
+    /** Whether this phone's on-device model is ready right now — re-checked on subscribe and reactively flips true if a background download finishes mid-session; see [ObserveRideComparisonInsightAvailabilityUseCase]. */
+    private val isAiInsightAvailable = observeAiInsightAvailability()
+
+    private val aiInsight = MutableStateFlow<AiInsightState>(AiInsightState.Idle)
+
+    /** The comparison data an AI insight would be generated from, as of the most recent [uiState] emission — read (not observed) by [onGenerateInsightClick]. */
+    private var latestComparisonSummary: RideComparisonSummary? = null
+
     init {
         viewModelScope.launch {
             referenceAttemptId.collect { id -> currentTrack.value = getAttemptTrack(id) }
@@ -66,8 +89,14 @@ class RideCompareViewModel @Inject constructor(
         observeSegmentAttempts(segmentId),
         selectedIds,
         excludedIds,
-        combine(addSheetState, currentTrack, referenceAttemptId) { sheet, track, referenceId -> Triple(sheet, track, referenceId) },
-    ) { segment, attempts, selected, excluded, (sheet, track, referenceId) ->
+        combine(
+            addSheetState,
+            currentTrack,
+            referenceAttemptId,
+            isAiInsightAvailable,
+            aiInsight,
+        ) { sheet, track, referenceId, aiAvailable, aiInsightState -> PickerAndAiState(sheet, track, referenceId, aiAvailable, aiInsightState) },
+    ) { segment, attempts, selected, excluded, (sheet, track, referenceId, aiAvailable, aiInsightState) ->
         if (segment == null || attempts.isEmpty()) {
             return@combine RideCompareUiState(isLoading = true)
         }
@@ -141,6 +170,8 @@ class RideCompareViewModel @Inject constructor(
 
         val slopePoints = slopeProfile(track)
 
+        latestComparisonSummary = buildComparisonSummary(segment.name, segment.distanceMeters, chips, attempts, timeGapSeries)
+
         val addable = attempts.map { attempt ->
             AddableAttemptItem(
                 id = attempt.id,
@@ -169,6 +200,8 @@ class RideCompareViewModel @Inject constructor(
             isAddSheetVisible = sheet.isVisible,
             addableAttempts = addable,
             selectedAddableId = sheet.selectedAddableId,
+            isAiInsightAvailable = aiAvailable,
+            aiInsight = aiInsightState,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -216,6 +249,72 @@ class RideCompareViewModel @Inject constructor(
     fun onSetReferenceClick(attemptId: Long) {
         referenceAttemptId.value = attemptId
     }
+
+    /** Generates an on-device AI explanation of the current comparison. A no-op if the comparison hasn't loaded yet — the UI never offers this action before then. */
+    fun onGenerateInsightClick() {
+        val summary = latestComparisonSummary ?: return
+        aiInsight.value = AiInsightState.Loading
+        viewModelScope.launch {
+            aiInsight.value = generateRideComparisonInsight(summary).fold(
+                onSuccess = { text -> AiInsightState.Loaded(text) },
+                onFailure = { throwable -> AiInsightState.Error(throwable.message ?: "Couldn't generate an insight.") },
+            )
+        }
+    }
+}
+
+/**
+ * Always exactly two rides — the reference plus its closest rival (the fastest of the others) —
+ * even when more chips are visible in the comparison. More than two muddies both "who was
+ * fastest" and "where did the reference lose/gain time" into a three-or-more-way comparison the
+ * model has no reliable way to keep straight, and isn't what "compare this ride to my PR" means
+ * anyway when Previous or a manually-added ride also happens to be on screen.
+ */
+private fun buildComparisonSummary(
+    segmentName: String,
+    segmentDistanceMeters: Double,
+    chips: List<AttemptChip>,
+    attempts: List<SegmentAttempt>,
+    timeGapSeries: List<TimeGapSeriesUi>,
+): RideComparisonSummary {
+    val referenceChip = chips.find { it.isReference }
+    val rivalChip = chips
+        .filter { !it.isReference }
+        .mapNotNull { chip -> attempts.find { it.id == chip.attemptId }?.let { chip to it } }
+        .minByOrNull { (_, attempt) -> attempt.duration.seconds }
+        ?.first
+    val comparedChips = listOfNotNull(referenceChip, rivalChip)
+
+    return RideComparisonSummary(
+        segmentName = segmentName,
+        segmentDistanceMeters = segmentDistanceMeters,
+        referenceLabel = referenceChip?.let { "${it.role.promptLabel()} (${it.dateLabel})" } ?: "the reference ride",
+        attempts = comparedChips.mapNotNull { chip ->
+            val attempt = attempts.find { it.id == chip.attemptId } ?: return@mapNotNull null
+            val series = timeGapSeries.find { it.attemptId == chip.attemptId }
+            RideComparisonAttemptSummary(
+                label = "${chip.role.promptLabel()} (${chip.dateLabel})",
+                durationSeconds = attempt.duration.seconds,
+                avgSpeedKmh = attempt.avgSpeedKmh,
+                avgPowerWatts = attempt.avgPowerWatts,
+                finalGapSeconds = series?.points?.lastOrNull()?.gapSeconds,
+                // Tracked separately (not just "the single biggest swing") so an early loss that's
+                // partly clawed back later doesn't get silently dropped in favor of a bigger — but
+                // less rider-relevant — moment of being ahead elsewhere.
+                worstPoint = series?.points?.filter { it.gapSeconds > 0 }?.maxByOrNull { it.gapSeconds }
+                    ?.let { RideComparisonGapPoint(it.distanceMeters, it.gapSeconds) },
+                bestPoint = series?.points?.filter { it.gapSeconds < 0 }?.minByOrNull { it.gapSeconds }
+                    ?.let { RideComparisonGapPoint(it.distanceMeters, it.gapSeconds) },
+            )
+        },
+    )
+}
+
+private fun AttemptRole.promptLabel(): String = when (this) {
+    AttemptRole.CURRENT -> "Current ride"
+    AttemptRole.PERSONAL_BEST -> "Personal Best"
+    AttemptRole.PREVIOUS -> "Previous ride"
+    AttemptRole.SELECTED -> "Selected ride"
 }
 
 private fun buildStatRows(chips: List<AttemptChip>, attempts: List<SegmentAttempt>): List<CompareStatRow> {
