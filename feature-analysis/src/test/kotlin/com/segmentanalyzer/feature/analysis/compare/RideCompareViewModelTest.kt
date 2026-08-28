@@ -5,10 +5,13 @@ import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.Segment
 import com.segmentanalyzer.domain.model.SegmentAttempt
 import com.segmentanalyzer.domain.model.TrackPoint
+import com.segmentanalyzer.domain.repository.RideComparisonInsightRepository
 import com.segmentanalyzer.domain.repository.SegmentAttemptRepository
 import com.segmentanalyzer.domain.repository.SegmentRepository
 import com.segmentanalyzer.domain.usecase.BuildSpeedSeriesUseCase
 import com.segmentanalyzer.domain.usecase.BuildTimeGapSeriesUseCase
+import com.segmentanalyzer.domain.usecase.GenerateRideComparisonInsightUseCase
+import com.segmentanalyzer.domain.usecase.ObserveRideComparisonInsightAvailabilityUseCase
 import com.segmentanalyzer.domain.usecase.GetAttemptTrackUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentAttemptsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveSegmentsUseCase
@@ -368,10 +371,131 @@ class RideCompareViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `AI insight button is hidden when the on-device model isn't available`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val viewModel = viewModel(
+            currentAttemptId = 1L,
+            attempts = listOf(current),
+            insightRepository = FakeRideComparisonInsightRepository(available = false),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.isAiInsightAvailable)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `AI insight button shows once the on-device model is available`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val viewModel = viewModel(
+            currentAttemptId = 1L,
+            attempts = listOf(current),
+            insightRepository = FakeRideComparisonInsightRepository(available = true),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value.isAiInsightAvailable)
+        assertEquals(AiInsightState.Idle, viewModel.uiState.value.aiInsight)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `AI insight button appears mid-session once a background model download finishes`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val insightRepository = FakeRideComparisonInsightRepository(available = false)
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current), insightRepository = insightRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.isAiInsightAvailable)
+
+        // The repository is expected to keep re-checking/downloading in the background and flip
+        // this on its own — the ViewModel just needs to stay subscribed and react.
+        insightRepository.availability.value = true
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value.isAiInsightAvailable)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `generating an insight shows the generated text, built from a prompt referencing the compared rides`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val faster = attempt(2, seconds = 2600, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val insightRepository = FakeRideComparisonInsightRepository(
+            available = true,
+            insightResult = Result.success("You lost time on the climb."),
+        )
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, faster), insightRepository = insightRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onGenerateInsightClick()
+        advanceUntilIdle()
+
+        assertEquals(AiInsightState.Loaded("You lost time on the climb."), viewModel.uiState.value.aiInsight)
+        assertTrue(insightRepository.lastPrompt.orEmpty().contains(segment.name))
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `the AI insight compares only the reference and its fastest rival, even with more chips on screen`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val personalBest = attempt(2, seconds = 2500, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        // Closest-before current, so it's the default "Previous" chip — slower than PB, so it
+        // should never make it into the AI insight prompt at all.
+        val previous = attempt(3, seconds = 2688, startTime = Instant.parse("2026-08-10T00:00:00Z"))
+        val insightRepository = FakeRideComparisonInsightRepository(available = true)
+        val viewModel = viewModel(
+            currentAttemptId = 1L,
+            attempts = listOf(current, personalBest, previous),
+            insightRepository = insightRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        // Sanity check: all three show up as chips in the comparison itself.
+        assertEquals(3, viewModel.uiState.value.chips.size)
+
+        viewModel.onGenerateInsightClick()
+        advanceUntilIdle()
+
+        val prompt = insightRepository.lastPrompt.orEmpty()
+        assertTrue(prompt.contains("Personal Best"))
+        assertEquals(false, prompt.contains("Previous ride"))
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a failed insight generation shows the error message, retryable`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val insightRepository = FakeRideComparisonInsightRepository(
+            available = true,
+            insightResult = Result.failure(IllegalStateException("model busy")),
+        )
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current), insightRepository = insightRepository)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onGenerateInsightClick()
+        advanceUntilIdle()
+
+        assertEquals(AiInsightState.Error("model busy"), viewModel.uiState.value.aiInsight)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         currentAttemptId: Long,
         attempts: List<SegmentAttempt>,
         tracksByAttemptId: Map<Long, List<TrackPoint>> = emptyMap(),
+        insightRepository: FakeRideComparisonInsightRepository = FakeRideComparisonInsightRepository(),
     ): RideCompareViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("segmentId" to 1L, "anchorAttemptId" to currentAttemptId))
         val attemptRepository = FakeCompareSegmentAttemptRepository(attempts, tracksByAttemptId)
@@ -382,7 +506,24 @@ class RideCompareViewModelTest {
             BuildTimeGapSeriesUseCase(attemptRepository),
             BuildSpeedSeriesUseCase(attemptRepository),
             GetAttemptTrackUseCase(attemptRepository),
+            ObserveRideComparisonInsightAvailabilityUseCase(insightRepository),
+            GenerateRideComparisonInsightUseCase(insightRepository),
         )
+    }
+}
+
+private class FakeRideComparisonInsightRepository(
+    available: Boolean = false,
+    private val insightResult: Result<String> = Result.success("You were fastest thanks to a strong finish."),
+) : RideComparisonInsightRepository {
+    var lastPrompt: String? = null
+    val availability = MutableStateFlow(available)
+
+    override fun observeAvailability(): Flow<Boolean> = availability
+
+    override suspend fun generateInsight(prompt: String): Result<String> {
+        lastPrompt = prompt
+        return insightResult
     }
 }
 

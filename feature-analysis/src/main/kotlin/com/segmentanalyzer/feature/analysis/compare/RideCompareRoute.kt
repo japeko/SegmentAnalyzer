@@ -23,6 +23,7 @@ fun RideCompareRoute(
         onDismissAddSheet = viewModel::onDismissAddSheet,
         onAddableAttemptSelected = viewModel::onAddableAttemptSelected,
         onConfirmAdd = viewModel::onConfirmAdd,
+        onGenerateInsightClick = viewModel::onGenerateInsightClick,
         modifier = modifier,
     )
 }

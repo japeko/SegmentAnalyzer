@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.segmentanalyzer.core.theme.MaterialThemeExtras
 import com.segmentanalyzer.core.ui.RoutePreviewCard
+import com.segmentanalyzer.feature.analysis.compare.components.AiInsightSection
 import com.segmentanalyzer.feature.analysis.compare.components.AttemptChipRow
 import com.segmentanalyzer.feature.analysis.compare.components.CompareStatsCard
 import com.segmentanalyzer.feature.analysis.compare.components.DistanceAxisRow
@@ -45,6 +46,7 @@ fun RideCompareScreen(
     onDismissAddSheet: () -> Unit,
     onAddableAttemptSelected: (Long) -> Unit,
     onConfirmAdd: () -> Unit,
+    onGenerateInsightClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -144,6 +146,16 @@ fun RideCompareScreen(
                     CompareStatsCard(
                         rows = uiState.statRows,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    )
+                }
+            }
+
+            if (uiState.isAiInsightAvailable) {
+                item {
+                    AiInsightSection(
+                        state = uiState.aiInsight,
+                        onGenerateClick = onGenerateInsightClick,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
             }
