@@ -179,6 +179,63 @@ class GarminImportViewModelTest {
     }
 
     @Test
+    fun `name filter narrows the visible candidates without touching selection`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            connected = true,
+            importRepository = FakeGarminImportRepository(
+                Result.success(listOf(ride("1", "Pudasjärvi Pyöräily"), ride("2", "Evening Loop"))),
+            ),
+        )
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // Idle
+            viewModel.onBrowseRidesClick()
+            awaitItem() // FetchingRides
+            awaitItem() // SelectingRides, both selected
+
+            viewModel.onNameFilterChange("Pudas")
+            val filtered = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(listOf("1"), filtered.visibleCandidates.map { it.externalId })
+            // Still selected, even though hidden by the filter.
+            assertEquals(setOf("1", "2"), filtered.selectedExternalIds)
+
+            viewModel.onNameFilterChange("")
+            val cleared = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(setOf("1", "2"), cleared.selectedExternalIds)
+        }
+    }
+
+    @Test
+    fun `select all while filtered only toggles the visible candidates`() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            connected = true,
+            importRepository = FakeGarminImportRepository(
+                Result.success(listOf(ride("1", "Pudasjärvi Pyöräily"), ride("2", "Evening Loop"))),
+            ),
+        )
+
+        viewModel.uiState.test {
+            skipItems(1)
+            awaitItem() // Idle
+            viewModel.onBrowseRidesClick()
+            awaitItem() // FetchingRides
+            awaitItem() // SelectingRides, both selected
+
+            viewModel.onNameFilterChange("Pudas")
+            awaitItem() // filtered to just "1"
+
+            viewModel.onSelectAllToggled() // deselects the only visible one ("1")
+            val afterFirstToggle = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(setOf("2"), afterFirstToggle.selectedExternalIds)
+
+            viewModel.onSelectAllToggled() // re-selects "1"; "2" was never touched since it's hidden
+            val afterSecondToggle = awaitItem() as GarminImportUiState.SelectingRides
+            assertEquals(setOf("1", "2"), afterSecondToggle.selectedExternalIds)
+        }
+    }
+
+    @Test
     fun `a fetch failure shows the error message`() = runTest(dispatcher) {
         val viewModel = viewModel(
             connected = true,
@@ -218,9 +275,9 @@ class GarminImportViewModelTest {
     }
 }
 
-private fun ride(externalId: String) = Ride(
+private fun ride(externalId: String, name: String = "Ride $externalId") = Ride(
     id = 0,
-    name = "Ride $externalId",
+    name = name,
     activityType = ActivityType.MTB,
     source = ActivitySource.GARMIN,
     startTime = Instant.now(),

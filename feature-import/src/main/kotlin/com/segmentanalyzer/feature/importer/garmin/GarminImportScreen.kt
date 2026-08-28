@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,7 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import com.segmentanalyzer.domain.model.ActivityType
+import com.segmentanalyzer.core.ui.label
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -55,6 +56,7 @@ fun GarminImportScreen(
     onBrowseRidesClick: () -> Unit,
     onRideToggled: (String) -> Unit,
     onSelectAllToggled: () -> Unit,
+    onNameFilterChange: (String) -> Unit,
     onImportSelectedClick: () -> Unit,
     onBackToIdleClick: () -> Unit,
     onGoToSettingsClick: () -> Unit,
@@ -79,6 +81,7 @@ fun GarminImportScreen(
                 state = uiState,
                 onRideToggled = onRideToggled,
                 onSelectAllToggled = onSelectAllToggled,
+                onNameFilterChange = onNameFilterChange,
                 onImportSelectedClick = onImportSelectedClick,
                 modifier = Modifier.padding(padding),
             )
@@ -244,6 +247,7 @@ private fun RidePicker(
     state: GarminImportUiState.SelectingRides,
     onRideToggled: (String) -> Unit,
     onSelectAllToggled: () -> Unit,
+    onNameFilterChange: (String) -> Unit,
     onImportSelectedClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -258,7 +262,8 @@ private fun RidePicker(
         return
     }
 
-    val allSelected = state.selectedExternalIds.size == state.candidates.size
+    val visible = state.visibleCandidates
+    val allVisibleSelected = visible.isNotEmpty() && visible.all { it.externalId in state.selectedExternalIds }
     Column(modifier = modifier.fillMaxSize()) {
         if (state.dateFrom != null || state.dateTo != null) {
             Text(
@@ -270,31 +275,49 @@ private fun RidePicker(
             )
         }
 
+        OutlinedTextField(
+            value = state.nameFilter,
+            onValueChange = onNameFilterChange,
+            label = { Text("Filter by name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${state.selectedExternalIds.size} of ${state.candidates.size} selected",
+                text = "${visible.count { it.externalId in state.selectedExternalIds }} of ${visible.size} selected",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = onSelectAllToggled) {
-                Text(if (allSelected) "Deselect all" else "Select all")
+            TextButton(onClick = onSelectAllToggled, enabled = visible.isNotEmpty()) {
+                Text(if (allVisibleSelected) "Deselect all" else "Select all")
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 8.dp),
-        ) {
-            items(state.candidates, key = { it.externalId }) { candidate ->
-                GarminRideCandidateRow(
-                    item = candidate,
-                    isSelected = candidate.externalId in state.selectedExternalIds,
-                    onToggle = { onRideToggled(candidate.externalId) },
+        if (visible.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "No rides match \"${state.nameFilter}\".",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 8.dp),
+            ) {
+                items(visible, key = { it.externalId }) { candidate ->
+                    GarminRideCandidateRow(
+                        item = candidate,
+                        isSelected = candidate.externalId in state.selectedExternalIds,
+                        onToggle = { onRideToggled(candidate.externalId) },
+                    )
+                }
             }
         }
 
@@ -332,14 +355,4 @@ private fun GarminRideCandidateRow(
             )
         }
     }
-}
-
-private fun ActivityType.label(): String = when (this) {
-    ActivityType.MTB -> "MTB"
-    ActivityType.EMTB -> "E-MTB"
-    ActivityType.GRAVEL -> "Gravel"
-    ActivityType.EGRAVEL -> "E-Gravel"
-    ActivityType.ROAD -> "Road"
-    ActivityType.EROAD -> "E-Road"
-    ActivityType.OTHER -> "Other"
 }

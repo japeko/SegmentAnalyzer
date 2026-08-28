@@ -11,13 +11,23 @@ sealed interface GarminImportUiState {
 
     data object FetchingRides : GarminImportUiState
 
-    /** The rider is choosing which of [candidates] (by [GarminRideCandidateItem.externalId]) to import. */
+    /**
+     * The rider is choosing which of [candidates] (by [GarminRideCandidateItem.externalId]) to
+     * import. [nameFilter] only narrows what's shown and selectable via "Select all" — it never
+     * drops an already-selected id, so clearing it back to blank brings previous selections back
+     * into view untouched.
+     */
     data class SelectingRides(
         val candidates: List<GarminRideCandidateItem>,
         val selectedExternalIds: Set<String>,
         val dateFrom: LocalDate?,
         val dateTo: LocalDate?,
-    ) : GarminImportUiState
+        val nameFilter: String = "",
+    ) : GarminImportUiState {
+        /** [candidates] narrowed to [nameFilter] — what the picker actually renders and what "Select all" scopes to. */
+        val visibleCandidates: List<GarminRideCandidateItem>
+            get() = candidates.filter { nameFilter.isBlank() || it.name.contains(nameFilter, ignoreCase = true) }
+    }
 
     data object Importing : GarminImportUiState
     data class Result(val selectedCount: Int, val importedCount: Int) : GarminImportUiState

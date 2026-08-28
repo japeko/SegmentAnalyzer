@@ -33,6 +33,9 @@ class GarminImportViewModel @Inject constructor(
     private val dateFrom = MutableStateFlow<LocalDate?>(null)
     private val dateTo = MutableStateFlow<LocalDate?>(null)
 
+    /** Narrows [GarminImportUiState.SelectingRides] to candidates whose name contains this text. */
+    private val nameFilter = MutableStateFlow("")
+
     /** The full candidate list from the last fetch, so the import step can resolve selected ids back to [Ride]s without re-fetching. */
     private var latestCandidates: List<Ride> = emptyList()
 
@@ -41,12 +44,14 @@ class GarminImportViewModel @Inject constructor(
         screenState,
         dateFrom,
         dateTo,
-    ) { connectionState, override, from, to ->
-        override ?: if (connectionState is GarminConnectionState.Connected) {
+        nameFilter,
+    ) { connectionState, override, from, to, filter ->
+        val base = override ?: if (connectionState is GarminConnectionState.Connected) {
             GarminImportUiState.Idle(dateFrom = from, dateTo = to)
         } else {
             GarminImportUiState.NotConnected
         }
+        if (base is GarminImportUiState.SelectingRides) base.copy(nameFilter = filter) else base
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -64,6 +69,7 @@ class GarminImportViewModel @Inject constructor(
     fun onBrowseRidesClick() {
         val from = dateFrom.value
         val to = dateTo.value
+        nameFilter.value = ""
         screenState.value = GarminImportUiState.FetchingRides
         viewModelScope.launch {
             screenState.value = fetchGarminRides(from, to).fold(
@@ -89,11 +95,17 @@ class GarminImportViewModel @Inject constructor(
         )
     }
 
+    fun onNameFilterChange(filter: String) {
+        nameFilter.value = filter
+    }
+
+    /** Toggles selection for whatever [GarminImportUiState.SelectingRides.visibleCandidates] currently shows, not the full candidate list. */
     fun onSelectAllToggled() {
-        val state = screenState.value as? GarminImportUiState.SelectingRides ?: return
-        val allIds = state.candidates.map { it.externalId }.toSet()
+        val state = (screenState.value as? GarminImportUiState.SelectingRides)?.copy(nameFilter = nameFilter.value) ?: return
+        val visibleIds = state.visibleCandidates.map { it.externalId }.toSet()
+        val allVisibleSelected = visibleIds.isNotEmpty() && state.selectedExternalIds.containsAll(visibleIds)
         screenState.value = state.copy(
-            selectedExternalIds = if (state.selectedExternalIds.size == allIds.size) emptySet() else allIds,
+            selectedExternalIds = if (allVisibleSelected) state.selectedExternalIds - visibleIds else state.selectedExternalIds + visibleIds,
         )
     }
 
@@ -112,6 +124,7 @@ class GarminImportViewModel @Inject constructor(
     /** Drops any override so [uiState] falls back to [GarminImportUiState.Idle], letting the rider adjust the date range before browsing again. */
     fun onBackToIdleClick() {
         screenState.value = null
+        nameFilter.value = ""
     }
 }
 

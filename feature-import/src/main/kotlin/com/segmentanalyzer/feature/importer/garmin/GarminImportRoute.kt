@@ -22,6 +22,7 @@ fun GarminImportRoute(
         onBrowseRidesClick = viewModel::onBrowseRidesClick,
         onRideToggled = viewModel::onRideToggled,
         onSelectAllToggled = viewModel::onSelectAllToggled,
+        onNameFilterChange = viewModel::onNameFilterChange,
         onImportSelectedClick = viewModel::onImportSelectedClick,
         onBackToIdleClick = viewModel::onBackToIdleClick,
         onGoToSettingsClick = onGoToSettingsClick,
