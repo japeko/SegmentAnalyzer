@@ -15,6 +15,8 @@ data class AttemptChip(
     val dateLabel: String,
     /** "Ride 1", "Ride 2", ... — this attempt's lap number among all attempts from the same ride. */
     val lapLabel: String,
+    /** The attempt's total time on the segment, e.g. "15:31". */
+    val durationLabel: String,
     val colorIndex: Int,
 )
 

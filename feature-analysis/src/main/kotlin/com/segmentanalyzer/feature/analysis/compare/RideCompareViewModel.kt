@@ -104,6 +104,7 @@ class RideCompareViewModel @Inject constructor(
                     isReference = id == referenceId,
                     dateLabel = attempt.startTime.toRideCardDate(),
                     lapLabel = lapLabels.getValue(id),
+                    durationLabel = attempt.duration.toRideClock(),
                     colorIndex = index,
                 )
             }

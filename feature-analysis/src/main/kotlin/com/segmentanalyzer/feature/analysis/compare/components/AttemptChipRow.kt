@@ -72,7 +72,7 @@ private fun AttemptChipItem(chip: AttemptChip, onRemoveClick: (Long) -> Unit, on
             Column {
                 Text(text = chip.role.label(), fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
                 Text(
-                    text = "${chip.dateLabel} · ${chip.lapLabel}",
+                    text = "${chip.dateLabel} · ${chip.lapLabel} · ${chip.durationLabel}",
                     fontSize = 9.5.sp,
                     color = MaterialThemeExtras.textTertiary,
                 )
