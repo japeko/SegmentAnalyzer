@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -58,7 +60,15 @@ fun ComparePickerSheet(
 
         val (unavailable, selectable) = attempts.partition { it.statusLabel != null }
 
-        Column(modifier = Modifier.padding(top = 12.dp)) {
+        // Scrollable and capped to the remaining space (fill = false) rather than fillMaxHeight,
+        // so a short list doesn't force the sheet to full height — but a long one scrolls here
+        // instead of pushing the confirm button below the sheet's visible bounds.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(top = 12.dp),
+        ) {
             unavailable.forEach { item -> UnavailableRow(item) }
             if (unavailable.isNotEmpty() && selectable.isNotEmpty()) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
