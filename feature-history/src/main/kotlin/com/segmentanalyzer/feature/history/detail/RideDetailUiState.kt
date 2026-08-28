@@ -15,7 +15,12 @@ data class RideDetailUiState(
     val selectedEffortIds: Set<String> = emptySet(),
     /** True while a bulk "Get Strava Data" fetch for [selectedEffortIds] is in flight. */
     val isFetchingSelectedEfforts: Boolean = false,
+    /** Non-null right after a bulk "Get Strava Data" fetch completes — auto-dismisses itself after a delay. */
+    val bulkFetchResult: BulkFetchResultState? = null,
 )
+
+/** [newlyImportedCount]/[alreadyImportedCount] always sum to how many efforts were selected for the fetch. */
+data class BulkFetchResultState(val newlyImportedCount: Int, val alreadyImportedCount: Int)
 
 /** Live state of the rename/tag/type dialog — [tagSuggestions] narrows as [tag] is typed. */
 data class EditRideDialogState(
@@ -46,6 +51,8 @@ data class StravaSegmentEffortItem(
     val komRank: Int?,
     /** 1-3 if this is the athlete's personal top-3 time on the segment, else null. */
     val prRank: Int?,
+    /** True if this effort already has a saved attempt (shows up on the Segments page). */
+    val isImported: Boolean = false,
 )
 
 /**

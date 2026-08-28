@@ -15,6 +15,9 @@ interface SegmentAttemptRepository {
     /** Segments [rideId] passed through, chronological. */
     fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>>
 
+    /** External ids of every Strava segment effort already saved as an attempt for [rideId]. */
+    fun observeImportedStravaEffortIds(rideId: Long): Flow<Set<String>>
+
     /** The current fastest attempt for every segment that has at least one, most recent first. */
     fun observeRecords(): Flow<List<SegmentRecord>>
 

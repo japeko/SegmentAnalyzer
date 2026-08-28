@@ -40,6 +40,9 @@ internal class SegmentAttemptRepositoryImpl @Inject constructor(
     override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> =
         segmentAttemptDao.observeForRide(rideId).map { rows -> rows.map { it.toDomain() } }
 
+    override fun observeImportedStravaEffortIds(rideId: Long): Flow<Set<String>> =
+        segmentAttemptDao.observeImportedStravaEffortIds(rideId).map { it.toSet() }
+
     override fun observeRecords(): Flow<List<SegmentRecord>> =
         segmentAttemptDao.observeRecords().map { rows -> rows.map { it.toDomain() } }
 

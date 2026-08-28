@@ -175,6 +175,7 @@ private class FakeRideRepository(rides: List<Ride>) : RideRepository {
 private class FakeSummarySegmentAttemptRepository(private val records: List<SegmentRecord>) : SegmentAttemptRepository {
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
     override fun observeMatchesForRide(rideId: Long): Flow<List<RideSegmentMatch>> = MutableStateFlow(emptyList())
+    override fun observeImportedStravaEffortIds(rideId: Long) = MutableStateFlow(emptySet<String>())
     override fun observeRecords(): Flow<List<SegmentRecord>> = MutableStateFlow(records)
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0

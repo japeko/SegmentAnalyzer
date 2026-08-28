@@ -163,15 +163,26 @@ fun RideDetailScreen(
 
             val isEffortSelectionMode = uiState.selectedEffortIds.isNotEmpty()
             item {
-                if (isEffortSelectionMode) {
-                    EffortSelectionActionRow(
+                when {
+                    isEffortSelectionMode -> EffortSelectionActionRow(
                         selectedCount = uiState.selectedEffortIds.size,
                         isFetching = uiState.isFetchingSelectedEfforts,
                         onFetchClick = onFetchSelectedEffortsClick,
                         onCancelClick = onExitEffortSelectionMode,
                     )
-                } else {
-                    Text(
+                    uiState.bulkFetchResult != null -> Text(
+                        text = "Saved ${uiState.bulkFetchResult.newlyImportedCount} new segment(s)." +
+                            if (uiState.bulkFetchResult.alreadyImportedCount > 0) {
+                                " ${uiState.bulkFetchResult.alreadyImportedCount} already imported."
+                            } else {
+                                ""
+                            },
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialThemeExtras.textTertiary,
+                        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 10.dp),
+                    )
+                    else -> Text(
                         text = "Segments in this Ride",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleSmall,

@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,6 +72,15 @@ fun StravaSegmentEffortRow(
                     fontSize = 11.sp,
                     color = MaterialThemeExtras.textTertiary,
                     modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+
+            if (item.isImported) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = "Already imported",
+                    tint = MaterialThemeExtras.faster,
+                    modifier = Modifier.padding(end = 8.dp).size(16.dp),
                 )
             }
 

@@ -306,6 +306,7 @@ private class FakeCompareSegmentAttemptRepository(
 ) : SegmentAttemptRepository {
     override fun observeAttemptsForSegment(segmentId: Long) = MutableStateFlow(attempts)
     override fun observeMatchesForRide(rideId: Long) = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.RideSegmentMatch>())
+    override fun observeImportedStravaEffortIds(rideId: Long) = MutableStateFlow(emptySet<String>())
     override fun observeRecords() = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentRecord>())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = tracksByAttemptId[attemptId].orEmpty()
     override suspend fun matchRideAgainstAllSegments(rideId: Long) = 0

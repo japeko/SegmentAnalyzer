@@ -13,6 +13,7 @@ import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortDetailUseCase
 import com.segmentanalyzer.domain.usecase.FetchStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.MarkRideViewedUseCase
+import com.segmentanalyzer.domain.usecase.ObserveImportedStravaEffortIdsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase
 import com.segmentanalyzer.domain.usecase.ObserveRideUseCase
 import com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase
@@ -20,6 +21,7 @@ import com.segmentanalyzer.domain.usecase.ObserveStravaSegmentEffortsUseCase
 import com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase
 import com.segmentanalyzer.domain.usecase.UpdateRideUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -36,6 +38,7 @@ class RideDetailViewModel @Inject constructor(
     observeStravaSegmentEfforts: ObserveStravaSegmentEffortsUseCase,
     observeStravaConnectionState: ObserveStravaConnectionStateUseCase,
     observeRideTags: ObserveRideTagsUseCase,
+    observeImportedStravaEffortIds: ObserveImportedStravaEffortIdsUseCase,
     private val fetchStravaSegmentEfforts: FetchStravaSegmentEffortsUseCase,
     private val fetchStravaSegmentEffortDetail: FetchStravaSegmentEffortDetailUseCase,
     private val saveStravaSegmentEffortAttempt: SaveStravaSegmentEffortAttemptUseCase,
@@ -84,19 +87,27 @@ class RideDetailViewModel @Inject constructor(
     /** True while a bulk "Get Strava Data" fetch for [selectedEffortIds] is in flight. */
     private val isFetchingSelectedEfforts = MutableStateFlow(false)
 
+    /** Non-null right after a bulk fetch completes, until it auto-dismisses itself. */
+    private val bulkFetchResult = MutableStateFlow<BulkFetchResultState?>(null)
+
+    /** The most recent imported-effort-ids emission, so a bulk fetch can tell new from already-imported without a second subscription. */
+    private var latestImportedEffortIds: Set<String> = emptySet()
+
     private val coreState = combine(
         observeRide(rideId),
         observeStravaSegmentEfforts(rideId),
         stravaEffortsOverride,
         observeStravaConnectionState(),
-    ) { ride, cachedEfforts, override, connectionState ->
+        observeImportedStravaEffortIds(rideId),
+    ) { ride, cachedEfforts, override, connectionState, importedIds ->
         latestRide = ride
         latestEfforts = cachedEfforts
+        latestImportedEffortIds = importedIds
         CoreRideDetail(
             ride = ride?.toInfo(),
             stravaSegmentEfforts = when {
                 connectionState !is StravaConnectionState.Connected -> StravaEffortsUiState.NotConnected
-                else -> override ?: cachedEfforts.toUiState()
+                else -> (override ?: cachedEfforts.toUiState()).withImportedFlags(importedIds)
             },
         )
     }
@@ -106,8 +117,10 @@ class RideDetailViewModel @Inject constructor(
         expandedSegmentEffortDetail,
         observeRideTags(),
         editRequest,
-        combine(selectedEffortIds, isFetchingSelectedEfforts) { selectedIds, fetching -> selectedIds to fetching },
-    ) { core, expandedDetail, tags, edit, (selectedIds, fetching) ->
+        combine(selectedEffortIds, isFetchingSelectedEfforts, bulkFetchResult) { selectedIds, fetching, result ->
+            Triple(selectedIds, fetching, result)
+        },
+    ) { core, expandedDetail, tags, edit, (selectedIds, fetching, bulkResult) ->
         RideDetailUiState(
             isLoading = false,
             ride = core.ride,
@@ -125,6 +138,7 @@ class RideDetailViewModel @Inject constructor(
             },
             selectedEffortIds = selectedIds,
             isFetchingSelectedEfforts = fetching,
+            bulkFetchResult = bulkResult,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -204,21 +218,41 @@ class RideDetailViewModel @Inject constructor(
 
     /**
      * Fetches and saves every selected effort's detail in one go, so the rider doesn't have to
-     * expand each row individually just to get it onto the Segments page.
+     * expand each row individually just to get it onto the Segments page. Cache-first per effort,
+     * same as [onStravaSegmentEffortClick] — an effort whose detail was already fetched before
+     * (an earlier tap, or an earlier bulk fetch) is saved straight from that cached detail instead
+     * of making a redundant Strava API call.
      */
     fun onFetchSelectedEffortsClick() {
         val ids = selectedEffortIds.value
         if (ids.isEmpty()) return
+        val alreadyImportedCount = ids.count { it in latestImportedEffortIds }
         isFetchingSelectedEfforts.value = true
         viewModelScope.launch {
             ids.forEach { effortExternalId ->
                 val effort = latestEfforts.find { it.effortExternalId == effortExternalId } ?: return@forEach
-                fetchStravaSegmentEffortDetail(effortExternalId).onSuccess { detail ->
-                    saveStravaSegmentEffortAttempt(rideId, effort, detail)
+                val cachedDetail = effort.detail
+                if (cachedDetail != null) {
+                    saveStravaSegmentEffortAttempt(rideId, effort, cachedDetail)
+                } else {
+                    fetchStravaSegmentEffortDetail(effortExternalId).onSuccess { detail ->
+                        saveStravaSegmentEffortAttempt(rideId, effort, detail)
+                    }
                 }
             }
             isFetchingSelectedEfforts.value = false
             selectedEffortIds.value = emptySet()
+
+            val result = BulkFetchResultState(
+                newlyImportedCount = ids.size - alreadyImportedCount,
+                alreadyImportedCount = alreadyImportedCount,
+            )
+            bulkFetchResult.value = result
+            // Auto-dismiss after a delay, same reasoning as SegmentsViewModel's sync result —
+            // reference equality so a second bulk fetch's own result isn't clipped short by the
+            // first one's timer.
+            delay(10_000)
+            if (bulkFetchResult.value === result) bulkFetchResult.value = null
         }
     }
 
@@ -267,6 +301,14 @@ private data class CoreRideDetail(
 
 private fun List<StravaSegmentEffort>.toUiState(): StravaEffortsUiState =
     if (isEmpty()) StravaEffortsUiState.Idle else StravaEffortsUiState.Loaded(map { it.toItem() })
+
+/** Overlays [importedIds] onto a [StravaEffortsUiState.Loaded]'s rows; a no-op for any other state. */
+private fun StravaEffortsUiState.withImportedFlags(importedIds: Set<String>): StravaEffortsUiState =
+    if (this is StravaEffortsUiState.Loaded) {
+        StravaEffortsUiState.Loaded(efforts.map { it.copy(isImported = it.effortExternalId in importedIds) })
+    } else {
+        this
+    }
 
 private fun Ride.toInfo(): RideDetailInfo = RideDetailInfo(
     name = name,

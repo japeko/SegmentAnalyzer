@@ -25,12 +25,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import java.time.Duration
@@ -481,6 +484,275 @@ class RideDetailViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `fetching selected efforts skips the network call for one whose detail is already cached`() = runTest(dispatcher) {
+        val cachedDetail = StravaSegmentEffortDetail(
+            avgSpeedKmh = 22.0,
+            maxSpeedKmh = 35.0,
+            elevationGainMeters = 8.0,
+            avgWatts = null,
+            avgHeartRateBpm = null,
+            avgCadenceRpm = null,
+            track = listOf(StravaSegmentEffortPoint(timeSeconds = 0, distanceMeters = 0.0, latitude = 61.0, longitude = 24.0)),
+        )
+        val efforts = listOf(
+            StravaSegmentEffort(
+                effortExternalId = "effort-1", segmentExternalId = "seg-1", segmentName = "Climb A",
+                elapsedTime = Duration.ofSeconds(120), distanceMeters = 500.0, komRank = null, prRank = null,
+                detail = cachedDetail,
+            ),
+            StravaSegmentEffort(
+                effortExternalId = "effort-2", segmentExternalId = "seg-2", segmentName = "Climb B",
+                elapsedTime = Duration.ofSeconds(180), distanceMeters = 700.0, komRank = null, prRank = null,
+            ),
+        )
+        val fetchedDetail = StravaSegmentEffortDetail(
+            avgSpeedKmh = 20.0,
+            maxSpeedKmh = 30.0,
+            elevationGainMeters = 5.0,
+            avgWatts = null,
+            avgHeartRateBpm = null,
+            avgCadenceRpm = null,
+            track = listOf(StravaSegmentEffortPoint(timeSeconds = 0, distanceMeters = 0.0, latitude = 61.0, longitude = 24.0)),
+        )
+        val segments = listOf(
+            com.segmentanalyzer.domain.model.Segment(
+                id = 1, externalId = "seg-1", name = "Climb A", distanceMeters = 500.0,
+                averageGradePercent = 3.0, maximumGradePercent = 5.0, elevationGainMeters = 10.0,
+                climbCategory = 0, city = null, state = null,
+            ),
+            com.segmentanalyzer.domain.model.Segment(
+                id = 2, externalId = "seg-2", name = "Climb B", distanceMeters = 700.0,
+                averageGradePercent = 4.0, maximumGradePercent = 6.0, elevationGainMeters = 15.0,
+                climbCategory = 0, city = null, state = null,
+            ),
+        )
+        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository()
+        val stravaActivityRepository = FakeStravaActivityRepository(Result.success(efforts), Result.success(fetchedDetail))
+        val viewModel = viewModel(
+            ride = ride,
+            stravaResult = Result.success(efforts),
+            // The automatic live fetch on load replaces whatever's cached with its own result, so
+            // it must also return effort-1's detail attached for the cache-first path to have
+            // something to find — see the analogous single-effort test above.
+            cachedEfforts = efforts,
+            segmentRepository = FakeRideDetailSegmentRepository(segments),
+            segmentAttemptRepository = segmentAttemptRepository,
+            stravaActivityRepository = stravaActivityRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onEffortLongPress("effort-1")
+        viewModel.onEffortSelectionToggled("effort-2")
+        advanceUntilIdle()
+
+        viewModel.onFetchSelectedEffortsClick()
+        advanceUntilIdle()
+
+        assertEquals(listOf("effort-2"), stravaActivityRepository.fetchEffortDetailCalls)
+        assertEquals(listOf("effort-1", "effort-2"), segmentAttemptRepository.savedStravaEffortAttempts.sorted())
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `fetching a mix of new and already-imported efforts reports both counts`() = runTest(dispatcher) {
+        val efforts = listOf(
+            StravaSegmentEffort(
+                effortExternalId = "effort-1", segmentExternalId = "seg-1", segmentName = "Climb A",
+                elapsedTime = Duration.ofSeconds(120), distanceMeters = 500.0, komRank = null, prRank = null,
+            ),
+            StravaSegmentEffort(
+                effortExternalId = "effort-2", segmentExternalId = "seg-2", segmentName = "Climb B",
+                elapsedTime = Duration.ofSeconds(180), distanceMeters = 700.0, komRank = null, prRank = null,
+            ),
+        )
+        val detail = StravaSegmentEffortDetail(
+            avgSpeedKmh = 20.0,
+            maxSpeedKmh = 30.0,
+            elevationGainMeters = 5.0,
+            avgWatts = null,
+            avgHeartRateBpm = null,
+            avgCadenceRpm = null,
+            track = listOf(StravaSegmentEffortPoint(timeSeconds = 0, distanceMeters = 0.0, latitude = 61.0, longitude = 24.0)),
+        )
+        val segments = listOf(
+            com.segmentanalyzer.domain.model.Segment(
+                id = 1, externalId = "seg-1", name = "Climb A", distanceMeters = 500.0,
+                averageGradePercent = 3.0, maximumGradePercent = 5.0, elevationGainMeters = 10.0,
+                climbCategory = 0, city = null, state = null,
+            ),
+            com.segmentanalyzer.domain.model.Segment(
+                id = 2, externalId = "seg-2", name = "Climb B", distanceMeters = 700.0,
+                averageGradePercent = 4.0, maximumGradePercent = 6.0, elevationGainMeters = 15.0,
+                climbCategory = 0, city = null, state = null,
+            ),
+        )
+        // effort-1 already has a saved attempt before the bulk fetch even starts.
+        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(initiallyImported = setOf("effort-1"))
+        val viewModel = viewModel(
+            ride = ride,
+            stravaResult = Result.success(efforts),
+            detailResult = Result.success(detail),
+            segmentRepository = FakeRideDetailSegmentRepository(segments),
+            segmentAttemptRepository = segmentAttemptRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onEffortLongPress("effort-1")
+        viewModel.onEffortSelectionToggled("effort-2")
+        advanceUntilIdle()
+
+        // runCurrent(), not advanceUntilIdle(): the latter fast-forwards through the 10s
+        // auto-dismiss delay too, clearing bulkFetchResult before we can assert on it.
+        viewModel.onFetchSelectedEffortsClick()
+        runCurrent()
+
+        val result = viewModel.uiState.value.bulkFetchResult
+        assertEquals(BulkFetchResultState(newlyImportedCount = 1, alreadyImportedCount = 1), result)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `bulk fetch result auto-dismisses back to null after 10 seconds`() = runTest(dispatcher) {
+        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository()
+        val viewModel = viewModel(
+            ride = ride,
+            stravaResult = Result.success(
+                listOf(
+                    StravaSegmentEffort(
+                        effortExternalId = "effort-1", segmentExternalId = "seg-1", segmentName = "Climb A",
+                        elapsedTime = Duration.ofSeconds(120), distanceMeters = 500.0, komRank = null, prRank = null,
+                    ),
+                ),
+            ),
+            detailResult = Result.success(
+                StravaSegmentEffortDetail(
+                    avgSpeedKmh = 20.0, maxSpeedKmh = 30.0, elevationGainMeters = 5.0,
+                    avgWatts = null, avgHeartRateBpm = null, avgCadenceRpm = null,
+                    track = listOf(StravaSegmentEffortPoint(timeSeconds = 0, distanceMeters = 0.0, latitude = 61.0, longitude = 24.0)),
+                ),
+            ),
+            segmentRepository = FakeRideDetailSegmentRepository(
+                listOf(
+                    com.segmentanalyzer.domain.model.Segment(
+                        id = 1, externalId = "seg-1", name = "Climb A", distanceMeters = 500.0,
+                        averageGradePercent = 3.0, maximumGradePercent = 5.0, elevationGainMeters = 10.0,
+                        climbCategory = 0, city = null, state = null,
+                    ),
+                ),
+            ),
+            segmentAttemptRepository = segmentAttemptRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onEffortLongPress("effort-1")
+        advanceUntilIdle()
+
+        // runCurrent(), not advanceUntilIdle(): the latter fast-forwards through the 10s delay too.
+        viewModel.onFetchSelectedEffortsClick()
+        runCurrent()
+        assertEquals(BulkFetchResultState(newlyImportedCount = 1, alreadyImportedCount = 0), viewModel.uiState.value.bulkFetchResult)
+
+        advanceTimeBy(10_001)
+        runCurrent()
+        assertNull(viewModel.uiState.value.bulkFetchResult)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `a second bulk fetch's equal-valued result isn't clipped early by the first fetch's own timer`() = runTest(dispatcher) {
+        val efforts = listOf(
+            StravaSegmentEffort(
+                effortExternalId = "effort-1", segmentExternalId = "seg-1", segmentName = "Climb A",
+                elapsedTime = Duration.ofSeconds(120), distanceMeters = 500.0, komRank = null, prRank = null,
+            ),
+            StravaSegmentEffort(
+                effortExternalId = "effort-2", segmentExternalId = "seg-2", segmentName = "Climb B",
+                elapsedTime = Duration.ofSeconds(180), distanceMeters = 700.0, komRank = null, prRank = null,
+            ),
+        )
+        val detail = StravaSegmentEffortDetail(
+            avgSpeedKmh = 20.0, maxSpeedKmh = 30.0, elevationGainMeters = 5.0,
+            avgWatts = null, avgHeartRateBpm = null, avgCadenceRpm = null,
+            track = listOf(StravaSegmentEffortPoint(timeSeconds = 0, distanceMeters = 0.0, latitude = 61.0, longitude = 24.0)),
+        )
+        val segments = listOf(
+            com.segmentanalyzer.domain.model.Segment(
+                id = 1, externalId = "seg-1", name = "Climb A", distanceMeters = 500.0,
+                averageGradePercent = 3.0, maximumGradePercent = 5.0, elevationGainMeters = 10.0,
+                climbCategory = 0, city = null, state = null,
+            ),
+            com.segmentanalyzer.domain.model.Segment(
+                id = 2, externalId = "seg-2", name = "Climb B", distanceMeters = 700.0,
+                averageGradePercent = 4.0, maximumGradePercent = 6.0, elevationGainMeters = 15.0,
+                climbCategory = 0, city = null, state = null,
+            ),
+        )
+        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository()
+        val viewModel = viewModel(
+            ride = ride,
+            stravaResult = Result.success(efforts),
+            detailResult = Result.success(detail),
+            segmentRepository = FakeRideDetailSegmentRepository(segments),
+            segmentAttemptRepository = segmentAttemptRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onEffortLongPress("effort-1")
+        advanceUntilIdle()
+        viewModel.onFetchSelectedEffortsClick()
+        runCurrent()
+        assertEquals(BulkFetchResultState(newlyImportedCount = 1, alreadyImportedCount = 0), viewModel.uiState.value.bulkFetchResult)
+
+        advanceTimeBy(9_000)
+        viewModel.onEffortLongPress("effort-2")
+        advanceUntilIdle()
+        viewModel.onFetchSelectedEffortsClick() // a second, equal-by-value result, before the first's 10s timer fires
+        runCurrent()
+
+        // Past the first fetch's original 10s mark (9_000 + 1_500), but well short of the second's own.
+        advanceTimeBy(1_500)
+        runCurrent()
+        assertEquals(BulkFetchResultState(newlyImportedCount = 1, alreadyImportedCount = 0), viewModel.uiState.value.bulkFetchResult)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `an already-imported effort is flagged isImported in the effort list`() = runTest(dispatcher) {
+        val efforts = listOf(
+            StravaSegmentEffort(
+                effortExternalId = "effort-1", segmentExternalId = "seg-1", segmentName = "Climb A",
+                elapsedTime = Duration.ofSeconds(120), distanceMeters = 500.0, komRank = null, prRank = null,
+            ),
+            StravaSegmentEffort(
+                effortExternalId = "effort-2", segmentExternalId = "seg-2", segmentName = "Climb B",
+                elapsedTime = Duration.ofSeconds(180), distanceMeters = 700.0, komRank = null, prRank = null,
+            ),
+        )
+        val segmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(initiallyImported = setOf("effort-1"))
+        val viewModel = viewModel(
+            ride = ride,
+            stravaResult = Result.success(efforts),
+            segmentAttemptRepository = segmentAttemptRepository,
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val loaded = viewModel.uiState.value.stravaSegmentEfforts as StravaEffortsUiState.Loaded
+        assertEquals(true, loaded.efforts.first { it.effortExternalId == "effort-1" }.isImported)
+        assertEquals(false, loaded.efforts.first { it.effortExternalId == "effort-2" }.isImported)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         ride: Ride?,
         stravaResult: Result<List<StravaSegmentEffort>> = Result.success(emptyList()),
@@ -491,9 +763,9 @@ class RideDetailViewModelTest {
         stravaAccountRepository: FakeRideDetailStravaAccountRepository = FakeRideDetailStravaAccountRepository(),
         segmentRepository: FakeRideDetailSegmentRepository = FakeRideDetailSegmentRepository(),
         segmentAttemptRepository: FakeRideDetailSegmentAttemptRepository = FakeRideDetailSegmentAttemptRepository(),
+        stravaActivityRepository: FakeStravaActivityRepository = FakeStravaActivityRepository(stravaResult, detailResult),
     ): RideDetailViewModel {
         val savedStateHandle = SavedStateHandle(mapOf("rideId" to 1L))
-        val stravaActivityRepository = FakeStravaActivityRepository(stravaResult, detailResult)
         val stravaEffortRepository = FakeStravaSegmentEffortRepository(mutableMapOf(1L to cachedEfforts))
         return RideDetailViewModel(
             savedStateHandle,
@@ -501,6 +773,7 @@ class RideDetailViewModelTest {
             ObserveStravaSegmentEffortsUseCase(stravaEffortRepository),
             com.segmentanalyzer.domain.usecase.ObserveStravaConnectionStateUseCase(stravaAccountRepository),
             com.segmentanalyzer.domain.usecase.ObserveRideTagsUseCase(rideRepository),
+            com.segmentanalyzer.domain.usecase.ObserveImportedStravaEffortIdsUseCase(segmentAttemptRepository),
             FetchStravaSegmentEffortsUseCase(stravaActivityRepository, stravaEffortRepository),
             FetchStravaSegmentEffortDetailUseCase(stravaActivityRepository, stravaEffortRepository),
             com.segmentanalyzer.domain.usecase.SaveStravaSegmentEffortAttemptUseCase(
@@ -541,12 +814,16 @@ private class FakeRideDetailRideRepository(
     override fun observeAllTags(): Flow<List<String>> = MutableStateFlow(tags)
 }
 
-private class FakeRideDetailSegmentAttemptRepository : SegmentAttemptRepository {
+private class FakeRideDetailSegmentAttemptRepository(
+    initiallyImported: Set<String> = emptySet(),
+) : SegmentAttemptRepository {
     val savedStravaEffortAttempts = mutableListOf<String>()
+    private val importedEffortIds = MutableStateFlow(initiallyImported)
 
     override fun observeAttemptsForSegment(segmentId: Long): Flow<List<SegmentAttempt>> = MutableStateFlow(emptyList())
     override fun observeMatchesForRide(rideId: Long): Flow<List<com.segmentanalyzer.domain.model.RideSegmentMatch>> =
         MutableStateFlow(emptyList())
+    override fun observeImportedStravaEffortIds(rideId: Long): Flow<Set<String>> = importedEffortIds
     override fun observeRecords() = MutableStateFlow(emptyList<com.segmentanalyzer.domain.model.SegmentRecord>())
     override suspend fun trackPointsForAttempt(attemptId: Long): List<TrackPoint> = emptyList()
     override suspend fun matchRideAgainstAllSegments(rideId: Long): Int = 0
@@ -562,6 +839,7 @@ private class FakeRideDetailSegmentAttemptRepository : SegmentAttemptRepository 
         effortExternalId: String,
     ) {
         savedStravaEffortAttempts += effortExternalId
+        importedEffortIds.value = importedEffortIds.value + effortExternalId
     }
 
 }
@@ -625,8 +903,13 @@ private class FakeStravaActivityRepository(
     private val segmentEffortsResult: Result<List<StravaSegmentEffort>>,
     private val detailResult: Result<StravaSegmentEffortDetail>,
 ) : StravaActivityRepository {
+    val fetchEffortDetailCalls = mutableListOf<String>()
+
     override suspend fun fetchSegmentEfforts(ride: Ride): Result<List<StravaSegmentEffort>> = segmentEffortsResult
-    override suspend fun fetchEffortDetail(effortExternalId: String): Result<StravaSegmentEffortDetail> = detailResult
+    override suspend fun fetchEffortDetail(effortExternalId: String): Result<StravaSegmentEffortDetail> {
+        fetchEffortDetailCalls += effortExternalId
+        return detailResult
+    }
 }
 
 private class FakeStravaSegmentEffortRepository(

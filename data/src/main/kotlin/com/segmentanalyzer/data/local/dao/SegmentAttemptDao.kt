@@ -61,6 +61,9 @@ interface SegmentAttemptDao {
     )
     fun observeForRide(rideId: Long): Flow<List<SegmentAttemptWithSegment>>
 
+    @Query("SELECT stravaEffortExternalId FROM segment_attempts WHERE rideId = :rideId AND stravaEffortExternalId IS NOT NULL")
+    fun observeImportedStravaEffortIds(rideId: Long): Flow<List<String>>
+
     @Query("SELECT * FROM segment_attempts WHERE id = :attemptId")
     suspend fun attemptById(attemptId: Long): SegmentAttemptEntity?
 
