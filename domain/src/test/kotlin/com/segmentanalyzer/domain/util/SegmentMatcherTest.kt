@@ -261,6 +261,23 @@ class SegmentMatcherTest {
     }
 
     @Test
+    fun `polyline rejects a neighboring parallel trail that only touches both endpoints`() {
+        // Regression test for a real false positive: a bike park with several parallel/crossing
+        // descents matched a ride to a segment it never actually rode — the ride touched both
+        // endpoints but ran a consistent ~83m off the real line the whole way in between (a
+        // neighboring trail), which the old 50%-within-100m on-route check let through at 100%.
+        val track = listOf(
+            point(START_LAT, START_LON, 0, 0.0),
+            point(60.0025, 24.0015, 30, 250.0),
+            point(60.005, 24.0015, 60, 500.0),
+            point(60.0075, 24.0015, 90, 750.0),
+            point(END_LAT, END_LON, 120, 1_000.0),
+        )
+
+        assertNull(matchSegment(track, START_LAT, START_LON, END_LAT, END_LON, SEGMENT_DISTANCE_METERS, polyline = STRAIGHT_POLYLINE))
+    }
+
+    @Test
     fun `a slow but still-plausible pass is not rejected by the duration guard`() {
         // Much slower than the typical case (a stop to sort out a mechanical, say), but well
         // within what's physically plausible for the segment's length — must still match.

@@ -17,8 +17,18 @@ const val SEGMENT_PROXIMITY_METERS = 50.0
 /** How many extra track points past the rough end-of-segment crossing to search for the true closest one. */
 private const val EXIT_SEARCH_SLACK_POINTS = 4
 
-/** Fraction of the entry..exit sub-track that must stay near the polyline for a match to be accepted. */
-private const val MIN_ON_ROUTE_FRACTION = 0.5
+/**
+ * Fraction of the entry..exit sub-track that must stay within [SEGMENT_PROXIMITY_METERS] of the
+ * polyline for a match to be accepted. Regression-tuned against a real false positive: a bike
+ * park with several parallel/crossing descents (Iso-Syöte) matched a ride to "Musta Enduro" that
+ * actually rode a neighboring trail the whole way — only 10% of its points landed within 50m of
+ * Musta Enduro's real line (average 100m off), while a genuine ride of that same segment kept
+ * 100% of its points within 50m (average 10m off, max 41m). The old 50%-within-100m check passed
+ * the false positive at 55% and was too loose to tell parallel trails apart; this is tight enough
+ * to reject that case with a wide margin while still tolerating a few GPS-noisy points on a
+ * genuine ride.
+ */
+private const val MIN_ON_ROUTE_FRACTION = 0.85
 
 /**
  * Well under anyone's realistic riding (or walking-the-bike) pace through even a technical
@@ -225,10 +235,13 @@ private fun findEntryExitViaPolyline(
     if (exitIndex <= entryIndex) return null
 
     // Reject a "match" that only clips near both endpoints via an unrelated path — the ride
-    // needs to actually track the segment's route in between, not just touch its ends.
+    // needs to actually track the segment's route in between, not just touch its ends. Same
+    // tolerance as entry/exit detection (not double it): a neighboring trail in a dense network
+    // can easily stay within a looser tolerance the whole way without ever being the segment
+    // itself — see [MIN_ON_ROUTE_FRACTION].
     val onRouteCount = (entryIndex..exitIndex).count { index ->
         val point = track[index]
-        polyline.any { p -> haversineMeters(point.latitude, point.longitude, p.latitude, p.longitude) <= proximityMeters * 2 }
+        polyline.any { p -> haversineMeters(point.latitude, point.longitude, p.latitude, p.longitude) <= proximityMeters }
     }
     val onRouteFraction = onRouteCount.toDouble() / (exitIndex - entryIndex + 1)
     if (onRouteFraction < MIN_ON_ROUTE_FRACTION) return null
