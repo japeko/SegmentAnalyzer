@@ -11,6 +11,7 @@ import com.segmentanalyzer.domain.model.Ride
 import com.segmentanalyzer.domain.model.StravaSegmentEffort
 import com.segmentanalyzer.domain.model.StravaSegmentEffortDetail
 import com.segmentanalyzer.domain.model.StravaSegmentEffortPoint
+import com.segmentanalyzer.domain.repository.StravaActivityNotFoundException
 import com.segmentanalyzer.domain.repository.StravaActivityRepository
 import com.segmentanalyzer.domain.repository.StravaSessionExpiredException
 import kotlinx.coroutines.withContext
@@ -41,7 +42,7 @@ internal class StravaActivityRepositoryImpl @Inject constructor(
                     afterEpochSeconds = ride.startTime.minus(MATCH_TOLERANCE).epochSecond,
                     beforeEpochSeconds = ride.startTime.plus(MATCH_TOLERANCE).epochSecond,
                 )
-                val activityId = candidates.closestTo(ride.startTime)?.id ?: return@runCatching emptyList()
+                val activityId = candidates.closestTo(ride.startTime)?.id ?: throw StravaActivityNotFoundException()
 
                 activityApi.fetchActivityDetail(session.accessToken, activityId).segmentEfforts.map { it.toDomain() }
             }

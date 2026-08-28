@@ -339,7 +339,7 @@ private fun LazyListScope.stravaEffortsSection(
         }
 
         is StravaEffortsUiState.Loaded -> if (state.efforts.isEmpty()) {
-            item { EmptyMessage("No matching Strava activity found for this ride.") }
+            item { EmptyMessage("This ride crossed no Strava segments.") }
         } else {
             itemsIndexed(state.efforts) { index, effort ->
                 Column {
