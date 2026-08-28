@@ -275,6 +275,99 @@ class RideCompareViewModelTest {
         collectJob.cancel()
     }
 
+    @Test
+    fun `tapping another chip makes it the reference without changing any chip's role label`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val pb = attempt(2, seconds = 2600, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, pb))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.chips.first { it.attemptId == 1L }.isReference)
+        assertEquals(false, viewModel.uiState.value.chips.first { it.attemptId == 2L }.isReference)
+
+        viewModel.onSetReferenceClick(2L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // Roles are unchanged — Current is still Current, Personal Best is still Personal Best.
+        assertEquals(AttemptRole.CURRENT, state.chips.first { it.attemptId == 1L }.role)
+        assertEquals(AttemptRole.PERSONAL_BEST, state.chips.first { it.attemptId == 2L }.role)
+        // Only which one is the reference has moved.
+        assertEquals(false, state.chips.first { it.attemptId == 1L }.isReference)
+        assertEquals(true, state.chips.first { it.attemptId == 2L }.isReference)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `once a non-Current chip is the reference, it can't be removed either`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val pb = attempt(2, seconds = 2600, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, pb))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onSetReferenceClick(2L)
+        advanceUntilIdle()
+
+        viewModel.onRemoveAttempt(2L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(true, state.chips.any { it.attemptId == 2L })
+        assertEquals(true, state.chips.first { it.attemptId == 2L }.isReference)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `switching the reference swaps the route to the new reference's GPS track`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 100, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val other = attempt(2, seconds = 110, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val currentTrack = listOf(
+            TrackPoint(0.0, 0.0, elevationMeters = 100f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 0.0),
+            TrackPoint(0.001, 0.0, elevationMeters = 110f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 111.0),
+        )
+        val otherTrack = listOf(
+            TrackPoint(0.0, 0.0, elevationMeters = 50f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 0.0),
+            TrackPoint(0.001, 0.0, elevationMeters = 60f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 111.0),
+            TrackPoint(0.002, 0.0, elevationMeters = 55f, timestamp = Instant.EPOCH, cumulativeDistanceMeters = 222.0),
+        )
+        val viewModel = viewModel(
+            currentAttemptId = 1L,
+            attempts = listOf(current, other),
+            tracksByAttemptId = mapOf(1L to currentTrack, 2L to otherTrack),
+        )
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.routePoints.size)
+
+        viewModel.onSetReferenceClick(2L)
+        advanceUntilIdle()
+
+        assertEquals(3, viewModel.uiState.value.routePoints.size)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `tapping the already-current chip is a no-op`() = runTest(dispatcher) {
+        val current = attempt(1, seconds = 2712, startTime = Instant.parse("2026-08-16T00:00:00Z"))
+        val other = attempt(2, seconds = 2688, startTime = Instant.parse("2026-06-01T00:00:00Z"))
+        val viewModel = viewModel(currentAttemptId = 1L, attempts = listOf(current, other))
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        viewModel.onSetReferenceClick(1L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(AttemptRole.CURRENT, state.chips.first { it.attemptId == 1L }.role)
+        assertEquals(AttemptRole.PERSONAL_BEST, state.chips.first { it.attemptId == 2L }.role)
+        collectJob.cancel()
+    }
+
     private fun viewModel(
         currentAttemptId: Long,
         attempts: List<SegmentAttempt>,

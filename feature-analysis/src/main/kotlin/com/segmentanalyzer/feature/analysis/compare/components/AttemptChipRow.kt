@@ -1,5 +1,6 @@
 package com.segmentanalyzer.feature.analysis.compare.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -34,25 +35,33 @@ fun AttemptChipRow(
     chips: List<AttemptChip>,
     onAddClick: () -> Unit,
     onRemoveClick: (Long) -> Unit,
+    onChipClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        chips.forEach { chip -> AttemptChipItem(chip, onRemoveClick = onRemoveClick) }
+        chips.forEach { chip -> AttemptChipItem(chip, onRemoveClick = onRemoveClick, onClick = { onChipClick(chip.attemptId) }) }
         AddChip(onClick = onAddClick)
     }
 }
 
+/**
+ * Tapping a chip makes it the new flat-line reference (highlighted with a colored border) without
+ * changing its role label — the Close icon (its own nested clickable) takes priority when tapped,
+ * so this doesn't also fire a switch on remove.
+ */
 @Composable
-private fun AttemptChipItem(chip: AttemptChip, onRemoveClick: (Long) -> Unit, modifier: Modifier = Modifier) {
+private fun AttemptChipItem(chip: AttemptChip, onRemoveClick: (Long) -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val color = MaterialThemeExtras.compareColor(chip.colorIndex, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
+        border = if (chip.isReference) BorderStroke(1.5.dp, color) else null,
+        onClick = onClick,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -68,7 +77,9 @@ private fun AttemptChipItem(chip: AttemptChip, onRemoveClick: (Long) -> Unit, mo
                     color = MaterialThemeExtras.textTertiary,
                 )
             }
-            if (chip.role != AttemptRole.CURRENT) {
+            // The reference can't be removed — the chart/map would lose its baseline — same
+            // protection Current always had, now extended to whichever chip is the reference.
+            if (chip.role != AttemptRole.CURRENT && !chip.isReference) {
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = "Remove from comparison",

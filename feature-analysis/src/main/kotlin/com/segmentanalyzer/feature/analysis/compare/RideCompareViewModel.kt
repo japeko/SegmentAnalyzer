@@ -40,19 +40,24 @@ class RideCompareViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val segmentId: Long = checkNotNull(savedStateHandle["segmentId"])
-    private val currentAttemptId: Long = checkNotNull(savedStateHandle["anchorAttemptId"])
+
+    /** The ride the screen was opened from — fixed for the life of the screen. Always the "Current" chip; unlike [referenceAttemptId], tapping another chip never changes this. */
+    private val anchorAttemptId: Long = checkNotNull(savedStateHandle["anchorAttemptId"])
+
+    /** Which attempt draws as the flat/zero-gap reference line on the Time Gap chart and feeds the route map. Starts at [anchorAttemptId], but the user can tap any chip to switch — this never changes a chip's role label, only which one the others are measured against. */
+    private val referenceAttemptId = MutableStateFlow(anchorAttemptId)
 
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val excludedIds = MutableStateFlow<Set<Long>>(emptySet())
     private val addSheetState = MutableStateFlow(AddSheetState())
-    // Current's actual GPS track (with elevation, if the source ride had it) — used to draw the
+    // Reference's actual GPS track (with elevation, if the source ride had it) — used to draw the
     // map's route gradient-colored by slope. Falls back to the segment's flat polyline if empty
     // (e.g. a Garmin- or Strava-sourced ride, which has no stored track in V1).
     private val currentTrack = MutableStateFlow<List<TrackPoint>>(emptyList())
 
     init {
         viewModelScope.launch {
-            currentTrack.value = getAttemptTrack(currentAttemptId)
+            referenceAttemptId.collect { id -> currentTrack.value = getAttemptTrack(id) }
         }
     }
 
@@ -61,16 +66,16 @@ class RideCompareViewModel @Inject constructor(
         observeSegmentAttempts(segmentId),
         selectedIds,
         excludedIds,
-        combine(addSheetState, currentTrack) { sheet, track -> sheet to track },
-    ) { segment, attempts, selected, excluded, (sheet, track) ->
+        combine(addSheetState, currentTrack, referenceAttemptId) { sheet, track, referenceId -> Triple(sheet, track, referenceId) },
+    ) { segment, attempts, selected, excluded, (sheet, track, referenceId) ->
         if (segment == null || attempts.isEmpty()) {
             return@combine RideCompareUiState(isLoading = true)
         }
 
-        val current = attempts.find { it.id == currentAttemptId }
+        val current = attempts.find { it.id == anchorAttemptId }
         val personalBest = attempts.minByOrNull { it.duration.seconds }
         val previous = attempts
-            .filter { it.id != currentAttemptId && current != null && it.startTime.isBefore(current.startTime) }
+            .filter { it.id != anchorAttemptId && current != null && it.startTime.isBefore(current.startTime) }
             .maxByOrNull { it.startTime }
 
         fun roleFor(id: Long): AttemptRole = when (id) {
@@ -96,6 +101,7 @@ class RideCompareViewModel @Inject constructor(
                 AttemptChip(
                     attemptId = id,
                     role = roleFor(id),
+                    isReference = id == referenceId,
                     dateLabel = attempt.startTime.toRideCardDate(),
                     lapLabel = lapLabels.getValue(id),
                     colorIndex = index,
@@ -103,10 +109,11 @@ class RideCompareViewModel @Inject constructor(
             }
         }
 
-        val otherIds = chips.map { it.attemptId }.filter { it != currentAttemptId }
-        val timeGapSeries = if (current != null && otherIds.isNotEmpty()) {
+        val referenceAttempt = attempts.find { it.id == referenceId }
+        val otherIds = chips.map { it.attemptId }.filter { it != referenceId }
+        val timeGapSeries = if (referenceAttempt != null && otherIds.isNotEmpty()) {
             val colorByAttemptId = chips.associate { it.attemptId to it.colorIndex }
-            buildTimeGapSeries(currentAttemptId, otherIds, segment.distanceMeters).map { series ->
+            buildTimeGapSeries(referenceId, otherIds, segment.distanceMeters).map { series ->
                 TimeGapSeriesUi(
                     attemptId = series.attemptId,
                     colorIndex = colorByAttemptId[series.attemptId] ?: 0,
@@ -140,7 +147,7 @@ class RideCompareViewModel @Inject constructor(
                 lapLabel = lapLabels.getValue(attempt.id),
                 statsLabel = "${attempt.duration.toRideClock()} · %.1f km/h".format(attempt.avgSpeedKmh),
                 statusLabel = when {
-                    attempt.id == currentAttemptId -> "CURRENT · ${lapLabels.getValue(attempt.id)}"
+                    attempt.id == anchorAttemptId -> "CURRENT · ${lapLabels.getValue(attempt.id)}"
                     attempt.id in orderedIds -> "ADDED · ${lapLabels.getValue(attempt.id)}"
                     else -> null
                 },
@@ -187,13 +194,26 @@ class RideCompareViewModel @Inject constructor(
 
     /**
      * Removes a chip from the comparison — a manually-added one, or a Personal Best/Previous
-     * default (Current can't be removed; it's the screen's anchor and the UI never offers it).
-     * Excluding a default's id keeps it from being auto-picked again; re-adding it via the picker
-     * still works, since [selectedIds] is checked independently of [excludedIds].
+     * default. A no-op for the anchor or the current reference: the anchor is the screen's
+     * identity and the UI never offers it; the reference is the chart/map's baseline, and
+     * removing its chip while it's still driving them would leave it visually gone but still
+     * affecting what's shown. Excluding a default's id keeps it from being auto-picked again;
+     * re-adding it via the picker still works, since [selectedIds] is checked independently of
+     * [excludedIds].
      */
     fun onRemoveAttempt(attemptId: Long) {
+        if (attemptId == anchorAttemptId || attemptId == referenceAttemptId.value) return
         selectedIds.value = selectedIds.value - attemptId
         excludedIds.value = excludedIds.value + attemptId
+    }
+
+    /**
+     * Makes [attemptId] the new flat-line reference for the Time Gap chart and route map — shown
+     * via [AttemptChip.isReference], not by changing anyone's role label (Personal Best stays
+     * Personal Best even while it's the reference; only the true anchor ride is ever "Current").
+     */
+    fun onSetReferenceClick(attemptId: Long) {
+        referenceAttemptId.value = attemptId
     }
 }
 

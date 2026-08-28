@@ -41,6 +41,7 @@ fun RideCompareScreen(
     onBackClick: () -> Unit,
     onAddClick: () -> Unit,
     onRemoveClick: (Long) -> Unit,
+    onSetReferenceClick: (Long) -> Unit,
     onDismissAddSheet: () -> Unit,
     onAddableAttemptSelected: (Long) -> Unit,
     onConfirmAdd: () -> Unit,
@@ -73,6 +74,7 @@ fun RideCompareScreen(
                     chips = uiState.chips,
                     onAddClick = onAddClick,
                     onRemoveClick = onRemoveClick,
+                    onChipClick = onSetReferenceClick,
                     modifier = Modifier.padding(start = 16.dp, top = 6.dp),
                 )
             }
@@ -123,9 +125,9 @@ fun RideCompareScreen(
             }
 
             if (uiState.timeGapSeries.isNotEmpty()) {
-                item { ChartSectionHeader("Time Gap vs Current Ride") }
+                item { ChartSectionHeader("Time Gap") }
                 item {
-                    val currentColorIndex = uiState.chips.find { it.role == AttemptRole.CURRENT }?.colorIndex ?: 0
+                    val currentColorIndex = uiState.chips.find { it.isReference }?.colorIndex ?: 0
                     TimeGapChart(
                         series = uiState.timeGapSeries,
                         currentColorIndex = currentColorIndex,
