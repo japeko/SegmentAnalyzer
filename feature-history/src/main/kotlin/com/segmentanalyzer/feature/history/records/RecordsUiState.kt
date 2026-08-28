@@ -10,6 +10,11 @@ data class RecordsUiState(
     val newPersonalBests: List<RecordListItem> = emptyList(),
     /** Segment records set before [selectedPeriod]. */
     val otherRecords: List<RecordListItem> = emptyList(),
+    /** Non-empty means selection mode is active — keyed by attemptId. */
+    val selectedAttemptIds: Set<Long> = emptySet(),
+    val isExporting: Boolean = false,
+    /** Non-null right after an export completes with at least one record skipped (no recorded track) — auto-dismisses itself after a delay. */
+    val exportSkippedMessage: String? = null,
 )
 
 /** A segment record pre-formatted for display — the ViewModel does the formatting, not the composable. */

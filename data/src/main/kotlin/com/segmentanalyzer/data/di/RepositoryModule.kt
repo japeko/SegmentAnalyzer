@@ -1,6 +1,7 @@
 package com.segmentanalyzer.data.di
 
 import com.segmentanalyzer.data.repository.ExcludedAttemptsRepositoryImpl
+import com.segmentanalyzer.data.repository.FitExportRepositoryImpl
 import com.segmentanalyzer.data.repository.FitFileRepositoryImpl
 import com.segmentanalyzer.data.repository.GarminAccountRepositoryImpl
 import com.segmentanalyzer.data.repository.GarminImportRepositoryImpl
@@ -16,6 +17,7 @@ import com.segmentanalyzer.data.repository.StravaSegmentEffortRepositoryImpl
 import com.segmentanalyzer.data.repository.StravaSegmentRepositoryImpl
 import com.segmentanalyzer.data.repository.ViewedRidesRepositoryImpl
 import com.segmentanalyzer.domain.repository.ExcludedAttemptsRepository
+import com.segmentanalyzer.domain.repository.FitExportRepository
 import com.segmentanalyzer.domain.repository.FitFileRepository
 import com.segmentanalyzer.domain.repository.GarminAccountRepository
 import com.segmentanalyzer.domain.repository.GarminImportRepository
@@ -103,4 +105,8 @@ abstract class RepositoryModule {
     internal abstract fun bindRideComparisonInsightRepository(
         impl: RideComparisonInsightRepositoryImpl,
     ): RideComparisonInsightRepository
+
+    @Binds
+    @Singleton
+    internal abstract fun bindFitExportRepository(impl: FitExportRepositoryImpl): FitExportRepository
 }

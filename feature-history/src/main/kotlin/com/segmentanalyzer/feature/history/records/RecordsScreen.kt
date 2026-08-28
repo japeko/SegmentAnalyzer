@@ -23,6 +23,7 @@ import com.segmentanalyzer.domain.model.ActivitySource
 import com.segmentanalyzer.domain.model.SummaryPeriod
 import com.segmentanalyzer.feature.history.history.components.SummaryPeriodRow
 import com.segmentanalyzer.feature.history.records.components.RecordRow
+import com.segmentanalyzer.feature.history.records.components.RecordsSelectionTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,11 +31,28 @@ fun RecordsScreen(
     uiState: RecordsUiState,
     onPeriodSelected: (SummaryPeriod) -> Unit,
     onRecordClick: (Long) -> Unit,
+    onRecordLongPress: (Long) -> Unit,
+    onRecordSelectionToggled: (Long) -> Unit,
+    onExitSelectionMode: () -> Unit,
+    onExportClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isSelectionMode = uiState.selectedAttemptIds.isNotEmpty()
+
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("Records") }) },
+        topBar = {
+            if (isSelectionMode) {
+                RecordsSelectionTopBar(
+                    selectedCount = uiState.selectedAttemptIds.size,
+                    isExporting = uiState.isExporting,
+                    onExitSelectionMode = onExitSelectionMode,
+                    onExportClick = onExportClick,
+                )
+            } else {
+                TopAppBar(title = { Text("Records") })
+            }
+        },
     ) { padding ->
         if (uiState.newPersonalBests.isEmpty() && uiState.otherRecords.isEmpty() && !uiState.isLoading) {
             Box(
@@ -62,6 +80,16 @@ fun RecordsScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
+                uiState.exportSkippedMessage?.let { message ->
+                    item {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                        )
+                    }
+                }
                 item {
                     SectionHeader(title = "New PBs", modifier = Modifier.padding(top = 20.dp))
                 }
@@ -72,7 +100,12 @@ fun RecordsScreen(
                         RecordRow(
                             item = record,
                             isNew = true,
-                            onClick = onRecordClick,
+                            isSelectionMode = isSelectionMode,
+                            isSelected = record.attemptId in uiState.selectedAttemptIds,
+                            onClick = {
+                                if (isSelectionMode) onRecordSelectionToggled(record.attemptId) else onRecordClick(record.segmentId)
+                            },
+                            onLongClick = { onRecordLongPress(record.attemptId) },
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
                         )
                     }
@@ -87,7 +120,12 @@ fun RecordsScreen(
                         RecordRow(
                             item = record,
                             isNew = false,
-                            onClick = onRecordClick,
+                            isSelectionMode = isSelectionMode,
+                            isSelected = record.attemptId in uiState.selectedAttemptIds,
+                            onClick = {
+                                if (isSelectionMode) onRecordSelectionToggled(record.attemptId) else onRecordClick(record.segmentId)
+                            },
+                            onLongClick = { onRecordLongPress(record.attemptId) },
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
                         )
                     }
@@ -157,7 +195,15 @@ private val previewState = RecordsUiState(
 @Composable
 private fun RecordsScreenLightPreview() {
     SegmentAnalyzerTheme(darkTheme = false) {
-        RecordsScreen(uiState = previewState, onPeriodSelected = {}, onRecordClick = {})
+        RecordsScreen(
+            uiState = previewState,
+            onPeriodSelected = {},
+            onRecordClick = {},
+            onRecordLongPress = {},
+            onRecordSelectionToggled = {},
+            onExitSelectionMode = {},
+            onExportClick = {},
+        )
     }
 }
 
@@ -165,6 +211,14 @@ private fun RecordsScreenLightPreview() {
 @Composable
 private fun RecordsScreenDarkPreview() {
     SegmentAnalyzerTheme(darkTheme = true) {
-        RecordsScreen(uiState = previewState, onPeriodSelected = {}, onRecordClick = {})
+        RecordsScreen(
+            uiState = previewState,
+            onPeriodSelected = {},
+            onRecordClick = {},
+            onRecordLongPress = {},
+            onRecordSelectionToggled = {},
+            onExitSelectionMode = {},
+            onExportClick = {},
+        )
     }
 }

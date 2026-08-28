@@ -1,7 +1,7 @@
 package com.segmentanalyzer.feature.history.records.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,8 +27,20 @@ import com.segmentanalyzer.core.ui.SourceTag
 import com.segmentanalyzer.feature.history.records.RecordListItem
 
 @Composable
-fun RecordRow(item: RecordListItem, isNew: Boolean, onClick: (Long) -> Unit, modifier: Modifier = Modifier) {
-    val borderColor = if (isNew) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
+fun RecordRow(
+    item: RecordListItem,
+    isNew: Boolean,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val borderColor = when {
+        isSelected -> MaterialTheme.colorScheme.primary
+        isNew -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.outline
+    }
     val containerColor = if (isNew) {
         MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
     } else {
@@ -37,15 +50,18 @@ fun RecordRow(item: RecordListItem, isNew: Boolean, onClick: (Long) -> Unit, mod
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick(item.segmentId) },
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        border = BorderStroke(1.dp, borderColor),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (isSelectionMode) {
+                Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.padding(end = 4.dp))
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isNew) {
