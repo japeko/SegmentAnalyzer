@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
@@ -165,6 +166,12 @@ private fun WhatItDoes(modifier: Modifier = Modifier) {
             accent = MaterialTheme.colorScheme.tertiary,
             title = "Offline-first",
             description = "Ride history and stats work with no network — import, map tiles, and a ride's live Strava segment list need one.",
+        )
+        FeatureRow(
+            icon = Icons.Filled.Groups,
+            accent = MaterialTheme.colorScheme.primary,
+            title = "Export & compare with friends",
+            description = "Export your records as .fit files, or import a friend's to compare it against your own attempts on the same segment.",
         )
     }
 }

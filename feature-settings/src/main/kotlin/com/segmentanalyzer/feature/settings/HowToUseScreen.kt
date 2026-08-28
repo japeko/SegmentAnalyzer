@@ -88,6 +88,8 @@ fun HowToUseScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
                         "The three fastest attempts (that you haven't excluded) are marked automatically.",
                     "Exclude an attempt" to
                         "Swipe it left to drop it from the chart and personal-best calculation. Swipe an excluded one back in to restore it.",
+                    "Import a guest ride" to
+                        "Tap the +person icon on Segment Detail to bring in a friend's .fit file — matched against this segment, shown in its own Guest Rides section, and never counted toward your own personal best or records.",
                 ),
             )
 
@@ -96,6 +98,8 @@ fun HowToUseScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
                 steps = listOf(
                     "New PBs & other records" to
                         "The Records tab lists every personal best and other segment record, filtered to the period you pick (Week/Month/Year/All Time).",
+                    "Export to FIT" to
+                        "Long-press a record to select one or more, then tap Export to share them as real .fit files — for backup, or to hand to a friend.",
                 ),
             )
 
@@ -105,7 +109,7 @@ fun HowToUseScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
                     "Open a comparison" to
                         "From Segment Detail, tap any attempt to compare it against your personal best and the previous attempt.",
                     "Add or remove rides" to
-                        "Use + Add to bring in another attempt, or dismiss a chip to drop it from the comparison.",
+                        "Use + Add to bring in another attempt — including an imported guest ride, listed under its own Guest Rides section — or dismiss a chip to drop it from the comparison.",
                     "Scrub the charts" to
                         "Drag a finger across the Slope, Speed, or Time Gap chart — the position stays in sync across all three plus the route map.",
                     "AI Insight" to

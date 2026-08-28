@@ -7,9 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Leaderboard
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,22 +61,10 @@ fun UpcomingFeaturesScreen(onBackClick: () -> Unit, modifier: Modifier = Modifie
                 description = "Import rides recorded on Polar devices, alongside Garmin.",
             )
             FeatureRow(
-                icon = Icons.Filled.Groups,
-                accent = MaterialTheme.colorScheme.tertiary,
-                title = "Import a friend's ride",
-                description = "Bring in another rider's exported FIT file so you can compare it against your own attempts.",
-            )
-            FeatureRow(
                 icon = Icons.Filled.Leaderboard,
                 accent = MaterialTheme.colorScheme.primary,
                 title = "Leaderboards",
                 description = "See how your times on a segment compare to other Segment Analyzer users who've shared their attempts.",
-            )
-            FeatureRow(
-                icon = Icons.Filled.Upload,
-                accent = MaterialTheme.colorScheme.tertiary,
-                title = "Export rides to FIT",
-                description = "Pick one or more rides from your history and export them as .fit files.",
             )
         }
     }
